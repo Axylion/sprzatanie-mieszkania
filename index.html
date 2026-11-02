@@ -1,0 +1,317 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8fafc">
+  <title>Sprzątanie mieszkania</title>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, sans-serif;
+      color: #172638;
+      background: #f5f7fa;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main {
+      max-width: 740px;
+      margin: auto;
+      padding: 22px 16px 60px;
+    }
+    h1 { font-size: 30px; margin: 12px 0; }
+    h2 { font-size: 20px; margin: 0 0 16px; }
+    p, li { line-height: 1.65; }
+    .muted { color: #64748b; }
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      color: #2563eb;
+    }
+    .card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 18px;
+      padding: 22px;
+      margin-top: 18px;
+    }
+    .highlight {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+    }
+    .room {
+      font-size: 38px;
+      font-weight: 750;
+      margin: 8px 0;
+    }
+    .schedule-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .schedule-row:last-child { border: 0; }
+    .room-tag {
+      background: #eaf1ff;
+      color: #1d4ed8;
+      padding: 7px 12px;
+      border-radius: 9px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 11px 0;
+      border-bottom: 1px solid #edf0f3;
+      cursor: pointer;
+    }
+    .check-item:last-child { border: 0; }
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      accent-color: #2563eb;
+    }
+    button {
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font: inherit;
+    }
+    footer {
+      margin-top: 30px;
+      text-align: center;
+      color: #64748b;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">CZĘŚCI WSPÓLNE MIESZKANIA</div>
+  <h1>🧹 Sprzątanie mieszkania</h1>
+  <p class="muted">
+    Harmonogram dyżurów, zasady sprzątania
+    i lista obowiązków mieszkańców.
+  </p>
+
+  <section class="card highlight">
+    <div class="eyebrow">NAJBLIŻSZY DYŻUR</div>
+    <div class="room" id="current-room">—</div>
+    <div id="current-date">Ładowanie harmonogramu...</div>
+    <p class="muted">
+      Sprzątanie należy wykonać w wyznaczony weekend.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>📅 Harmonogram</h2>
+    <div id="schedule"></div>
+    <p class="muted">
+      Kolejność dyżurów: 1 → 2 → 3 → 4.
+      Harmonogram jest kontynuowany bez przerw
+      przy zmianie roku.
+    </p>
+  </section>
+
+  <section class="card">
+    <h2>📋 Lista czynności</h2>
+    <p class="muted">
+      Zaznacz wykonane czynności. Lista jest zapisywana
+      wyłącznie na tym urządzeniu.
+    </p>
+    <div id="checklist"></div>
+    <p><button id="reset">Wyczyść zaznaczenia</button></p>
+  </section>
+
+  <section class="card">
+    <h2>🧴 Środki czystości</h2>
+    <p>
+      Osoba pełniąca dyżur zapewnia odpowiednie środki
+      czystości we własnym zakresie.
+    </p>
+    <ul>
+      <li>Płyn do mycia podłóg</li>
+      <li>Środek do czyszczenia łazienki i toalety</li>
+      <li>Płyn do czyszczenia kuchni</li>
+      <li>Płyn do mycia szyb i luster</li>
+      <li>Gąbki, ściereczki i worki na śmieci</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>📖 Zasady sprzątania</h2>
+    <p>
+      Każdy mieszkaniec przeprowadza dokładne sprzątanie
+      części wspólnych raz na cztery tygodnie,
+      w wyznaczony weekend.
+    </p>
+    <p>
+      W przypadku nieobecności można wcześniej uzgodnić
+      zamianę dyżuru z innym mieszkańcem.
+      Żaden termin sprzątania nie powinien zostać pominięty.
+    </p>
+    <p>
+      Niezależnie od dyżuru każdy mieszkaniec powinien
+      na bieżąco sprzątać po sobie.
+      Codzienne utrzymywanie porządku nie zastępuje
+      sprzątania w ramach dyżuru.
+    </p>
+    <p>
+      Uwagi i propozycje zmian można omówić
+      podczas wspólnego spotkania mieszkańców.
+    </p>
+  </section>
+
+  <footer>Sprzątanie mieszkania · Harmonogram mieszkańców</footer>
+</main>
+
+<script>
+  // Data odniesienia: 31.10–01.11.2026, pokój nr 3.
+  const BASE = Date.UTC(2026, 9, 31);
+  const BASE_ROOM = 3;
+  const DAY_MS = 86400000;
+
+  const tasks = [
+    "Umyć kuchenkę i powierzchnie robocze",
+    "Wyczyścić zlew kuchenny",
+    "Umyć blaty i stoły",
+    "Wyczyścić umywalkę, wannę lub prysznic",
+    "Umyć toaletę",
+    "Umyć lustra",
+    "Odkurzyć lub zamieść podłogi",
+    "Umyć podłogi w częściach wspólnych",
+    "Wynieść śmieci i wyczyścić kosze"
+  ];
+
+  function warsawToday() {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Warsaw",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(new Date());
+
+    const value = type => Number(
+      parts.find(part => part.type === type).value
+    );
+
+    return new Date(Date.UTC(
+      value("year"), value("month") - 1, value("day")
+    ));
+  }
+
+  function nextWeekend() {
+    const today = warsawToday();
+    const day = today.getUTCDay();
+
+    // W niedzielę nadal pokazujemy bieżący weekend.
+    const offset = day === 0 ? -1 : (6 - day + 7) % 7;
+
+    return new Date(today.getTime() + offset * DAY_MS);
+  }
+
+  function roomFor(saturday) {
+    const weeks = Math.round(
+      (saturday.getTime() - BASE) / (7 * DAY_MS)
+    );
+    return ((BASE_ROOM - 1 + weeks) % 4 + 4) % 4 + 1;
+  }
+
+  function dateLabel(date) {
+    return new Intl.DateTimeFormat("pl-PL", {
+      day: "numeric", month: "long",
+      timeZone: "UTC"
+    }).format(date);
+  }
+
+  function weekendLabel(saturday) {
+    const sunday = new Date(saturday.getTime() + DAY_MS);
+    return dateLabel(saturday) + " – " + dateLabel(sunday);
+  }
+
+  function renderSchedule() {
+    const start = nextWeekend();
+    const room = roomFor(start);
+
+    document.getElementById("current-room").textContent =
+      "Pokój nr " + room;
+    document.getElementById("current-date").textContent =
+      weekendLabel(start);
+
+    const container = document.getElementById("schedule");
+    container.replaceChildren();
+
+    for (let i = 0; i < 8; i++) {
+      const saturday = new Date(
+        start.getTime() + i * 7 * DAY_MS
+      );
+      const row = document.createElement("div");
+      row.className = "schedule-row";
+
+      const date = document.createElement("span");
+      date.textContent = weekendLabel(saturday);
+
+      const badge = document.createElement("span");
+      badge.className = "room-tag";
+      badge.textContent = "Pokój " + roomFor(saturday);
+
+      row.append(date, badge);
+      container.append(row);
+    }
+  }
+
+  function renderChecklist() {
+    const container = document.getElementById("checklist");
+    let saved = {};
+
+    try {
+      saved = JSON.parse(
+        localStorage.getItem("cleaning-checklist") || "{}"
+      );
+    } catch (_) {}
+
+    container.replaceChildren();
+
+    tasks.forEach((task, index) => {
+      const label = document.createElement("label");
+      label.className = "check-item";
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = Boolean(saved[index]);
+
+      input.addEventListener("change", () => {
+        saved[index] = input.checked;
+        localStorage.setItem(
+          "cleaning-checklist", JSON.stringify(saved)
+        );
+      });
+
+      const span = document.createElement("span");
+      span.textContent = task;
+
+      label.append(input, span);
+      container.append(label);
+    });
+  }
+
+  document.getElementById("reset").addEventListener(
+    "click", () => {
+      localStorage.removeItem("cleaning-checklist");
+      renderChecklist();
+    }
+  );
+
+  renderSchedule();
+  renderChecklist();
+</script>
+</body>
+</html>

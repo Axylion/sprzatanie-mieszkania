@@ -1,197 +1,382 @@
 
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="pl" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f8fafc">
+  <meta name="description" content="Harmonogram i zasady sprzątania mieszkania">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f7fb" id="theme-color">
   <title>Sprzątanie mieszkania</title>
+
+  <script>
+    // Zastosuj motyw przed wyświetleniem strony.
+    const savedTheme = localStorage.getItem("cleaning-theme") || "system";
+    const prefersDark = matchMedia("(prefers-color-scheme: dark)");
+    function effectiveTheme(mode) {
+      return mode === "system"
+        ? (prefersDark.matches ? "dark" : "light")
+        : mode;
+    }
+    document.documentElement.dataset.theme = effectiveTheme(savedTheme);
+  </script>
+
   <style>
     :root {
-      font-family: system-ui, -apple-system, sans-serif;
-      color: #172638;
-      background: #f5f7fa;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-synthesis: none;
+      --bg: #f6f7fb;
+      --surface: #ffffff;
+      --surface-alt: #f1f5f9;
+      --text: #162338;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-bg: #eff6ff;
+      --accent-text: #1d4ed8;
+      --shadow: 0 4px 22px rgba(15, 23, 42, .035);
+      color-scheme: light;
     }
+
+    :root[data-theme="dark"] {
+      --bg: #0e131c;
+      --surface: #19212d;
+      --surface-alt: #222d3c;
+      --text: #edf3fc;
+      --muted: #a1aec0;
+      --border: #313e50;
+      --accent: #82aaff;
+      --accent-bg: #202f49;
+      --accent-text: #b4ceff;
+      --shadow: none;
+      color-scheme: dark;
+    }
+
     * { box-sizing: border-box; }
-    body { margin: 0; }
-    main {
-      max-width: 740px;
-      margin: auto;
-      padding: 22px 16px 60px;
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      transition: background .2s, color .2s;
     }
-    h1 { font-size: 30px; margin: 12px 0; }
-    h2 { font-size: 20px; margin: 0 0 16px; }
-    p, li { line-height: 1.65; }
-    .muted { color: #64748b; }
-    .eyebrow {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1.4px;
-      color: #2563eb;
+    button, select { font: inherit; }
+    button { cursor: pointer; }
+    .container {
+      width: min(100% - 32px, 760px);
+      margin: 0 auto;
     }
-    .card {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 18px;
-      padding: 22px;
-      margin-top: 18px;
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
-    .highlight {
-      background: #eff6ff;
-      border-color: #bfdbfe;
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 0;
     }
-    .room {
-      font-size: 38px;
+    .brand {
+      display: flex;
+      gap: 11px;
+      align-items: center;
       font-weight: 750;
-      margin: 8px 0;
+      font-size: 16px;
     }
+    .brand-icon {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      background: var(--accent-bg);
+      font-size: 22px;
+    }
+    select {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      color: var(--text);
+      max-width: 145px;
+    }
+
+    main { padding: 30px 0 50px; }
+    .intro { margin-bottom: 24px; }
+    h1 {
+      font-size: clamp(27px, 6vw, 35px);
+      letter-spacing: -.8px;
+      margin: 0 0 8px;
+    }
+    .muted { color: var(--muted); }
+    p { line-height: 1.65; }
+    .intro p { margin: 0; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 23px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      background: var(--accent-bg);
+      border-color: transparent;
+    }
+    .eyebrow {
+      color: var(--accent-text);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 750;
+    }
+    .hero-room {
+      font-size: 37px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin: 11px 0 3px;
+    }
+    .hero-date { font-size: 16px; }
+    h2 {
+      font-size: 20px;
+      letter-spacing: -.3px;
+      margin: 0 0 15px;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .schedule-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid #e2e8f0;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border);
     }
-    .schedule-row:last-child { border: 0; }
-    .room-tag {
-      background: #eaf1ff;
-      color: #1d4ed8;
-      padding: 7px 12px;
+    .schedule-row:last-child { border-bottom: none; }
+    .schedule-date { font-size: 14px; }
+    .room-badge {
+      display: inline-block;
       border-radius: 9px;
-      font-weight: 650;
+      padding: 7px 12px;
+      background: var(--surface-alt);
       white-space: nowrap;
+      font-weight: 650;
+      font-size: 13px;
     }
-    .check-item {
+    .schedule-row.active .room-badge {
+      background: var(--accent-bg);
+      color: var(--accent-text);
+    }
+
+    .field-label {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 9px;
+    }
+    .room-buttons {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 9px;
+    }
+    .room-button {
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 12px 5px;
+      background: var(--surface-alt);
+      color: var(--text);
+      font-weight: 650;
+    }
+    .room-button.selected {
+      border-color: var(--accent);
+      background: var(--accent-bg);
+      color: var(--accent-text);
+    }
+    .personal-result {
+      background: var(--surface-alt);
+      padding: 14px;
+      border-radius: 12px;
+      margin-top: 15px;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .notice {
       display: flex;
       align-items: flex-start;
-      gap: 12px;
-      padding: 11px 0;
-      border-bottom: 1px solid #edf0f3;
+      gap: 13px;
+    }
+    .notice-icon { font-size: 25px; }
+    .notice p { margin: 4px 0 0; font-size: 14px; }
+
+    details {
+      border-top: 1px solid var(--border);
+      padding: 15px 0;
+    }
+    details:first-of-type { border-top: none; }
+    summary {
       cursor: pointer;
+      font-weight: 650;
+      list-style-position: outside;
+      padding-left: 4px;
     }
-    .check-item:last-child { border: 0; }
-    input[type="checkbox"] {
-      width: 20px;
-      height: 20px;
-      flex-shrink: 0;
-      accent-color: #2563eb;
+    details p {
+      margin: 12px 0 0;
+      font-size: 14px;
+      color: var(--muted);
     }
-    button {
-      background: white;
-      border: 1px solid #cbd5e1;
-      border-radius: 9px;
-      padding: 10px 14px;
-      cursor: pointer;
-      font: inherit;
-    }
+    .card > p:last-child { margin-bottom: 0; }
     footer {
-      margin-top: 30px;
+      padding: 0 0 30px;
       text-align: center;
-      color: #64748b;
       font-size: 12px;
+      color: var(--muted);
+    }
+
+    @media(max-width: 480px) {
+      .container { width: min(100% - 24px, 760px); }
+      .brand { font-size: 14px; }
+      .brand-icon { width: 37px; height: 37px; }
+      .card { padding: 19px; }
+      main { padding-top: 25px; }
     }
   </style>
 </head>
+
 <body>
-<main>
-  <div class="eyebrow">CZĘŚCI WSPÓLNE MIESZKANIA</div>
-  <h1>🧹 Sprzątanie mieszkania</h1>
-  <p class="muted">
-    Harmonogram dyżurów, zasady sprzątania
-    i lista obowiązków mieszkańców.
-  </p>
+<header>
+  <div class="container header-inner">
+    <div class="brand">
+      <span class="brand-icon">🧹</span>
+      <span>Sprzątanie mieszkania</span>
+    </div>
+    <select id="theme-select" aria-label="Motyw strony">
+      <option value="system">⚙ Systemowy</option>
+      <option value="light">☀ Jasny</option>
+      <option value="dark">☾ Ciemny</option>
+    </select>
+  </div>
+</header>
 
-  <section class="card highlight">
-    <div class="eyebrow">NAJBLIŻSZY DYŻUR</div>
-    <div class="room" id="current-room">—</div>
-    <div id="current-date">Ładowanie harmonogramu...</div>
+<main class="container">
+  <div class="intro">
+    <h1>Harmonogram sprzątania</h1>
     <p class="muted">
-      Sprzątanie należy wykonać w wyznaczony weekend.
+      Wspólny porządek, wspólna odpowiedzialność.
     </p>
+  </div>
+
+  <section class="card hero">
+    <div class="eyebrow">Najbliższy dyżur</div>
+    <div class="hero-room" id="next-room">—</div>
+    <div class="hero-date" id="next-date">—</div>
+    <p>Sprzątanie części wspólnych odbywa się w weekend.</p>
   </section>
 
   <section class="card">
-    <h2>📅 Harmonogram</h2>
+    <h2>📅 Nadchodzące dyżury</h2>
     <div id="schedule"></div>
-    <p class="muted">
-      Kolejność dyżurów: 1 → 2 → 3 → 4.
-      Harmonogram jest kontynuowany bez przerw
-      przy zmianie roku.
+    <p class="muted" style="font-size:13px">
+      Kolejność: 1 → 2 → 3 → 4.
+      Harmonogram jest kontynuowany bez przerw,
+      również po zmianie roku.
     </p>
   </section>
 
   <section class="card">
-    <h2>📋 Lista czynności</h2>
-    <p class="muted">
-      Zaznacz wykonane czynności. Lista jest zapisywana
-      wyłącznie na tym urządzeniu.
+    <h2>🏠 Mój pokój</h2>
+    <label class="field-label">
+      Wybierz numer swojego pokoju:
+    </label>
+    <div class="room-buttons" id="room-buttons"></div>
+    <div class="personal-result" id="personal-result">
+      Wybierz pokój, aby zobaczyć swój najbliższy dyżur.
+    </div>
+    <p class="muted" style="font-size:12px">
+      Twój wybór zostanie zapamiętany na tym urządzeniu.
     </p>
-    <div id="checklist"></div>
-    <p><button id="reset">Wyczyść zaznaczenia</button></p>
   </section>
 
-  <section class="card">
-    <h2>🧴 Środki czystości</h2>
-    <p>
-      Osoba pełniąca dyżur zapewnia odpowiednie środki
-      czystości we własnym zakresie.
-    </p>
-    <ul>
-      <li>Płyn do mycia podłóg</li>
-      <li>Środek do czyszczenia łazienki i toalety</li>
-      <li>Płyn do czyszczenia kuchni</li>
-      <li>Płyn do mycia szyb i luster</li>
-      <li>Gąbki, ściereczki i worki na śmieci</li>
-    </ul>
+  <section class="card notice">
+    <div class="notice-icon">🔔</div>
+    <div>
+      <strong>Powiadomienia o dyżurze</strong>
+      <p class="muted">
+        Wkrótce będzie można włączyć przypomnienia
+        na telefon. Planowana godzina wysyłki:
+        piątek, 12:00.
+      </p>
+    </div>
   </section>
 
   <section class="card">
     <h2>📖 Zasady sprzątania</h2>
-    <p>
-      Każdy mieszkaniec przeprowadza dokładne sprzątanie
-      części wspólnych raz na cztery tygodnie,
-      w wyznaczony weekend.
-    </p>
-    <p>
-      W przypadku nieobecności można wcześniej uzgodnić
-      zamianę dyżuru z innym mieszkańcem.
-      Żaden termin sprzątania nie powinien zostać pominięty.
-    </p>
-    <p>
-      Niezależnie od dyżuru każdy mieszkaniec powinien
-      na bieżąco sprzątać po sobie.
-      Codzienne utrzymywanie porządku nie zastępuje
-      sprzątania w ramach dyżuru.
-    </p>
-    <p>
-      Uwagi i propozycje zmian można omówić
-      podczas wspólnego spotkania mieszkańców.
-    </p>
-  </section>
 
-  <footer>Sprzątanie mieszkania · Harmonogram mieszkańców</footer>
+    <details>
+      <summary>Dyżury weekendowe</summary>
+      <p>
+        Każdy mieszkaniec przeprowadza dokładne sprzątanie
+        części wspólnych raz na cztery tygodnie,
+        zgodnie z harmonogramem.
+        Do sprzątania należy zapewnić odpowiednie
+        środki czystości we własnym zakresie.
+      </p>
+    </details>
+
+    <details>
+      <summary>Codzienne utrzymywanie porządku</summary>
+      <p>
+        Niezależnie od dyżuru każdy mieszkaniec
+        sprząta po sobie. Dotyczy to między innymi
+        kuchenki, piekarnika, blatów, stołów,
+        zlewu oraz innych używanych powierzchni.
+        Codzienne utrzymywanie porządku
+        nie zastępuje sprzątania weekendowego.
+      </p>
+    </details>
+
+    <details>
+      <summary>Zamiana dyżurów</summary>
+      <p>
+        Jeżeli ktoś nie może sprzątać w wyznaczonym
+        terminie, może wcześniej uzgodnić zamianę
+        z innym mieszkańcem.
+        Ważne, aby żaden dyżur nie został pominięty.
+      </p>
+    </details>
+
+    <details>
+      <summary>Uwagi i propozycje</summary>
+      <p>
+        Harmonogram powstał na podstawie wcześniejszych
+        wspólnych ustaleń mieszkańców.
+        W razie uwag lub propozycji zmian
+        możemy omówić je wspólnie i uzgodnić
+        rozwiązanie odpowiadające wszystkim.
+      </p>
+    </details>
+  </section>
 </main>
 
+<footer>
+  Sprzątanie mieszkania · Wspólna przestrzeń
+</footer>
+
 <script>
-  // Data odniesienia: 31.10–01.11.2026, pokój nr 3.
+  // Punkt odniesienia: 31.10–01.11.2026, pokój nr 3.
   const BASE = Date.UTC(2026, 9, 31);
-  const BASE_ROOM = 3;
-  const DAY_MS = 86400000;
+  const WEEK = 7 * 86400000;
 
-  const tasks = [
-    "Umyć kuchenkę i powierzchnie robocze",
-    "Wyczyścić zlew kuchenny",
-    "Umyć blaty i stoły",
-    "Wyczyścić umywalkę, wannę lub prysznic",
-    "Umyć toaletę",
-    "Umyć lustra",
-    "Odkurzyć lub zamieść podłogi",
-    "Umyć podłogi w częściach wspólnych",
-    "Wynieść śmieci i wyczyścić kosze"
-  ];
-
-  function warsawToday() {
+  function todayInPoland() {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: "Europe/Warsaw",
       year: "numeric",
@@ -199,68 +384,68 @@
       day: "2-digit"
     }).formatToParts(new Date());
 
-    const value = type => Number(
-      parts.find(part => part.type === type).value
+    const n = type => Number(
+      parts.find(p => p.type === type).value
     );
 
-    return new Date(Date.UTC(
-      value("year"), value("month") - 1, value("day")
-    ));
+    return Date.UTC(n("year"), n("month") - 1, n("day"));
   }
 
-  function nextWeekend() {
-    const today = warsawToday();
-    const day = today.getUTCDay();
-
-    // W niedzielę nadal pokazujemy bieżący weekend.
+  function nearestSaturday() {
+    const today = todayInPoland();
+    const day = new Date(today).getUTCDay();
     const offset = day === 0 ? -1 : (6 - day + 7) % 7;
-
-    return new Date(today.getTime() + offset * DAY_MS);
+    return today + offset * 86400000;
   }
 
   function roomFor(saturday) {
-    const weeks = Math.round(
-      (saturday.getTime() - BASE) / (7 * DAY_MS)
-    );
-    return ((BASE_ROOM - 1 + weeks) % 4 + 4) % 4 + 1;
+    const weeks = Math.round((saturday - BASE) / WEEK);
+    return ((weeks + 2) % 4 + 4) % 4 + 1;
   }
 
-  function dateLabel(date) {
+  function dateText(timestamp) {
     return new Intl.DateTimeFormat("pl-PL", {
-      day: "numeric", month: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
       timeZone: "UTC"
-    }).format(date);
+    }).format(new Date(timestamp));
   }
 
-  function weekendLabel(saturday) {
-    const sunday = new Date(saturday.getTime() + DAY_MS);
-    return dateLabel(saturday) + " – " + dateLabel(sunday);
+  function weekendText(saturday) {
+    const end = saturday + 86400000;
+    const from = new Date(saturday);
+    const to = new Date(end);
+
+    if (from.getUTCMonth() === to.getUTCMonth()
+        && from.getUTCFullYear() === to.getUTCFullYear()) {
+      return from.getUTCDate() + "–" + dateText(end);
+    }
+    return dateText(saturday) + " – " + dateText(end);
   }
 
-  function renderSchedule() {
-    const start = nextWeekend();
-    const room = roomFor(start);
+  const start = nearestSaturday();
 
-    document.getElementById("current-room").textContent =
-      "Pokój nr " + room;
-    document.getElementById("current-date").textContent =
-      weekendLabel(start);
+  function showSchedule() {
+    document.getElementById("next-room").textContent =
+      "Pokój nr " + roomFor(start);
+    document.getElementById("next-date").textContent =
+      weekendText(start);
 
     const container = document.getElementById("schedule");
     container.replaceChildren();
 
     for (let i = 0; i < 8; i++) {
-      const saturday = new Date(
-        start.getTime() + i * 7 * DAY_MS
-      );
+      const saturday = start + i * WEEK;
       const row = document.createElement("div");
-      row.className = "schedule-row";
+      row.className = "schedule-row" + (i === 0 ? " active" : "");
 
       const date = document.createElement("span");
-      date.textContent = weekendLabel(saturday);
+      date.className = "schedule-date";
+      date.textContent = weekendText(saturday);
 
       const badge = document.createElement("span");
-      badge.className = "room-tag";
+      badge.className = "room-badge";
       badge.textContent = "Pokój " + roomFor(saturday);
 
       row.append(date, badge);
@@ -268,50 +453,73 @@
     }
   }
 
-  function renderChecklist() {
-    const container = document.getElementById("checklist");
-    let saved = {};
+  let selectedRoom = localStorage.getItem("cleaning-room") || "";
 
-    try {
-      saved = JSON.parse(
-        localStorage.getItem("cleaning-checklist") || "{}"
-      );
-    } catch (_) {}
-
+  function showRoomSelection() {
+    const container = document.getElementById("room-buttons");
     container.replaceChildren();
 
-    tasks.forEach((task, index) => {
-      const label = document.createElement("label");
-      label.className = "check-item";
+    for (let room = 1; room <= 4; room++) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "room-button";
+      if (selectedRoom === String(room)) {
+        button.classList.add("selected");
+      }
+      button.textContent = "Pokój " + room;
+      button.setAttribute(
+        "aria-pressed", selectedRoom === String(room)
+      );
 
-      const input = document.createElement("input");
-      input.type = "checkbox";
-      input.checked = Boolean(saved[index]);
-
-      input.addEventListener("change", () => {
-        saved[index] = input.checked;
-        localStorage.setItem(
-          "cleaning-checklist", JSON.stringify(saved)
-        );
+      button.addEventListener("click", () => {
+        selectedRoom = String(room);
+        localStorage.setItem("cleaning-room", selectedRoom);
+        showRoomSelection();
       });
 
-      const span = document.createElement("span");
-      span.textContent = task;
+      container.append(button);
+    }
 
-      label.append(input, span);
-      container.append(label);
-    });
+    const result = document.getElementById("personal-result");
+    if (!selectedRoom || !["1", "2", "3", "4"].includes(selectedRoom)) {
+      result.textContent =
+        "Wybierz pokój, aby zobaczyć swój najbliższy dyżur.";
+      return;
+    }
+
+    let saturday = start;
+    while (roomFor(saturday) !== Number(selectedRoom)) {
+      saturday += WEEK;
+    }
+
+    result.textContent =
+      "Najbliższy dyżur pokoju nr " + selectedRoom +
+      ": " + weekendText(saturday) + ".";
   }
 
-  document.getElementById("reset").addEventListener(
-    "click", () => {
-      localStorage.removeItem("cleaning-checklist");
-      renderChecklist();
-    }
-  );
+  const themeSelect = document.getElementById("theme-select");
+  themeSelect.value = ["system", "light", "dark"]
+    .includes(savedTheme) ? savedTheme : "system";
 
-  renderSchedule();
-  renderChecklist();
+  function applyTheme(mode) {
+    const actual = effectiveTheme(mode);
+    document.documentElement.dataset.theme = actual;
+    document.getElementById("theme-color").content =
+      actual === "dark" ? "#0e131c" : "#f6f7fb";
+  }
+
+  themeSelect.addEventListener("change", () => {
+    localStorage.setItem("cleaning-theme", themeSelect.value);
+    applyTheme(themeSelect.value);
+  });
+
+  prefersDark.addEventListener("change", () => {
+    if (themeSelect.value === "system") applyTheme("system");
+  });
+
+  applyTheme(themeSelect.value);
+  showSchedule();
+  showRoomSelection();
 </script>
 </body>
 </html>

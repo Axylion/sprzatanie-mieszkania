@@ -250,6 +250,26 @@
       .card { padding: 19px; }
       main { padding-top: 25px; }
     }
+    .schedule-row[hidden] {
+  display: none;
+}
+
+.schedule-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-alt);
+  color: var(--accent-text);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.schedule-toggle:hover {
+  background: var(--accent-bg);
+}
   </style>
 </head>
 
@@ -286,6 +306,10 @@
   <section class="card">
     <h2>📅 Nadchodzące dyżury</h2>
     <div id="schedule"></div>
+    <button id="toggle-schedule" class="schedule-toggle"
+        type="button" aria-expanded="false">
+      Pokaż więcej ↓
+    </button>
     <p class="muted" style="font-size:13px">
       Kolejność: 1 → 2 → 3 → 4.
       Harmonogram jest kontynuowany bez przerw,
@@ -436,7 +460,7 @@
     const container = document.getElementById("schedule");
     container.replaceChildren();
 
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 12; i++) {
       const saturday = start + i * WEEK;
       const row = document.createElement("div");
       row.className = "schedule-row" + (i === 0 ? " active" : "");
@@ -453,7 +477,29 @@
       container.append(row);
     }
   }
-
+  const toggleSchedule = document.getElementById("toggle-schedule");
+  let scheduleExpanded = false;
+  
+  function updateScheduleVisibility() {
+    const rows = document.querySelectorAll("#schedule .schedule-row");
+  
+    rows.forEach((row, index) => {
+      row.hidden = !scheduleExpanded && index >= 4;
+    });
+  
+    toggleSchedule.textContent = scheduleExpanded
+      ? "Pokaż mniej ↑"
+      : "Pokaż więcej ↓";
+  
+    toggleSchedule.setAttribute(
+      "aria-expanded", String(scheduleExpanded)
+    );
+  }
+  
+  toggleSchedule.addEventListener("click", () => {
+    scheduleExpanded = !scheduleExpanded;
+    updateScheduleVisibility();
+  });
   let selectedRoom = localStorage.getItem("cleaning-room") || "";
 
   function showRoomSelection() {
@@ -520,6 +566,7 @@
 
   applyTheme(themeSelect.value);
   showSchedule();
+  updateScheduleVisibility();
   showRoomSelection();
 </script>
 </body>

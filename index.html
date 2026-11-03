@@ -9,6 +9,8 @@
   <meta name="theme-color" content="#f6f7fb" id="theme-color">
   <title>Goleszan 19</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="manifest" href="./manifest.webmanifest">
 
   <script>
     // Zastosuj motyw przed wyświetleniem strony.
@@ -95,6 +97,11 @@
       white-space: nowrap;
     }
     .shortcut-button:hover { background: var(--accent-bg); }
+    .shortcut-button[hidden] { display: none !important; }
+    .shortcut-button { display: none; }
+    @media (hover: none) and (pointer: coarse) {
+      .shortcut-button { display: inline-flex; align-items: center; gap: 6px; }
+    }
     .shortcut-help {
       border: 1px solid var(--border);
       background: var(--surface);
@@ -374,7 +381,7 @@
       <span>Sprzątanie mieszkania</span>
     </div>
     <div class="header-actions">
-      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog">⌂ Dodaj skrót</button>
+      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Dodaj Goleszan 19 na ekran główny">📱 Na telefon</button>
       <select id="theme-select" aria-label="Motyw strony">
         <option value="system">⚙ Systemowy</option>
         <option value="light">☀ Jasny</option>
@@ -385,21 +392,26 @@
 </header>
 
 <dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
-  <h2 id="shortcut-title">🏠 Skrót na ekranie głównym</h2>
-  <p>Dodaj skrót do tej strony. Nie musisz instalować żadnej aplikacji.</p>
-  <strong>Android (Chrome)</strong>
-  <ol>
-    <li>Otwórz tę stronę w przeglądarce Chrome.</li>
-    <li>Otwórz menu <strong>⋮</strong> i wybierz <strong>Zainstaluj i utwórz skrót</strong> (w innych wersjach: <strong>Dodaj do ekranu głównego</strong>).</li>
-    <li>Wybierz utworzenie skrótu i zatwierdź.</li>
-  </ol>
-  <strong>iPhone (Safari)</strong>
-  <ol>
-    <li>Otwórz tę stronę w Safari.</li>
-    <li>Dotknij <strong>Udostępnij</strong>, a następnie <strong>Do ekranu początkowego</strong>.</li>
-    <li>Zatwierdź przyciskiem <strong>Dodaj</strong>.</li>
-  </ol>
-  <p>Wygląd i nazwy opcji mogą różnić się zależnie od przeglądarki.</p>
+  <h2 id="shortcut-title">🏠 Dodaj Goleszan 19 na ekran główny</h2>
+  <p>Otwieraj harmonogram jednym dotknięciem. Po włączeniu powiadomień będziesz mógł również otrzymywać przypomnienia i ważne informacje. Bez pobierania ze sklepu.</p>
+  <div id="android-install-instructions">
+    <strong>Android (Chrome)</strong>
+    <ol>
+      <li>Otwórz stronę w Chrome.</li>
+      <li>Wybierz menu <strong>⋮ → Zainstaluj i utwórz skrót</strong> (nazwa może się różnić).</li>
+      <li>Wybierz <strong>Zainstaluj</strong> i zatwierdź.</li>
+    </ol>
+    <button type="button" class="shortcut-close" id="native-install" hidden>Zainstaluj</button>
+  </div>
+  <div id="ios-install-instructions">
+    <strong>iPhone (Safari)</strong>
+    <ol>
+      <li>Otwórz stronę w Safari.</li>
+      <li>Wybierz <strong>Udostępnij → Do ekranu początkowego</strong>.</li>
+      <li>Jeśli pojawi się taka opcja, włącz <strong>Otwórz jako aplikację webową</strong>, a następnie wybierz <strong>Dodaj</strong>.</li>
+    </ol>
+  </div>
+  <p>To strona internetowa dodawana na ekran telefonu. Zgoda na powiadomienia będzie wymagana oddzielnie, gdy je uruchomimy.</p>
   <button type="button" class="shortcut-close" id="shortcut-close">Zamknij</button>
 </dialog>
 
@@ -816,8 +828,39 @@ result.append(description, date, ".");
   loadAnnouncements();
 
   const shortcutHelp = document.getElementById("shortcut-help");
-  document.getElementById("shortcut-open").addEventListener("click", () => {
-    shortcutHelp.showModal();
+  const shortcutButton = document.getElementById("shortcut-open");
+  const nativeInstallButton = document.getElementById("native-install");
+  let deferredInstallPrompt = null;
+  const isStandalone = () =>
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+  const updateInstallVisibility = () => {
+    shortcutButton.hidden = isStandalone();
+  };
+  updateInstallVisibility();
+
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    nativeInstallButton.hidden = false;
+  });
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    nativeInstallButton.hidden = true;
+    shortcutHelp.close();
+    shortcutButton.hidden = true;
+  });
+  window.matchMedia("(display-mode: standalone)").addEventListener("change", updateInstallVisibility);
+
+  shortcutButton.addEventListener("click", () => {
+    if (!isStandalone()) shortcutHelp.showModal();
+  });
+  nativeInstallButton.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    const promptEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    nativeInstallButton.hidden = true;
+    await promptEvent.prompt();
   });
   document.getElementById("shortcut-close").addEventListener("click", () => {
     shortcutHelp.close();
@@ -825,6 +868,14 @@ result.append(description, date, ".");
   shortcutHelp.addEventListener("click", event => {
     if (event.target === shortcutHelp) shortcutHelp.close();
   });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {
+        // Serwis pozostaje dostępny w przeglądarce bez trybu offline.
+      });
+    });
+  }
 </script>
 </body>
 </html>

@@ -176,6 +176,23 @@
       background: var(--accent-bg);
       color: var(--accent-text);
     }
+    
+    /* Podświetlenie dyżurów wybranego pokoju */
+    .schedule-row.my-room {
+      background: var(--accent-bg);
+      border-radius: 9px;
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+    
+    .schedule-row.my-room .room-badge {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    
+    :root[data-theme="dark"] .schedule-row.my-room .room-badge {
+      color: #0e131c;
+    }
 
     .field-label {
       display: block;
@@ -504,6 +521,17 @@
   function showRoomSelection() {
     const container = document.getElementById("room-buttons");
     container.replaceChildren();
+    
+    // Podświetl dyżury wybranego pokoju.
+    document.querySelectorAll("#schedule .schedule-row")
+      .forEach((row, index) => {
+        const saturday = start + index * WEEK;
+        const isMyRoom = selectedRoom !== "" &&
+          roomFor(saturday) === Number(selectedRoom);
+
+        row.classList.toggle("my-room", isMyRoom);
+      });
+
 
     for (let room = 1; room <= 4; room++) {
       const button = document.createElement("button");
@@ -567,6 +595,14 @@
   showSchedule();
   updateScheduleVisibility();
   showRoomSelection();
+  // Umieść sekcję "Mój pokój" przed harmonogramem.
+  const roomCard = document.getElementById("room-buttons")
+    .closest(".card");
+  
+  const scheduleCard = document.getElementById("schedule")
+    .closest(".card");
+  
+  scheduleCard.before(roomCard);
 </script>
 </body>
 </html>

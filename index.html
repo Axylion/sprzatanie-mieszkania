@@ -7,7 +7,8 @@
   <meta name="description" content="Harmonogram i zasady sprzątania mieszkania">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7fb" id="theme-color">
-  <title>Sprzątanie mieszkania</title>
+  <title>Goleszan 19</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
 
   <script>
     // Zastosuj motyw przed wyświetleniem strony.
@@ -82,6 +83,38 @@
       justify-content: space-between;
       gap: 16px;
       padding: 16px 0;
+    }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .shortcut-button {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface-alt);
+      color: var(--text);
+      font-weight: 650;
+      white-space: nowrap;
+    }
+    .shortcut-button:hover { background: var(--accent-bg); }
+    .shortcut-help {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 22px;
+      width: min(90vw, 440px);
+      box-shadow: 0 16px 70px rgba(0,0,0,.25);
+    }
+    .shortcut-help::backdrop { background: rgba(0,0,0,.55); }
+    .shortcut-help h2 { margin-top: 0; }
+    .shortcut-help ol { padding-left: 22px; line-height: 1.7; }
+    .shortcut-help p { line-height: 1.6; color: var(--muted); }
+    .shortcut-close {
+      background: var(--accent-bg);
+      color: var(--accent-text);
+      border: 0;
+      border-radius: 9px;
+      padding: 11px 16px;
+      font-weight: 650;
     }
     .brand {
       display: flex;
@@ -303,6 +336,10 @@
       .container { width: min(100% - 24px, 760px); }
       .brand { font-size: 14px; }
       .brand-icon { width: 37px; height: 37px; }
+      .header-actions { gap: 5px; }
+      .shortcut-button { font-size: 12px; padding: 10px 8px; }
+      select#theme-select { max-width: 110px; font-size: 12px; padding: 9px 5px; }
+      .brand > span:last-child { max-width: 110px; line-height: 1.15; }
       .card { padding: 19px; }
       main { padding-top: 25px; }
     }
@@ -336,13 +373,35 @@
       <span class="brand-icon">🧹</span>
       <span>Sprzątanie mieszkania</span>
     </div>
-    <select id="theme-select" aria-label="Motyw strony">
-      <option value="system">⚙ Systemowy</option>
-      <option value="light">☀ Jasny</option>
-      <option value="dark">☾ Ciemny</option>
-    </select>
+    <div class="header-actions">
+      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog">⌂ Dodaj skrót</button>
+      <select id="theme-select" aria-label="Motyw strony">
+        <option value="system">⚙ Systemowy</option>
+        <option value="light">☀ Jasny</option>
+        <option value="dark">☾ Ciemny</option>
+      </select>
+    </div>
   </div>
 </header>
+
+<dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
+  <h2 id="shortcut-title">🏠 Skrót na ekranie głównym</h2>
+  <p>Dodaj skrót do tej strony. Nie musisz instalować żadnej aplikacji.</p>
+  <strong>Android (Chrome)</strong>
+  <ol>
+    <li>Otwórz tę stronę w przeglądarce Chrome.</li>
+    <li>Otwórz menu <strong>⋮</strong> i wybierz <strong>Dodaj do ekranu głównego</strong>.</li>
+    <li>Wybierz utworzenie skrótu i zatwierdź.</li>
+  </ol>
+  <strong>iPhone (Safari)</strong>
+  <ol>
+    <li>Otwórz tę stronę w Safari.</li>
+    <li>Dotknij <strong>Udostępnij</strong>, a następnie <strong>Do ekranu początkowego</strong>.</li>
+    <li>Zatwierdź przyciskiem <strong>Dodaj</strong>.</li>
+  </ol>
+  <p>Wygląd i nazwy opcji mogą różnić się zależnie od przeglądarki.</p>
+  <button type="button" class="shortcut-close" id="shortcut-close">Zamknij</button>
+</dialog>
 
 <main class="container">
   <div class="intro">
@@ -755,6 +814,17 @@ result.append(description, date, ".");
     }
   }
   loadAnnouncements();
+
+  const shortcutHelp = document.getElementById("shortcut-help");
+  document.getElementById("shortcut-open").addEventListener("click", () => {
+    shortcutHelp.showModal();
+  });
+  document.getElementById("shortcut-close").addEventListener("click", () => {
+    shortcutHelp.close();
+  });
+  shortcutHelp.addEventListener("click", event => {
+    if (event.target === shortcutHelp) shortcutHelp.close();
+  });
 </script>
 </body>
 </html>

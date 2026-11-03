@@ -38,6 +38,11 @@
       color-scheme: light;
     }
 
+    .personal-result .duty-date {
+      color: #fb923c;
+      font-weight: 600;
+    }
+
     :root[data-theme="dark"] {
       --bg: #0e131c;
       --surface: #19212d;
@@ -563,9 +568,17 @@
       saturday += WEEK;
     }
 
-    result.textContent =
-      "Najbliższy dyżur pokoju nr " + selectedRoom +
-      ": " + weekendText(saturday) + ".";
+    result.replaceChildren();
+
+    const description = document.createTextNode(
+      "Najbliższy dyżur pokoju nr " + selectedRoom + ": "
+    );
+
+const date = document.createElement("span");
+date.className = "duty-date";
+date.textContent = weekendText(saturday);
+
+result.append(description, date, ".");
   }
 
   const themeSelect = document.getElementById("theme-select");

@@ -29,6 +29,7 @@ test('PWA v3 to v4 update under the GitHub Pages subpath', async () => {
   const browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
   const context = await browser.newContext();
   const page = await context.newPage();
+  await page.clock.install({time:new Date('2026-11-04T12:00:00Z')});
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}${prefix}`);
     await page.evaluate(() => navigator.serviceWorker.ready);
@@ -88,6 +89,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
   const browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
   const context = await browser.newContext();
   const page = await context.newPage();
+  await page.clock.install({time:new Date('2026-11-04T12:00:00Z')});
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   const url = `http://127.0.0.1:${server.address().port}/`;
@@ -194,6 +196,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     // Verify the shipped, explicitly labelled sample really overflows on desktop.
     data = JSON.parse(fs.readFileSync(path.join(root,'announcements.json'),'utf8'));
     assert.equal(data.length, 1);
+    assert.equal(data[0].expiresAt, '2026-11-16T00:00:00+01:00');
     assert.match(data[0].body, /TO JEST OGŁOSZENIE TESTOWE/);
     await page.reload();
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);

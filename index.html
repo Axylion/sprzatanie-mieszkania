@@ -83,10 +83,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 16px;
+      gap: 8px;
+      flex-wrap: wrap;
       padding: 16px 0;
     }
-    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
     .shortcut-button {
       padding: 10px 12px;
       border: 1px solid var(--border);
@@ -98,10 +99,7 @@
     }
     .shortcut-button:hover { background: var(--accent-bg); }
     .shortcut-button[hidden] { display: none !important; }
-    .shortcut-button { display: none; }
-    @media (hover: none) and (pointer: coarse) {
-      .shortcut-button { display: inline-flex; align-items: center; gap: 6px; }
-    }
+    .shortcut-button { display: inline-flex; align-items: center; gap: 6px; }
     .shortcut-help {
       border: 1px solid var(--border);
       background: var(--surface);
@@ -130,9 +128,21 @@
       font-weight: 750;
       font-size: 16px;
     }
+    .brand > span:last-child { white-space: nowrap; }
+    .theme-picker { position: relative; width: 44px; height: 42px; }
+    .theme-icon {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      pointer-events: none; font-size: 20px;
+    }
+    #theme-select {
+      width: 100%; height: 100%; padding: 0; cursor: pointer;
+      appearance: none; color: transparent;
+    }
+    #theme-select option { color: var(--text); }
     .brand-icon {
       display: grid;
       place-items: center;
+      flex-shrink: 0;
       width: 42px;
       height: 42px;
       border-radius: 13px;
@@ -345,8 +355,7 @@
       .brand-icon { width: 37px; height: 37px; }
       .header-actions { gap: 5px; }
       .shortcut-button { font-size: 12px; padding: 10px 8px; }
-      select#theme-select { max-width: 110px; font-size: 12px; padding: 9px 5px; }
-      .brand > span:last-child { max-width: 110px; line-height: 1.15; }
+      .brand > span:last-child { line-height: 1.15; }
       .card { padding: 19px; }
       main { padding-top: 25px; }
     }
@@ -382,26 +391,28 @@
     </div>
     <div class="header-actions">
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Dodaj Goleszan 19 na ekran główny">📱 Na telefon</button>
+      <div class="theme-picker">
+      <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
       <select id="theme-select" aria-label="Motyw strony">
         <option value="system">⚙ Systemowy</option>
         <option value="light">☀ Jasny</option>
         <option value="dark">☾ Ciemny</option>
       </select>
+      </div>
     </div>
   </div>
 </header>
 
 <dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
   <h2 id="shortcut-title">🏠 Dodaj Goleszan 19 na ekran główny</h2>
-  <p>Otwieraj harmonogram jednym dotknięciem. Po włączeniu powiadomień będziesz mógł również otrzymywać przypomnienia i ważne informacje. Bez pobierania ze sklepu.</p>
+  <p>Zainstalowana aplikacja otwiera harmonogram bez interfejsu przeglądarki i działa również offline po pierwszym wczytaniu. Powiadomienia push nie są jeszcze aktywne.</p>
   <div id="android-install-instructions">
     <strong>Android (Chrome)</strong>
     <ol>
       <li>Otwórz stronę w Chrome.</li>
-      <li>Wybierz menu <strong>⋮ → Zainstaluj i utwórz skrót</strong> (nazwa może się różnić).</li>
-      <li>Wybierz <strong>Zainstaluj</strong> i zatwierdź.</li>
+      <li>W menu <strong>⋮</strong> poszukaj opcji <strong>Zainstaluj aplikację</strong> (nazwa może się różnić).</li>
+      <li>Jeśli opcja instalacji jest dostępna, wybierz <strong>Zainstaluj</strong> i zatwierdź. Sam skrót strony nie oznacza instalacji aplikacji PWA.</li>
     </ol>
-    <button type="button" class="shortcut-close" id="native-install" hidden>Zainstaluj</button>
   </div>
   <div id="ios-install-instructions">
     <strong>iPhone (Safari)</strong>
@@ -411,11 +422,26 @@
       <li>Jeśli pojawi się taka opcja, włącz <strong>Otwórz jako aplikację webową</strong>, a następnie wybierz <strong>Dodaj</strong>.</li>
     </ol>
   </div>
-  <p>To strona internetowa dodawana na ekran telefonu. Zgoda na powiadomienia będzie wymagana oddzielnie, gdy je uruchomimy.</p>
+  <p id="other-install-instructions" hidden>Ta przeglądarka może nie obsługiwać instalacji PWA. Otwórz stronę w Chrome na Androidzie lub Safari na iPhonie i sprawdź dostępne opcje. Jeśli przeglądarka nie oferuje instalacji aplikacji webowej, możesz nadal korzystać ze strony w przeglądarce.</p>
+  <p>Możliwość instalacji zależy od przeglądarki. Jeśli opcja nie jest dostępna, korzystaj ze strony w przeglądarce. Ogłoszenia wymagają połączenia z internetem.</p>
+  <button type="button" class="shortcut-close" id="native-install" hidden>Zainstaluj</button>
   <button type="button" class="shortcut-close" id="shortcut-close">Zamknij</button>
 </dialog>
 
 <main class="container">
+  <section class="card announcement-card" id="announcements-card">
+    <details id="announcements-details">
+      <summary aria-label="Ważne ogłoszenia">
+        <span aria-hidden="true">📢</span>
+        <span class="announcement-heading">Ważne ogłoszenia</span>
+        <span id="announcement-count" class="announcement-count" aria-live="polite"></span>
+        <span class="announcement-chevron" aria-hidden="true">⌄</span>
+      </summary>
+      <p class="announcement-status" id="announcements-status" role="status">Wczytywanie ogłoszeń…</p>
+      <div class="announcements-list" id="announcements-list"></div>
+    </details>
+  </section>
+
   <div class="intro">
     <h1>Harmonogram sprzątania</h1>
     <p class="muted">
@@ -428,20 +454,6 @@
     <div class="hero-room" id="next-room">—</div>
     <div class="hero-date" id="next-date">—</div>
     <p>Sprzątanie części wspólnych odbywa się w weekend.</p>
-  </section>
-
-  <section class="card">
-    <h2>📅 Nadchodzące dyżury</h2>
-    <div id="schedule"></div>
-    <button id="toggle-schedule" class="schedule-toggle"
-        type="button" aria-expanded="false">
-      Pokaż więcej ↓
-    </button>
-    <p class="muted" style="font-size:13px">
-      Kolejność: 1 → 2 → 3 → 4.
-      Harmonogram jest kontynuowany bez przerw,
-      również po zmianie roku.
-    </p>
   </section>
 
   <section class="card">
@@ -458,19 +470,6 @@
     </p>
   </section>
 
-  <section class="card announcement-card" id="announcements-card">
-    <details id="announcements-details">
-      <summary aria-label="Ważne ogłoszenia">
-        <span aria-hidden="true">📢</span>
-        <span class="announcement-heading">Ważne ogłoszenia</span>
-        <span id="announcement-count" class="announcement-count" aria-live="polite"></span>
-        <span class="announcement-chevron" aria-hidden="true">⌄</span>
-      </summary>
-      <p class="announcement-status" id="announcements-status" role="status">Wczytywanie ogłoszeń…</p>
-      <div class="announcements-list" id="announcements-list"></div>
-    </details>
-  </section>
-
   <section class="card notice">
     <div class="notice-icon">🔔</div>
     <div>
@@ -481,6 +480,20 @@
         Powiadomienia push nie są jeszcze aktywne.
       </p>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>📅 Nadchodzące dyżury</h2>
+    <div id="schedule"></div>
+    <button id="toggle-schedule" class="schedule-toggle"
+        type="button" aria-expanded="false">
+      Pokaż więcej ↓
+    </button>
+    <p class="muted" style="font-size:13px">
+      Kolejność: 1 → 2 → 3 → 4.
+      Harmonogram jest kontynuowany bez przerw,
+      również po zmianie roku.
+    </p>
   </section>
 
   <section class="card">
@@ -708,6 +721,8 @@ result.append(description, date, ".");
     .includes(savedTheme) ? savedTheme : "system";
 
   function applyTheme(mode) {
+    document.getElementById("theme-icon").textContent =
+      { system: "⚙", light: "☀", dark: "☾" }[mode];
     const actual = effectiveTheme(mode);
     document.documentElement.dataset.theme = actual;
     document.getElementById("theme-color").content =
@@ -727,16 +742,6 @@ result.append(description, date, ".");
   showSchedule();
   updateScheduleVisibility();
   showRoomSelection();
-  // Umieść sekcję "Mój pokój" przed harmonogramem.
-  const roomCard = document.getElementById("room-buttons")
-    .closest(".card");
-  
-  const scheduleCard = document.getElementById("schedule")
-    .closest(".card");
-  
-  scheduleCard.before(roomCard);
-  roomCard.after(document.getElementById("announcements-card"));
-
   // Ogłoszenia są publiczne. Nie umieszczaj tu danych poufnych.
   const announcementDetails = document.getElementById("announcements-details");
   const announcementList = document.getElementById("announcements-list");
@@ -834,18 +839,31 @@ result.append(description, date, ".");
   const isStandalone = () =>
     window.matchMedia("(display-mode: standalone)").matches ||
     window.navigator.standalone === true;
+  let installed = localStorage.getItem("goleszan19-installed") === "true";
   const updateInstallVisibility = () => {
-    shortcutButton.hidden = isStandalone();
+    shortcutButton.hidden = isStandalone() || installed;
   };
   updateInstallVisibility();
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isAndroidChrome = /Android/.test(navigator.userAgent) &&
+    /Chrome\//.test(navigator.userAgent) && !/EdgA|OPR|SamsungBrowser/.test(navigator.userAgent);
+  document.getElementById("ios-install-instructions").hidden = !isIOS;
+  document.getElementById("android-install-instructions").hidden = !isAndroidChrome;
+  document.getElementById("other-install-instructions").hidden = isIOS || isAndroidChrome;
 
   window.addEventListener("beforeinstallprompt", event => {
     event.preventDefault();
+    installed = false;
+    localStorage.removeItem("goleszan19-installed");
+    updateInstallVisibility();
     deferredInstallPrompt = event;
     nativeInstallButton.hidden = false;
   });
   window.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
+    installed = true;
+    localStorage.setItem("goleszan19-installed", "true");
     nativeInstallButton.hidden = true;
     shortcutHelp.close();
     shortcutButton.hidden = true;
@@ -860,7 +878,12 @@ result.append(description, date, ".");
     const promptEvent = deferredInstallPrompt;
     deferredInstallPrompt = null;
     nativeInstallButton.hidden = true;
-    await promptEvent.prompt();
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+    } catch (_) {
+      // Instrukcje pozostają dostępne, gdy przeglądarka odrzuci żądanie.
+    }
   });
   document.getElementById("shortcut-close").addEventListener("click", () => {
     shortcutHelp.close();

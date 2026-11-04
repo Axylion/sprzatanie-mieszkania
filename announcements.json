@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "id": "test-wazna-informacja-2026-11-04",
+    "title": "Ogłoszenie testowe — sprawdzenie wyświetlania",
+    "body": "TO JEST OGŁOSZENIE TESTOWE. Nie informuje o rzeczywistych pracach, awarii ani zmianie harmonogramu. Ten przykładowy komunikat służy wyłącznie do sprawdzenia, czy dłuższa treść jest początkowo ograniczona do trzech wierszy na telefonie i komputerze. Wybierz „Więcej ↓”, aby przeczytać cały tekst, a następnie „Zwiń ↑”, aby wrócić do krótkiego podglądu. Każde ogłoszenie rozwija się niezależnie od pozostałych. Krzyżyk w prawym górnym rogu ukrywa komunikat tylko na tym urządzeniu i nie usuwa go dla innych mieszkańców. Aby go przywrócić, użyj odnośnika „Pokaż ukryte ogłoszenia” w stopce strony. To tylko próba działania interfejsu; obowiązujący harmonogram sprzątania pozostaje bez zmian.",
+    "publishedAt": "2026-11-04T12:00:00+01:00"
+  }
+]

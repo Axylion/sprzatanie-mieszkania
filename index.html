@@ -287,6 +287,44 @@
     }
     #announcements-card[hidden], .announcement-toggle[hidden] { display: none; }
     .announcement-heading { font-size: 20px; font-weight: 700; }
+    .announcement-entry { position: relative; }
+    .announcement-entry h3, .announcement-date { padding-right: 40px; }
+    .announcement-dismiss {
+      position: absolute;
+      top: -9px;
+      right: -9px;
+      width: 44px;
+      height: 44px;
+      padding: 9px;
+      border: 0;
+      background: transparent;
+      color: #333333;
+      display: grid;
+      place-items: center;
+    }
+    .announcement-dismiss svg { width: 26px; height: 26px; }
+    .announcement-entry + .announcement-entry .announcement-dismiss { top: 7px; }
+    .announcement-restore {
+      display: block;
+      margin: 8px auto;
+      padding: 12px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .announcement-restore[hidden] { display: none; }
+    .announcement-dismiss:focus-visible, .announcement-restore:focus-visible {
+      outline: 2px solid #2f8842;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0;
+      margin: -1px; overflow: hidden; clip-path: inset(50%);
+      white-space: nowrap; border: 0;
+    }
     .announcement-entry + .announcement-entry {
       border-top: 1px solid #e4ca49;
       margin-top: 16px;
@@ -394,7 +432,7 @@
       <span>Sprzątanie mieszkania</span>
     </div>
     <div class="header-actions">
-      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Dodaj Goleszan 19 na ekran główny">📱 Na telefon</button>
+      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
       <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
       <select id="theme-select" aria-label="Motyw strony">
@@ -542,6 +580,8 @@
 </main>
 
 <footer>
+  <button type="button" class="announcement-restore" id="announcements-restore" hidden>Pokaż ukryte ogłoszenia</button>
+  <span class="sr-only" id="announcements-status" role="status"></span>
   Sprzątanie mieszkania · Wspólna przestrzeń
 </footer>
 
@@ -742,7 +782,26 @@ result.append(description, date, ".");
   const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");
   const expandedAnnouncements = new Set();
-  const announcementKey = item => JSON.stringify([item.id, item.updatedAt || item.publishedAt, item.body]);
+  const restoreAnnouncements = document.getElementById("announcements-restore");
+  const announcementStatus = document.getElementById("announcements-status");
+  const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
+  let activeAnnouncements = [];
+  function readHiddenAnnouncements() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HIDDEN_ANNOUNCEMENTS_KEY) || "[]");
+      return new Set(Array.isArray(saved) ? saved.filter(key => typeof key === "string") : []);
+    } catch (_) { return new Set(); }
+  }
+  let hiddenAnnouncements = readHiddenAnnouncements();
+  function saveHiddenAnnouncements() {
+    try {
+      localStorage.setItem(HIDDEN_ANNOUNCEMENTS_KEY, JSON.stringify([...hiddenAnnouncements]));
+    } catch (_) { /* Bez pamięci lokalnej ukrywanie działa do przeładowania strony. */ }
+  }
+  // Identyfikator i wersja treści: nowe lub zmienione ogłoszenie pojawia się ponownie.
+  const announcementKey = item => JSON.stringify([
+    item.id, item.publishedAt, item.updatedAt, item.title, item.body
+  ]);
   const fmtAnnouncementDate = value => new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium", timeZone: "Europe/Warsaw"
   }).format(new Date(value));
@@ -758,9 +817,12 @@ result.append(description, date, ".");
   }
 
   function renderAnnouncements(items) {
+    activeAnnouncements = items;
+    const visibleItems = items.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
+    restoreAnnouncements.hidden = !items.some(item => hiddenAnnouncements.has(announcementKey(item)));
     announcementList.replaceChildren();
-    announcementCard.hidden = items.length === 0;
-    items.forEach((item, index) => {
+    announcementCard.hidden = visibleItems.length === 0;
+    visibleItems.forEach((item, index) => {
       const article = document.createElement("article");
       article.className = "announcement-entry";
       const meta = document.createElement("div");
@@ -778,6 +840,19 @@ result.append(description, date, ".");
       button.setAttribute("aria-controls", body.id);
       button.hidden = true;
       const key = announcementKey(item);
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "announcement-dismiss";
+      dismiss.setAttribute("aria-label", "Ukryj ogłoszenie na tym urządzeniu: " + item.title);
+      dismiss.innerHTML = '<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true" focusable="false"><circle cx="13" cy="13" r="12.5"/><path d="m9 9 8 8m0-8-8 8" stroke-width="1.5" stroke-linecap="round"/></svg>';
+      dismiss.addEventListener("click", () => {
+        hiddenAnnouncements.add(key);
+        saveHiddenAnnouncements();
+        renderAnnouncements(activeAnnouncements);
+        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić linkiem w stopce.";
+        const remaining = announcementList.querySelectorAll(".announcement-dismiss");
+        (remaining[Math.min(index, remaining.length - 1)] || restoreAnnouncements).focus();
+      });
       function updateExpanded() {
         const expanded = expandedAnnouncements.has(key);
         body.classList.toggle("expanded", expanded);
@@ -790,11 +865,24 @@ result.append(description, date, ".");
         updateExpanded();
       });
       updateExpanded();
-      article.append(meta, title, body, button);
+      article.append(dismiss, meta, title, body, button);
       announcementList.append(article);
     });
     updateAnnouncementToggles();
   }
+  restoreAnnouncements.addEventListener("click", () => {
+    activeAnnouncements.forEach(item => hiddenAnnouncements.delete(announcementKey(item)));
+    saveHiddenAnnouncements();
+    renderAnnouncements(activeAnnouncements);
+    announcementStatus.textContent = "Przywrócono ukryte ogłoszenia na tym urządzeniu.";
+    announcementList.querySelector(".announcement-dismiss")?.focus();
+  });
+  window.addEventListener("storage", event => {
+    if (event.key === HIDDEN_ANNOUNCEMENTS_KEY || event.key === null) {
+      hiddenAnnouncements = readHiddenAnnouncements();
+      renderAnnouncements(activeAnnouncements);
+    }
+  });
   new ResizeObserver(updateAnnouncementToggles).observe(announcementList);
   document.fonts.ready.then(updateAnnouncementToggles);
 

@@ -1,5 +1,5 @@
 // Goleszan 19: minimal offline shell; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v3";
+const CACHE_NAME = "goleszan19-shell-v4";
 const SHELL = ["./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./manifest.webmanifest"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)));

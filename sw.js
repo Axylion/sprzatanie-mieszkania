@@ -1,5 +1,5 @@
 // Goleszan 19: minimal offline shell; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v2";
+const CACHE_NAME = "goleszan19-shell-v3";
 const SHELL = ["./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./manifest.webmanifest"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)));
@@ -16,7 +16,10 @@ self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   // News should never be served from an old offline cache.
-  if (url.pathname.endsWith("/announcements.json")) return;
+  if (url.pathname.endsWith("/announcements.json")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
   if (event.request.mode === "navigate") {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);

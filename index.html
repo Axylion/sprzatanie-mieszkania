@@ -92,12 +92,12 @@
       padding: 10px 12px;
       border: 1px solid var(--border);
       border-radius: 10px;
-      background: var(--surface-alt);
-      color: var(--text);
+      background: #2f8842;
+      color: #ffffff;
       font-weight: 650;
       white-space: nowrap;
     }
-    .shortcut-button:hover { background: var(--accent-bg); }
+    .shortcut-button:hover { background: #2f8842; }
     .shortcut-button[hidden] { display: none !important; }
     .shortcut-button { display: inline-flex; align-items: center; gap: 6px; }
     .shortcut-help {
@@ -279,44 +279,48 @@
       line-height: 1.65;
     }
 
-    /* Kompaktowe ogłoszenia z oznaczeniem nowych wiadomości. */
-    .announcement-card { padding-bottom: 16px; }
-    .announcement-card details { padding: 0; border: 0; }
-    .announcement-card summary {
-      list-style: none;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      gap: 11px;
+    /* Każde aktywne ogłoszenie ma niezależne rozwijanie treści. */
+    .announcement-card {
+      background: #fff6af;
+      border: 1px solid #e4ca49;
+      color: #302b16;
     }
-    .announcement-card summary::-webkit-details-marker { display: none; }
-    .announcement-card summary:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 6px;
-      border-radius: 5px;
+    #announcements-card[hidden], .announcement-toggle[hidden] { display: none; }
+    .announcement-heading { font-size: 20px; font-weight: 700; }
+    .announcement-entry + .announcement-entry {
+      border-top: 1px solid #e4ca49;
+      margin-top: 16px;
+      padding-top: 16px;
     }
-    .announcement-heading { flex: 1; font-size: 20px; font-weight: 700; }
-    .announcement-chevron { color: var(--muted); transition: transform .2s; }
-    .announcement-card details[open] .announcement-chevron { transform: rotate(180deg); }
-    .announcement-count {
-      display: none;
-      background: #b91c1c;
-      color: white;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 750;
-      padding: 5px 9px;
-      white-space: nowrap;
-    }
-    .announcement-count.visible { display: inline-block; }
-    .announcement-status { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
-    .announcements-list { margin-top: 16px; border-top: 1px solid var(--border); }
-    .announcement-entry { padding: 16px 0; border-bottom: 1px solid var(--border); }
-    .announcement-entry:last-child { border-bottom: 0; padding-bottom: 0; }
     .announcement-entry h3 { font-size: 16px; margin: 7px 0; }
-    .announcement-entry p { margin: 5px 0; color: var(--text); font-size: 14px; white-space: pre-line; overflow-wrap: anywhere; }
-    .announcement-date { font-size: 12px; color: var(--muted); }
-    .announcement-new { color: #ef4444; font-size: 12px; font-weight: 700; }
+    .announcement-body {
+      margin: 5px 0;
+      color: #302b16;
+      font-size: 14px;
+      white-space: pre-line;
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+    .announcement-body.expanded { display: block; }
+    .announcement-date { font-size: 12px; color: #5f5428; }
+    .announcement-toggle {
+      display: block;
+      margin: 8px 0 0 auto;
+      padding: 8px 0 8px 12px;
+      border: 0;
+      background: transparent;
+      color: #302b16;
+      font-size: 14px;
+      font-weight: 650;
+    }
+    .announcement-toggle:focus-visible {
+      outline: 2px solid #2f8842;
+      outline-offset: 3px;
+      border-radius: 3px;
+    }
     .notice {
       display: flex;
       align-items: flex-start;
@@ -429,17 +433,9 @@
 </dialog>
 
 <main class="container">
-  <section class="card announcement-card" id="announcements-card">
-    <details id="announcements-details">
-      <summary aria-label="Ważne ogłoszenia">
-        <span aria-hidden="true">📢</span>
-        <span class="announcement-heading">Ważne ogłoszenia</span>
-        <span id="announcement-count" class="announcement-count" aria-live="polite"></span>
-        <span class="announcement-chevron" aria-hidden="true">⌄</span>
-      </summary>
-      <p class="announcement-status" id="announcements-status" role="status">Wczytywanie ogłoszeń…</p>
-      <div class="announcements-list" id="announcements-list"></div>
-    </details>
+  <section class="card announcement-card" id="announcements-card" aria-labelledby="announcements-heading" hidden>
+    <h2 class="announcement-heading" id="announcements-heading">Ważna informacja dla mieszkańców</h2>
+    <div id="announcements-list"></div>
   </section>
 
   <div class="intro">
@@ -743,41 +739,28 @@ result.append(description, date, ".");
   updateScheduleVisibility();
   showRoomSelection();
   // Ogłoszenia są publiczne. Nie umieszczaj tu danych poufnych.
-  const announcementDetails = document.getElementById("announcements-details");
+  const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");
-  const announcementStatus = document.getElementById("announcements-status");
-  const announcementCount = document.getElementById("announcement-count");
-  let visibleAnnouncements = [];
-
-  function readAnnouncements() {
-    try {
-      const saved = JSON.parse(localStorage.getItem("cleaning-announcements-read") || "[]");
-      return Array.isArray(saved) ? saved : [];
-    } catch (_) {
-      return [];
-    }
-  }
-  const readKeys = new Set(readAnnouncements());
-  const announcementKey = item => item.id + ":" + (item.updatedAt || item.publishedAt);
+  const expandedAnnouncements = new Set();
+  const announcementKey = item => JSON.stringify([item.id, item.updatedAt || item.publishedAt, item.body]);
   const fmtAnnouncementDate = value => new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium", timeZone: "Europe/Warsaw"
   }).format(new Date(value));
 
-  function renderAnnouncements() {
+  function updateAnnouncementToggles() {
+    announcementList.querySelectorAll(".announcement-entry").forEach(article => {
+      const body = article.querySelector(".announcement-body");
+      const button = article.querySelector(".announcement-toggle");
+      // scrollHeight zawiera pełną treść również przy ograniczeniu do trzech wierszy.
+      const hasMore = body.scrollHeight > parseFloat(getComputedStyle(body).lineHeight) * 3 + 1;
+      button.hidden = !hasMore;
+    });
+  }
+
+  function renderAnnouncements(items) {
     announcementList.replaceChildren();
-    const unread = visibleAnnouncements.filter(a => !readKeys.has(announcementKey(a)));
-    announcementCount.classList.toggle("visible", unread.length > 0);
-    announcementCount.textContent = unread.length + (unread.length === 1 ? " nowe" : " nowe");
-
-    if (!visibleAnnouncements.length) {
-      announcementStatus.textContent = "Brak aktualnych ogłoszeń.";
-      return;
-    }
-    announcementStatus.textContent = unread.length
-      ? "Nowa ważna informacja dla mieszkańców."
-      : "Aktualne informacje dla mieszkańców.";
-
-    visibleAnnouncements.forEach(item => {
+    announcementCard.hidden = items.length === 0;
+    items.forEach((item, index) => {
       const article = document.createElement("article");
       article.className = "announcement-entry";
       const meta = document.createElement("div");
@@ -786,36 +769,46 @@ result.append(description, date, ".");
       const title = document.createElement("h3");
       title.textContent = item.title;
       const body = document.createElement("p");
+      body.className = "announcement-body";
+      body.id = "announcement-body-" + index;
       body.textContent = item.body;
-      article.append(meta, title, body);
-      if (!readKeys.has(announcementKey(item))) {
-        const newTag = document.createElement("div");
-        newTag.className = "announcement-new";
-        newTag.textContent = "Nowe";
-        article.prepend(newTag);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "announcement-toggle";
+      button.setAttribute("aria-controls", body.id);
+      button.hidden = true;
+      const key = announcementKey(item);
+      function updateExpanded() {
+        const expanded = expandedAnnouncements.has(key);
+        body.classList.toggle("expanded", expanded);
+        button.setAttribute("aria-expanded", String(expanded));
+        button.textContent = expanded ? "Zwiń ↑" : "Więcej ↓";
       }
+      button.addEventListener("click", () => {
+        if (expandedAnnouncements.has(key)) expandedAnnouncements.delete(key);
+        else expandedAnnouncements.add(key);
+        updateExpanded();
+      });
+      updateExpanded();
+      article.append(meta, title, body, button);
       announcementList.append(article);
     });
+    updateAnnouncementToggles();
   }
+  new ResizeObserver(updateAnnouncementToggles).observe(announcementList);
+  document.fonts.ready.then(updateAnnouncementToggles);
 
-  // Otwarcie sekcji oznacza zapoznanie się z ogłoszeniami na tym urządzeniu.
-  announcementDetails.addEventListener("toggle", () => {
-    if (!announcementDetails.open || !visibleAnnouncements.length) return;
-    for (const item of visibleAnnouncements) readKeys.add(announcementKey(item));
-    try {
-      localStorage.setItem("cleaning-announcements-read", JSON.stringify([...readKeys]));
-    } catch (_) {}
-    renderAnnouncements();
-  });
-
+  let announcementRequest = 0;
   async function loadAnnouncements() {
+    const request = ++announcementRequest;
     try {
       const response = await fetch("./announcements.json", {cache: "no-store"});
       if (!response.ok) throw new Error("HTTP " + response.status);
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Invalid announcements data");
+      if (request !== announcementRequest) return;
       const now = Date.now();
-      visibleAnnouncements = data.filter(item =>
+      const items = data.filter(item =>
         item && typeof item.id === "string" &&
         typeof item.title === "string" &&
         typeof item.body === "string" &&
@@ -825,12 +818,20 @@ result.append(description, date, ".");
         (!item.expiresAt || (Number.isFinite(Date.parse(item.expiresAt)) &&
           Date.parse(item.expiresAt) >= now))
       ).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-      renderAnnouncements();
+      renderAnnouncements(items);
     } catch (_) {
-      announcementStatus.textContent = "Nie udało się wczytać ogłoszeń. Spróbuj odświeżyć stronę.";
+      // Offline nadal działa harmonogram; nie pokazuj nieaktualnych ogłoszeń.
+      if (request === announcementRequest) renderAnnouncements([]);
     }
   }
   loadAnnouncements();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") loadAnnouncements();
+  });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) loadAnnouncements();
+  });
+  window.addEventListener("online", loadAnnouncements);
 
   const shortcutHelp = document.getElementById("shortcut-help");
   const shortcutButton = document.getElementById("shortcut-open");

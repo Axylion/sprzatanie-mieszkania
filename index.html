@@ -786,6 +786,8 @@ result.append(description, date, ".");
   const announcementStatus = document.getElementById("announcements-status");
   const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
   let activeAnnouncements = [];
+  let loadedAnnouncements = [];
+  let announcementTimer;
   function readHiddenAnnouncements() {
     try {
       const saved = JSON.parse(localStorage.getItem(HIDDEN_ANNOUNCEMENTS_KEY) || "[]");
@@ -800,11 +802,62 @@ result.append(description, date, ".");
   }
   // Identyfikator i wersja treści: nowe lub zmienione ogłoszenie pojawia się ponownie.
   const announcementKey = item => JSON.stringify([
-    item.id, item.publishedAt, item.updatedAt, item.title, item.body
+    item.id, item.publishedAt, item.updatedAt, item.title, item.body, item.expiresAt
   ]);
+  const warsawDateParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+  });
+  function partsInWarsaw(timestamp) {
+    const parts = warsawDateParts.formatToParts(new Date(timestamp));
+    return ["year", "month", "day", "hour", "minute", "second"]
+      .map(type => Number(parts.find(part => part.type === type).value));
+  }
+  // ISO z offsetem oznacza konkretną chwilę. Bez offsetu używamy Europe/Warsaw,
+  // niezależnie od strefy urządzenia. Sama data expiresAt jest ważna do końca dnia.
+  function parseAnnouncementDate(value, endOfDay = false) {
+    if (typeof value !== "string") return NaN;
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:\d{2})?)?$/.exec(value);
+    if (!match) return NaN;
+    const [, y, m, d, h, min, sec, fraction, zone] = match;
+    const parts = [Number(y), Number(m), Number(d), Number(h || 0), Number(min || 0), Number(sec || 0)];
+    const [year, month, day, hour, minute, second] = parts;
+    const wall = Date.UTC(year, month - 1, day, hour, minute, second);
+    const check = new Date(wall);
+    if (year < 100 || check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 ||
+        check.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59) return NaN;
+    if (zone) return Date.parse(value);
+    let local = parts;
+    let localWall = wall;
+    if (!h && endOfDay) {
+      const next = new Date(wall + 86400000);
+      local = [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), 0, 0, 0];
+      localWall += 86400000;
+    }
+    // Offset przed/po granicy wykrywa CET/CEST także w dniu zmiany czasu.
+    const candidates = [-36, 0, 36].map(hours => {
+      const sample = localWall + hours * 3600000;
+      const [sy, sm, sd, sh, smin, ss] = partsInWarsaw(sample);
+      const offset = Date.UTC(sy, sm - 1, sd, sh, smin, ss) - sample;
+      return localWall - offset;
+    }).filter(candidate => partsInWarsaw(candidate).every((part, index) => part === local[index]));
+    // Nieistniejący czas wiosną jest odrzucany; jesienią wybieramy wcześniejszą chwilę.
+    return candidates.length ? Math.min(...candidates) + Number((fraction || "").padEnd(3, "0")) : NaN;
+  }
   const fmtAnnouncementDate = value => new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium", timeZone: "Europe/Warsaw"
-  }).format(new Date(value));
+  }).format(new Date(parseAnnouncementDate(value)));
+  function announcementDates(item) {
+    const published = parseAnnouncementDate(item?.publishedAt);
+    const expires = item?.expiresAt == null ? Infinity : parseAnnouncementDate(item.expiresAt, true);
+    return {published, expires};
+  }
+  function isActiveAnnouncement(item, now) {
+    const {published, expires} = announcementDates(item);
+    return item && typeof item.id === "string" && typeof item.title === "string" &&
+      typeof item.body === "string" && Number.isFinite(published) &&
+      published <= now && expires > now;
+  }
 
   function updateAnnouncementToggles() {
     announcementList.querySelectorAll(".announcement-entry").forEach(article => {
@@ -817,9 +870,20 @@ result.append(description, date, ".");
   }
 
   function renderAnnouncements(items) {
-    activeAnnouncements = items;
-    const visibleItems = items.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
-    restoreAnnouncements.hidden = !items.some(item => hiddenAnnouncements.has(announcementKey(item)));
+    loadedAnnouncements = items;
+    const now = Date.now();
+    activeAnnouncements = items.filter(item => isActiveAnnouncement(item, now))
+      .sort((a, b) => parseAnnouncementDate(b.publishedAt) - parseAnnouncementDate(a.publishedAt));
+    clearTimeout(announcementTimer);
+    const boundaries = items.flatMap(item => Object.values(announcementDates(item)))
+      .filter(time => Number.isFinite(time) && time > now);
+    if (boundaries.length) {
+      // Limit setTimeout do ~24 dni; ponowne sprawdzenie również po uśpieniu karty.
+      announcementTimer = setTimeout(() => renderAnnouncements(loadedAnnouncements),
+        Math.min(Math.min(...boundaries) - now, 2147483647));
+    }
+    const visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
+    restoreAnnouncements.hidden = !activeAnnouncements.some(item => hiddenAnnouncements.has(announcementKey(item)));
     announcementList.replaceChildren();
     announcementCard.hidden = visibleItems.length === 0;
     visibleItems.forEach((item, index) => {
@@ -848,7 +912,7 @@ result.append(description, date, ".");
       dismiss.addEventListener("click", () => {
         hiddenAnnouncements.add(key);
         saveHiddenAnnouncements();
-        renderAnnouncements(activeAnnouncements);
+        renderAnnouncements(loadedAnnouncements);
         announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić linkiem w stopce.";
         const remaining = announcementList.querySelectorAll(".announcement-dismiss");
         (remaining[Math.min(index, remaining.length - 1)] || restoreAnnouncements).focus();
@@ -871,16 +935,17 @@ result.append(description, date, ".");
     updateAnnouncementToggles();
   }
   restoreAnnouncements.addEventListener("click", () => {
-    activeAnnouncements.forEach(item => hiddenAnnouncements.delete(announcementKey(item)));
+    activeAnnouncements.filter(item => isActiveAnnouncement(item, Date.now()))
+      .forEach(item => hiddenAnnouncements.delete(announcementKey(item)));
     saveHiddenAnnouncements();
-    renderAnnouncements(activeAnnouncements);
+    renderAnnouncements(loadedAnnouncements);
     announcementStatus.textContent = "Przywrócono ukryte ogłoszenia na tym urządzeniu.";
     announcementList.querySelector(".announcement-dismiss")?.focus();
   });
   window.addEventListener("storage", event => {
     if (event.key === HIDDEN_ANNOUNCEMENTS_KEY || event.key === null) {
       hiddenAnnouncements = readHiddenAnnouncements();
-      renderAnnouncements(activeAnnouncements);
+      renderAnnouncements(loadedAnnouncements);
     }
   });
   new ResizeObserver(updateAnnouncementToggles).observe(announcementList);
@@ -895,18 +960,7 @@ result.append(description, date, ".");
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Invalid announcements data");
       if (request !== announcementRequest) return;
-      const now = Date.now();
-      const items = data.filter(item =>
-        item && typeof item.id === "string" &&
-        typeof item.title === "string" &&
-        typeof item.body === "string" &&
-        typeof item.publishedAt === "string" &&
-        Number.isFinite(Date.parse(item.publishedAt)) &&
-        Date.parse(item.publishedAt) <= now &&
-        (!item.expiresAt || (Number.isFinite(Date.parse(item.expiresAt)) &&
-          Date.parse(item.expiresAt) >= now))
-      ).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-      renderAnnouncements(items);
+      renderAnnouncements(data);
     } catch (_) {
       // Offline nadal działa harmonogram; nie pokazuj nieaktualnych ogłoszeń.
       if (request === announcementRequest) renderAnnouncements([]);
@@ -914,10 +968,16 @@ result.append(description, date, ".");
   }
   loadAnnouncements();
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") loadAnnouncements();
+    if (document.visibilityState === "visible") {
+      renderAnnouncements(loadedAnnouncements);
+      loadAnnouncements();
+    }
   });
   window.addEventListener("pageshow", event => {
-    if (event.persisted) loadAnnouncements();
+    if (event.persisted) {
+      renderAnnouncements(loadedAnnouncements);
+      loadAnnouncements();
+    }
   });
   window.addEventListener("online", loadAnnouncements);
 

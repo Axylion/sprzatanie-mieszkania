@@ -258,3 +258,106 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('Warsaw expiry, live timers and local restore on devices in other timezones', async () => {
+  const data = [
+    announcement('permanent', 'Bez terminu'),
+    announcement('date', 'Do końca dnia', {expiresAt:'2026-11-04'}),
+    announcement('instant', 'Do konkretnej godziny', {expiresAt:'2026-11-05T00:00:02'}),
+    announcement('future', 'Późniejsza publikacja', {publishedAt:'2026-11-05T00:00:03'}),
+    announcement('invalid-date', 'Nieprawidłowa data', {expiresAt:'2026-02-30'}),
+    announcement('invalid-type', 'Nieprawidłowy typ', {expiresAt:123}),
+    announcement('invalid-empty', 'Pusty termin', {expiresAt:''})
+  ];
+  const server = http.createServer((req, res) => {
+    const file = new URL(req.url, 'http://localhost').pathname;
+    if (file === '/announcements.json') {
+      res.setHeader('Content-Type','application/json');
+      return res.end(JSON.stringify(data));
+    }
+    const target = path.join(root, file === '/' ? 'index.html' : file);
+    if (!fs.existsSync(target)) { res.writeHead(404); return res.end(); }
+    res.setHeader('Content-Type',file.endsWith('.svg') ? 'image/svg+xml' : 'text/html');
+    res.end(fs.readFileSync(target));
+  });
+  await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
+  const browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
+  try {
+    const pages = [];
+    const errors = [];
+    for (const timezoneId of ['America/Los_Angeles','Asia/Tokyo']) {
+      const context = await browser.newContext({timezoneId,serviceWorkers:'block'});
+      const page = await context.newPage();
+      page.on('pageerror', e => errors.push(e.message));
+      await page.clock.install({time:new Date('2026-11-04T22:59:58Z')});
+      await page.clock.pauseAt(new Date('2026-11-04T22:59:59Z'));
+      await page.goto(`http://127.0.0.1:${server.address().port}/`);
+      await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+      pages.push(page);
+      const parsed = await page.evaluate(() => [
+        parseAnnouncementDate('2026-11-04T12:30:00'),
+        parseAnnouncementDate('2026-07-01T12:30'),
+        parseAnnouncementDate('2026-11-04',true),
+        parseAnnouncementDate('2026-03-29',true),
+        parseAnnouncementDate('2026-10-25',true),
+        parseAnnouncementDate('2026-10-25T02:30'),
+        parseAnnouncementDate('2026-11-05T00:00:02+01:00'),
+        parseAnnouncementDate('2026-11-04T23:00:02Z'),
+        parseAnnouncementDate('2026-11-05T08:00:02+09:00')
+      ].map(value => new Date(value).toISOString()));
+      assert.deepEqual(parsed,[
+        '2026-11-04T11:30:00.000Z','2026-07-01T10:30:00.000Z',
+        '2026-11-04T23:00:00.000Z','2026-03-29T22:00:00.000Z',
+        '2026-10-25T23:00:00.000Z','2026-10-25T00:30:00.000Z',
+        '2026-11-04T23:00:02.000Z','2026-11-04T23:00:02.000Z','2026-11-04T23:00:02.000Z'
+      ]);
+      assert.equal(await page.evaluate(() => [
+        '2026-03-29T02:30','2026-02-30','2026-11-04T24:00','bad',''
+      ].every(value => Number.isNaN(parseAnnouncementDate(value)))),true);
+      // W dni zmiany czasu sam dzień trwa odpowiednio 23 i 25 godzin.
+      assert.deepEqual(await page.evaluate(() => ['2026-03-29','2026-10-25'].map(value =>
+        (parseAnnouncementDate(value,true)-parseAnnouncementDate(value))/3600000)),[23,25]);
+    }
+    const [page, other] = pages;
+    const hide = id => page.getByRole('button',{name:'Ukryj ogłoszenie na tym urządzeniu: Informacja '+id,exact:true}).click();
+    await hide('permanent');
+    await hide('instant');
+    assert.equal(await page.locator('.announcement-entry').count(),1);
+    assert.equal(await other.locator('.announcement-entry').count(),3);
+    // Dokładnie o północy w Warszawie ogłoszenie z samą datą znika na obu urządzeniach.
+    for (const p of pages) await p.clock.runFor(1000);
+    assert.equal(await page.locator('#announcements-card').isVisible(),false);
+    assert.equal(await page.locator('#announcements-card').evaluate(e => e.getBoundingClientRect().height),0);
+    assert.equal(await other.locator('.announcement-entry').count(),2);
+    await page.locator('#announcements-restore').click();
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent','Informacja instant']);
+    await hide('instant');
+    for (const p of pages) await p.clock.runFor(2000);
+    assert.equal(await page.locator('#announcements-restore').isVisible(),false);
+    assert.deepEqual(await other.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
+    // Termin nie usuwa wpisu z JSON i nie można go przywrócić lokalną funkcją.
+    await hide('permanent');
+    await page.locator('#announcements-restore').click();
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
+    assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()),data);
+    // Zaplanowana publikacja również uwzględnia Warsaw i działa bez przeładowania.
+    for (const p of pages) await p.clock.runFor(1000);
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
+    assert.equal(await page.locator('#announcements-restore').isVisible(),false);
+    // Wpisy bez expiresAt pozostają aktywne także po miesiącu.
+    for (const p of pages) {
+      await p.clock.fastForward(16 * 86400000);
+      await p.clock.fastForward(16 * 86400000);
+    }
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
+    // Przedłużony termin jest nową wersją, nie dziedziczy wcześniejszego ukrycia.
+    data[2].expiresAt = '2099-12-31';
+    await page.reload();
+    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+    assert.equal(await page.locator('.announcement-entry h3').allTextContents().then(t => t.includes('Informacja instant')),true);
+    assert.deepEqual(errors,[]);
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});

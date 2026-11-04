@@ -287,6 +287,44 @@
     }
     #announcements-card[hidden], .announcement-toggle[hidden] { display: none; }
     .announcement-heading { font-size: 20px; font-weight: 700; }
+    .announcement-entry { position: relative; }
+    .announcement-entry h3, .announcement-date { padding-right: 40px; }
+    .announcement-dismiss {
+      position: absolute;
+      top: -9px;
+      right: -9px;
+      width: 44px;
+      height: 44px;
+      padding: 9px;
+      border: 0;
+      background: transparent;
+      color: #333333;
+      display: grid;
+      place-items: center;
+    }
+    .announcement-dismiss svg { width: 26px; height: 26px; }
+    .announcement-entry + .announcement-entry .announcement-dismiss { top: 7px; }
+    .announcement-restore {
+      display: block;
+      margin: 8px auto;
+      padding: 12px;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .announcement-restore[hidden] { display: none; }
+    .announcement-dismiss:focus-visible, .announcement-restore:focus-visible {
+      outline: 2px solid #2f8842;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0;
+      margin: -1px; overflow: hidden; clip-path: inset(50%);
+      white-space: nowrap; border: 0;
+    }
     .announcement-entry + .announcement-entry {
       border-top: 1px solid #e4ca49;
       margin-top: 16px;
@@ -394,7 +432,7 @@
       <span>Sprzątanie mieszkania</span>
     </div>
     <div class="header-actions">
-      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Dodaj Goleszan 19 na ekran główny">📱 Na telefon</button>
+      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
       <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
       <select id="theme-select" aria-label="Motyw strony">
@@ -542,6 +580,8 @@
 </main>
 
 <footer>
+  <button type="button" class="announcement-restore" id="announcements-restore" hidden>Pokaż ukryte ogłoszenia</button>
+  <span class="sr-only" id="announcements-status" role="status"></span>
   Sprzątanie mieszkania · Wspólna przestrzeń
 </footer>
 
@@ -742,10 +782,82 @@ result.append(description, date, ".");
   const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");
   const expandedAnnouncements = new Set();
-  const announcementKey = item => JSON.stringify([item.id, item.updatedAt || item.publishedAt, item.body]);
+  const restoreAnnouncements = document.getElementById("announcements-restore");
+  const announcementStatus = document.getElementById("announcements-status");
+  const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
+  let activeAnnouncements = [];
+  let loadedAnnouncements = [];
+  let announcementTimer;
+  function readHiddenAnnouncements() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HIDDEN_ANNOUNCEMENTS_KEY) || "[]");
+      return new Set(Array.isArray(saved) ? saved.filter(key => typeof key === "string") : []);
+    } catch (_) { return new Set(); }
+  }
+  let hiddenAnnouncements = readHiddenAnnouncements();
+  function saveHiddenAnnouncements() {
+    try {
+      localStorage.setItem(HIDDEN_ANNOUNCEMENTS_KEY, JSON.stringify([...hiddenAnnouncements]));
+    } catch (_) { /* Bez pamięci lokalnej ukrywanie działa do przeładowania strony. */ }
+  }
+  // Identyfikator i wersja treści: nowe lub zmienione ogłoszenie pojawia się ponownie.
+  const announcementKey = item => JSON.stringify([
+    item.id, item.publishedAt, item.updatedAt, item.title, item.body, item.expiresAt
+  ]);
+  const warsawDateParts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+  });
+  function partsInWarsaw(timestamp) {
+    const parts = warsawDateParts.formatToParts(new Date(timestamp));
+    return ["year", "month", "day", "hour", "minute", "second"]
+      .map(type => Number(parts.find(part => part.type === type).value));
+  }
+  // ISO z offsetem oznacza konkretną chwilę. Bez offsetu używamy Europe/Warsaw,
+  // niezależnie od strefy urządzenia. Sama data expiresAt jest ważna do końca dnia.
+  function parseAnnouncementDate(value, endOfDay = false) {
+    if (typeof value !== "string") return NaN;
+    const match = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:\d{2})?)?$/.exec(value);
+    if (!match) return NaN;
+    const [, y, m, d, h, min, sec, fraction, zone] = match;
+    const parts = [Number(y), Number(m), Number(d), Number(h || 0), Number(min || 0), Number(sec || 0)];
+    const [year, month, day, hour, minute, second] = parts;
+    const wall = Date.UTC(year, month - 1, day, hour, minute, second);
+    const check = new Date(wall);
+    if (year < 100 || check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 ||
+        check.getUTCDate() !== day || hour > 23 || minute > 59 || second > 59) return NaN;
+    if (zone) return Date.parse(value);
+    let local = parts;
+    let localWall = wall;
+    if (!h && endOfDay) {
+      const next = new Date(wall + 86400000);
+      local = [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), 0, 0, 0];
+      localWall += 86400000;
+    }
+    // Offset przed/po granicy wykrywa CET/CEST także w dniu zmiany czasu.
+    const candidates = [-36, 0, 36].map(hours => {
+      const sample = localWall + hours * 3600000;
+      const [sy, sm, sd, sh, smin, ss] = partsInWarsaw(sample);
+      const offset = Date.UTC(sy, sm - 1, sd, sh, smin, ss) - sample;
+      return localWall - offset;
+    }).filter(candidate => partsInWarsaw(candidate).every((part, index) => part === local[index]));
+    // Nieistniejący czas wiosną jest odrzucany; jesienią wybieramy wcześniejszą chwilę.
+    return candidates.length ? Math.min(...candidates) + Number((fraction || "").padEnd(3, "0")) : NaN;
+  }
   const fmtAnnouncementDate = value => new Intl.DateTimeFormat("pl-PL", {
     dateStyle: "medium", timeZone: "Europe/Warsaw"
-  }).format(new Date(value));
+  }).format(new Date(parseAnnouncementDate(value)));
+  function announcementDates(item) {
+    const published = parseAnnouncementDate(item?.publishedAt);
+    const expires = item?.expiresAt == null ? Infinity : parseAnnouncementDate(item.expiresAt, true);
+    return {published, expires};
+  }
+  function isActiveAnnouncement(item, now) {
+    const {published, expires} = announcementDates(item);
+    return item && typeof item.id === "string" && typeof item.title === "string" &&
+      typeof item.body === "string" && Number.isFinite(published) &&
+      published <= now && expires > now;
+  }
 
   function updateAnnouncementToggles() {
     announcementList.querySelectorAll(".announcement-entry").forEach(article => {
@@ -758,9 +870,23 @@ result.append(description, date, ".");
   }
 
   function renderAnnouncements(items) {
+    loadedAnnouncements = items;
+    const now = Date.now();
+    activeAnnouncements = items.filter(item => isActiveAnnouncement(item, now))
+      .sort((a, b) => parseAnnouncementDate(b.publishedAt) - parseAnnouncementDate(a.publishedAt));
+    clearTimeout(announcementTimer);
+    const boundaries = items.flatMap(item => Object.values(announcementDates(item)))
+      .filter(time => Number.isFinite(time) && time > now);
+    if (boundaries.length) {
+      // Limit setTimeout do ~24 dni; ponowne sprawdzenie również po uśpieniu karty.
+      announcementTimer = setTimeout(() => renderAnnouncements(loadedAnnouncements),
+        Math.min(Math.min(...boundaries) - now, 2147483647));
+    }
+    const visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
+    restoreAnnouncements.hidden = !activeAnnouncements.some(item => hiddenAnnouncements.has(announcementKey(item)));
     announcementList.replaceChildren();
-    announcementCard.hidden = items.length === 0;
-    items.forEach((item, index) => {
+    announcementCard.hidden = visibleItems.length === 0;
+    visibleItems.forEach((item, index) => {
       const article = document.createElement("article");
       article.className = "announcement-entry";
       const meta = document.createElement("div");
@@ -778,6 +904,19 @@ result.append(description, date, ".");
       button.setAttribute("aria-controls", body.id);
       button.hidden = true;
       const key = announcementKey(item);
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "announcement-dismiss";
+      dismiss.setAttribute("aria-label", "Ukryj ogłoszenie na tym urządzeniu: " + item.title);
+      dismiss.innerHTML = '<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true" focusable="false"><circle cx="13" cy="13" r="12.5"/><path d="m9 9 8 8m0-8-8 8" stroke-width="1.5" stroke-linecap="round"/></svg>';
+      dismiss.addEventListener("click", () => {
+        hiddenAnnouncements.add(key);
+        saveHiddenAnnouncements();
+        renderAnnouncements(loadedAnnouncements);
+        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić linkiem w stopce.";
+        const remaining = announcementList.querySelectorAll(".announcement-dismiss");
+        (remaining[Math.min(index, remaining.length - 1)] || restoreAnnouncements).focus();
+      });
       function updateExpanded() {
         const expanded = expandedAnnouncements.has(key);
         body.classList.toggle("expanded", expanded);
@@ -790,11 +929,25 @@ result.append(description, date, ".");
         updateExpanded();
       });
       updateExpanded();
-      article.append(meta, title, body, button);
+      article.append(dismiss, meta, title, body, button);
       announcementList.append(article);
     });
     updateAnnouncementToggles();
   }
+  restoreAnnouncements.addEventListener("click", () => {
+    activeAnnouncements.filter(item => isActiveAnnouncement(item, Date.now()))
+      .forEach(item => hiddenAnnouncements.delete(announcementKey(item)));
+    saveHiddenAnnouncements();
+    renderAnnouncements(loadedAnnouncements);
+    announcementStatus.textContent = "Przywrócono ukryte ogłoszenia na tym urządzeniu.";
+    announcementList.querySelector(".announcement-dismiss")?.focus();
+  });
+  window.addEventListener("storage", event => {
+    if (event.key === HIDDEN_ANNOUNCEMENTS_KEY || event.key === null) {
+      hiddenAnnouncements = readHiddenAnnouncements();
+      renderAnnouncements(loadedAnnouncements);
+    }
+  });
   new ResizeObserver(updateAnnouncementToggles).observe(announcementList);
   document.fonts.ready.then(updateAnnouncementToggles);
 
@@ -807,18 +960,7 @@ result.append(description, date, ".");
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Invalid announcements data");
       if (request !== announcementRequest) return;
-      const now = Date.now();
-      const items = data.filter(item =>
-        item && typeof item.id === "string" &&
-        typeof item.title === "string" &&
-        typeof item.body === "string" &&
-        typeof item.publishedAt === "string" &&
-        Number.isFinite(Date.parse(item.publishedAt)) &&
-        Date.parse(item.publishedAt) <= now &&
-        (!item.expiresAt || (Number.isFinite(Date.parse(item.expiresAt)) &&
-          Date.parse(item.expiresAt) >= now))
-      ).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-      renderAnnouncements(items);
+      renderAnnouncements(data);
     } catch (_) {
       // Offline nadal działa harmonogram; nie pokazuj nieaktualnych ogłoszeń.
       if (request === announcementRequest) renderAnnouncements([]);
@@ -826,10 +968,16 @@ result.append(description, date, ".");
   }
   loadAnnouncements();
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") loadAnnouncements();
+    if (document.visibilityState === "visible") {
+      renderAnnouncements(loadedAnnouncements);
+      loadAnnouncements();
+    }
   });
   window.addEventListener("pageshow", event => {
-    if (event.persisted) loadAnnouncements();
+    if (event.persisted) {
+      renderAnnouncements(loadedAnnouncements);
+      loadAnnouncements();
+    }
   });
   window.addEventListener("online", loadAnnouncements);
 

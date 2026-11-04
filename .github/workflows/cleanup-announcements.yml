@@ -1,0 +1,53 @@
+name: Clean up expired announcements
+
+on:
+  schedule:
+    # Once a day at 04:17 UTC (05:17 CET / 06:17 CEST in Warsaw).
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: cleanup-announcements-main
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    if: github.repository == 'Axylion/sprzatanie-mieszkania' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      changed: ${{ steps.publish.outputs.changed }}
+    steps:
+      - name: Check out main without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Test calendar retention and safe publication
+        run: python3 -m unittest discover -s tests -p 'test_cleanup*.py' -v
+      - name: Remove records past the retention period
+        run: python3 scripts/cleanup-announcements.py
+      - name: Commit only the changed announcements file
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/publish-announcements.sh
+
+  refresh-pages:
+    needs: cleanup
+    if: needs.cleanup.outputs.changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+    steps:
+      # GITHUB_TOKEN commits do not automatically trigger a branch-based Pages build.
+      # Manual dispatch also permits retrying a failed Pages build without another commit.
+      - name: Request publication of the current main revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" --silent

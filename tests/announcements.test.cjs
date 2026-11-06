@@ -7,11 +7,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+const mimeTypes = {
+  '.js': 'text/javascript',
+  '.css': 'text/css',
+  '.json': 'application/json',
+  '.png': 'image/png',
+  '.svg': 'image/svg+xml',
+  '.webp': 'image/webp'
+};
 const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v3 to v4 update under the GitHub Pages subpath', async () => {
+test('PWA v4 to v5 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -21,9 +29,11 @@ test('PWA v3 to v4 update under the GitHub Pages subpath', async () => {
     const target = path.join(root, name);
     if (!fs.existsSync(target)) { res.writeHead(404); return res.end(); }
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Type', name.endsWith('.js') ? 'text/javascript' : name.endsWith('.json') ? 'application/json' : name.endsWith('.png') ? 'image/png' : name.endsWith('.svg') ? 'image/svg+xml' : 'text/html');
+    res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
-    res.end(name === 'sw.js' && legacy ? contents.toString().replace('shell-v4', 'shell-v3') : contents);
+    res.end(name === 'sw.js' && legacy
+      ? contents.toString().replace('shell-v5', 'shell-v4').replace(/^  "\.\/poradnik\/.*\n/gm, '')
+      : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
@@ -35,14 +45,14 @@ test('PWA v3 to v4 update under the GitHub Pages subpath', async () => {
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v3');
+      const cache = await caches.open('goleszan19-shell-v4');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v4') && !keys.includes('goleszan19-shell-v3');
+      return keys.includes('goleszan19-shell-v5') && !keys.includes('goleszan19-shell-v4');
     });
     await page.reload();
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
@@ -82,7 +92,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     }
     const target = path.join(root, file === '/' ? 'index.html' : file);
     if (!fs.existsSync(target)) { res.writeHead(404); return res.end(); }
-    res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.png') ? 'image/png' : file.endsWith('.svg') ? 'image/svg+xml' : 'text/html');
+    res.setHeader('Content-Type', mimeTypes[path.extname(file)] || 'text/html');
     res.end(fs.readFileSync(target));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -236,7 +246,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v4');
+      const c = await caches.open('goleszan19-shell-v5');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), data);
@@ -280,7 +290,7 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
     }
     const target = path.join(root, file === '/' ? 'index.html' : file);
     if (!fs.existsSync(target)) { res.writeHead(404); return res.end(); }
-    res.setHeader('Content-Type',file.endsWith('.svg') ? 'image/svg+xml' : 'text/html');
+    res.setHeader('Content-Type', mimeTypes[path.extname(file)] || 'text/html');
     res.end(fs.readFileSync(target));
   });
   await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));

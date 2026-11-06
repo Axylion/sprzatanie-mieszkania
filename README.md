@@ -77,3 +77,22 @@ Testy czyszczenia i bezpiecznej publikacji (Python 3.9+, bez pakietów zewnętrz
 `python3 -m unittest discover -s tests -p 'test_cleanup*.py' -v`.
 Lokalna próba czyszczenia na kopii danych:
 `python3 scripts/cleanup-announcements.py --file /sciezka/do/kopii.json`.
+
+## Poradnik sprzątania
+
+Przycisk pod najbliższym dyżurem otwiera spis ośmiu kart. Bezpośredni link do
+karty ma postać `./#poradnik/toaleta`. Instrukcje i opisy zdjęć są w
+`poradnik/dane.js`, a szablon, nawigacja i galeria w `poradnik/poradnik.js`.
+Zdjęcia i ilustracje z infografik są w `poradnik/media/`.
+
+Aby dodać kartę, dopisz jej dane oraz pliki WebP. Numeruj zdjęcia od 1, zaczynając
+od galerii, a potem dodając zdjęcia kroków w ich kolejności. Arkusz
+`<id>-ikony.webp` zawiera kwadratowe pola w kolejności środków i akcesoriów,
+a następnie dodatkowe ilustracje kroków. Pole `illustration` wskazuje pozycję
+w arkuszu od 0. Dodaj ścieżki plików do `SHELL` i zwiększ wersję cache w `sw.js`.
+
+Aby otworzyć podgląd lokalny i sprawdzić PWA, uruchom `python3 -m http.server 8000`
+w katalogu projektu i otwórz `http://localhost:8000/`. Po pierwszym wczytaniu
+i aktywacji service workera można przełączyć przeglądarkę w tryb offline
+i odświeżyć bezpośredni link do karty. Test w Playwright uruchamia polecenie
+`node --test tests/poradnik.test.cjs`.

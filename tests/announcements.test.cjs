@@ -19,7 +19,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v4 to v5 update under the GitHub Pages subpath', async () => {
+test('PWA v5 to v6 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -32,7 +32,7 @@ test('PWA v4 to v5 update under the GitHub Pages subpath', async () => {
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v5', 'shell-v4').replace(/^  "\.\/poradnik\/.*\n/gm, '')
+      ? contents.toString().replace('shell-v6', 'shell-v5')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -45,14 +45,14 @@ test('PWA v4 to v5 update under the GitHub Pages subpath', async () => {
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v4');
+      const cache = await caches.open('goleszan19-shell-v5');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v5') && !keys.includes('goleszan19-shell-v4');
+      return keys.includes('goleszan19-shell-v6') && !keys.includes('goleszan19-shell-v5');
     });
     await page.reload();
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
@@ -246,7 +246,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v5');
+      const c = await caches.open('goleszan19-shell-v6');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), data);

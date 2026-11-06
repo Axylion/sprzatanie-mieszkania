@@ -23,6 +23,7 @@
   const homeTitle = document.title;
   let photos = [];
   let photoIndex = 0;
+  let cardIndex = 0;
   let currentHash;
   let homeScroll = 0;
 
@@ -42,22 +43,17 @@
     }).join("")}</nav>`;
   }
 
-  function overview() {
-    return `
-      <div class="guide-intro">
-        <h1 tabindex="-1">Poradnik sprzątania</h1>
-        <p>Instrukcje ze zdjęciami</p>
-      </div>
-      <div class="guide-overview">${guideSections.map(section => `
-        <section class="guide-panel">
-          <h2>${icon(section.id)} ${section.title}</h2>
-          <ul class="guide-card-links">${guideCards.filter(card => card.section === section.id).map(card => `
-            <li><a href="${cardLink(card)}">${card.label || card.title}<span aria-hidden="true">›</span></a></li>
-          `).join("")}</ul>
-        </section>
-      `).join("")}</div>
-      ${categoryNav()}
-    `;
+  function cardNavigation() {
+    return `<nav class="guide-pagination" aria-label="Nawigacja kart poradnika">
+      <button type="button" data-card-step="-1"${cardIndex === 0 ? " disabled" : ""}>‹ Poprzednia</button>
+      <span class="guide-card-position">${cardIndex + 1} / ${guideCards.length}</span>
+      <button type="button" data-card-step="1"${cardIndex === guideCards.length - 1 ? " disabled" : ""}>Następna ›</button>
+    </nav>`;
+  }
+
+  function changeCard(step) {
+    const target = guideCards[cardIndex + step];
+    if (target) location.hash = cardLink(target);
   }
 
   function photoButton(index, className = "") {
@@ -85,13 +81,8 @@
 
   function cardContent(card) {
     const section = guideSections.find(item => item.id === card.section);
-    const siblings = guideCards.filter(item => item.section === card.section);
-    const next = guideCards[guideCards.indexOf(card) + 1];
     let detailIndex = card.photos.length;
     return `
-      ${siblings.length > 1 ? `<nav class="guide-siblings" aria-label="Karty w dziale ${section.title}">
-        ${siblings.map(item => `<a href="${cardLink(item)}"${item === card ? ' aria-current="page"' : ""}>${item.label || item.title}</a>`).join("")}
-      </nav>` : ""}
       <article class="guide-article" aria-labelledby="guide-title">
         <div class="guide-card-header">
           ${icon(card.icon)}
@@ -123,7 +114,7 @@
         </div>
         <aside class="guide-tip">${icon("informacja")}<p><strong>Wskazówka:</strong> ${card.tip}</p></aside>
       </article>
-      ${next ? `<a class="guide-next" href="${cardLink(next)}">Następna karta: ${next.label || next.title} <span aria-hidden="true">→</span></a>` : ""}
+      ${cardNavigation()}
       ${categoryNav(card.section)}
     `;
   }
@@ -147,24 +138,22 @@
     }
 
     if (!wasGuide) homeScroll = window.scrollY;
-    const currentCard = guideCards.find(card => cardLink(card) === hash);
-    photos = currentCard
-      ? [...currentCard.photos, ...currentCard.steps.filter(step => step.photo).map(step => step.photo)]
-        .map((alt, index) => ({ alt, src: `./poradnik/media/${currentCard.id}-${index + 1}.webp` }))
-      : [];
+    cardIndex = Math.max(0, guideCards.findIndex(card => cardLink(card) === hash));
+    const currentCard = guideCards[cardIndex];
+    photos = [...currentCard.photos, ...currentCard.steps.filter(step => step.photo).map(step => step.photo)]
+      .map((alt, index) => ({ alt, src: `./poradnik/media/${currentCard.id}-${index + 1}.webp` }));
 
     guide.innerHTML = `
       <div class="guide-frame">
         <div class="guide-top">
           <a href="#harmonogram">← Harmonogram</a>
-          ${currentCard ? '<a href="#poradnik">Wszystkie karty</a>' : ""}
         </div>
-        ${currentCard ? cardContent(currentCard) : overview()}
+        ${cardContent(currentCard)}
       </div>
     `;
     home.hidden = footer.hidden = true;
     guide.hidden = false;
-    document.title = currentCard ? `${currentCard.title} · Poradnik sprzątania` : "Poradnik sprzątania · Goleszan 19";
+    document.title = `${currentCard.title} · Poradnik sprzątania`;
     guide.querySelector("h1").focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: "instant" });
   }
@@ -178,6 +167,11 @@
   }
 
   guide.addEventListener("click", event => {
+    const control = event.target.closest("[data-card-step]");
+    if (control) {
+      changeCard(Number(control.dataset.cardStep));
+      return;
+    }
     const photo = event.target.closest("[data-photo]");
     if (!photo) return;
     showPhoto(Number(photo.dataset.photo));
@@ -198,6 +192,43 @@
       showPhoto(photoIndex + (event.key === "ArrowLeft" ? -1 : 1));
     }
   });
+
+  function onHorizontalSwipe(surface, navigate) {
+    let start;
+    let verticalTravel = 0;
+
+    surface.addEventListener("touchstart", event => {
+      start = event.touches.length === 1 ? event.touches[0] : undefined;
+      verticalTravel = 0;
+    }, { passive: true });
+    surface.addEventListener("touchmove", event => {
+      if (!start) return;
+      if (event.touches.length !== 1) {
+        start = undefined;
+        return;
+      }
+      verticalTravel = Math.max(verticalTravel, Math.abs(event.touches[0].clientY - start.clientY));
+    }, { passive: true });
+    surface.addEventListener("touchcancel", () => { start = undefined; }, { passive: true });
+    surface.addEventListener("touchend", event => {
+      const origin = start;
+      start = undefined;
+      if (!origin || event.touches.length) return;
+      const end = Array.from(event.changedTouches).find(touch => touch.identifier === origin.identifier);
+      if (!end) return;
+      const dx = end.clientX - origin.clientX;
+      const dy = Math.max(verticalTravel, Math.abs(end.clientY - origin.clientY));
+      if (Math.abs(dx) < 60 || dy > 45 || Math.abs(dx) < 2 * dy) return;
+      // A swipe starting on a thumbnail must not also open it as a tap.
+      if (event.cancelable) event.preventDefault();
+      navigate(dx < 0 ? 1 : -1);
+    }, { passive: false });
+  }
+
+  onHorizontalSwipe(guide, step => {
+    if (!gallery.open) changeCard(step);
+  });
+  onHorizontalSwipe(gallery, step => showPhoto(photoIndex + step));
 
   window.addEventListener("hashchange", renderGuide);
   renderGuide();

@@ -422,6 +422,9 @@
   background: var(--accent-bg);
 }
   </style>
+  <link rel="stylesheet" href="./poradnik/poradnik.css">
+  <script defer src="./poradnik/dane.js"></script>
+  <script defer src="./poradnik/poradnik.js"></script>
 </head>
 
 <body>
@@ -470,7 +473,7 @@
   <button type="button" class="shortcut-close" id="shortcut-close">Zamknij</button>
 </dialog>
 
-<main class="container">
+<main class="container" id="harmonogram">
   <section class="card announcement-card" id="announcements-card" aria-labelledby="announcements-heading" hidden>
     <h2 class="announcement-heading" id="announcements-heading">Ważna informacja dla mieszkańców</h2>
     <div id="announcements-list"></div>
@@ -489,6 +492,14 @@
     <div class="hero-date" id="next-date">—</div>
     <p>Sprzątanie części wspólnych odbywa się w weekend.</p>
   </section>
+
+  <a class="card guide-entry" href="#poradnik">
+    <span class="guide-entry-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 2Zm0 0v15"/></svg>
+    </span>
+    <span><strong>Poradnik sprzątania</strong><small>Instrukcje ze zdjęciami</small></span>
+    <span class="guide-entry-arrow" aria-hidden="true">→</span>
+  </a>
 
   <section class="card">
     <h2>🏠 Mój pokój</h2>
@@ -578,6 +589,22 @@
     </details>
   </section>
 </main>
+
+<main id="poradnik-view" hidden></main>
+
+<dialog id="poradnik-gallery" aria-label="Powiększone zdjęcia">
+  <div class="guide-viewer">
+    <button type="button" class="guide-viewer-close" data-close autofocus aria-label="Zamknij zdjęcie">×</button>
+    <figure>
+      <img alt="">
+      <figcaption aria-live="polite"></figcaption>
+    </figure>
+    <div class="guide-viewer-controls">
+      <button type="button" data-previous aria-label="Poprzednie zdjęcie">←</button>
+      <button type="button" data-next aria-label="Następne zdjęcie">→</button>
+    </div>
+  </div>
+</dialog>
 
 <footer>
   <button type="button" class="announcement-restore" id="announcements-restore" hidden>Pokaż ukryte ogłoszenia</button>

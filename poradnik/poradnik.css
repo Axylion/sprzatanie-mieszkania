@@ -37,6 +37,7 @@
 }
 
 #poradnik-view { padding: 18px 0 38px; }
+#poradnik-view, #poradnik-gallery { touch-action: pan-y pinch-zoom; }
 #poradnik-view[hidden] { display: none; }
 #poradnik-view p { margin: 0; line-height: 1.48; }
 #poradnik-view h1 { margin: 0; line-height: 1.14; }
@@ -56,65 +57,20 @@
   overflow-wrap: anywhere;
 }
 
-.guide-top, .guide-siblings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.guide-top {
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.guide-top a, .guide-siblings a, .guide-next {
+.guide-top { margin-bottom: 12px; }
+.guide-top a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   text-decoration: none;
 }
 
-.guide-top a:hover, .guide-next:hover, .guide-card-links a:hover {
-  text-decoration: underline;
-}
+.guide-top a:hover { text-decoration: underline; }
 
-.guide-siblings { margin-bottom: 20px; }
-.guide-siblings a {
-  padding: 6px 11px;
-  border: 1px solid #297481;
-  border-radius: 9px;
-  font-size: .88rem;
-}
-
-#poradnik-view .guide-siblings a[aria-current], .guide-siblings a:hover {
-  color: var(--guide-yellow);
-  border-color: var(--guide-yellow);
-}
-
-.guide-intro {
-  padding-block: 10px 24px;
-}
-
-.guide-intro p { padding-top: 6px; }
-.guide-overview, .guide-instructions {
+.guide-instructions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
-
-.guide-card-links { list-style: none; padding: 0; margin: 0; }
-.guide-card-links li + li { border-top: 1px solid #29535c; }
-.guide-card-links a {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 46px;
-  padding-block: 8px;
-  text-decoration: none;
-}
-
-.guide-card-links a span, .guide-next span { color: var(--guide-yellow); font-size: 1.3rem; }
 
 .guide-card-header {
   display: grid;
@@ -281,7 +237,29 @@
 }
 
 .guide-tip strong { color: var(--guide-line); }
-.guide-next { gap: 8px; margin: 6px 0 0; }
+.guide-pagination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.guide-pagination button {
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid var(--guide-line);
+  border-radius: 9px;
+  background: var(--guide-tip);
+  color: var(--guide-text);
+  font-size: .9rem;
+}
+
+.guide-pagination button:first-child { justify-self: start; }
+.guide-pagination button:last-child { justify-self: end; }
+.guide-pagination button:not(:disabled):hover { color: var(--guide-yellow); }
+.guide-pagination button:disabled { opacity: .5; cursor: default; }
+.guide-card-position { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .guide-categories {
   display: grid;
@@ -375,7 +353,7 @@
 }
 
 @media (max-width: 620px) {
-  .guide-overview, .guide-instructions { grid-template-columns: minmax(0, 1fr); }
+  .guide-instructions { grid-template-columns: minmax(0, 1fr); }
   .guide-card-header { grid-template-columns: auto minmax(0, 1fr); }
   .guide-card-header .guide-note { grid-column: 1 / -1; max-width: none; }
   .guide-items:has(> :nth-child(4)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }

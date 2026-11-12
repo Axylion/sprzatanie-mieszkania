@@ -1,7 +1,8 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v6";
+const CACHE_NAME = "goleszan19-shell-v7";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./manifest.webmanifest",
+  "./dyskusje/dyskusje.css", "./dyskusje/config.js", "./dyskusje/dyskusje.js",
   "./poradnik/poradnik.css", "./poradnik/dane.js", "./poradnik/poradnik.js",
   "./poradnik/media/kabina-1.webp",
   "./poradnik/media/kabina-2.webp",
@@ -41,7 +42,7 @@ const SHELL = [
   "./poradnik/media/zlewozmywak-ikony.webp",
 ];
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL.map(path => new Request(path, { cache: "reload" })))));
   self.skipWaiting();
 });
 self.addEventListener("activate", event => {

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Harmonogram i zasady sprzątania mieszkania">
+  <meta name="description" content="Panel mieszkańców Goleszan 19">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7fb" id="theme-color">
   <title>Goleszan 19</title>
@@ -265,11 +265,6 @@
       color: var(--text);
       font-weight: 650;
     }
-    .room-button.selected {
-      border-color: var(--accent);
-      background: var(--accent-bg);
-      color: var(--accent-text);
-    }
     .personal-result {
       background: var(--surface-alt);
       padding: 14px;
@@ -359,14 +354,6 @@
       outline-offset: 3px;
       border-radius: 3px;
     }
-    .notice {
-      display: flex;
-      align-items: flex-start;
-      gap: 13px;
-    }
-    .notice-icon { font-size: 25px; }
-    .notice p { margin: 4px 0 0; font-size: 14px; }
-
     details {
       border-top: 1px solid var(--border);
       padding: 15px 0;
@@ -425,6 +412,9 @@
   <link rel="stylesheet" href="./poradnik/poradnik.css">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js"></script>
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css">
+  <script defer src="./dyskusje/config.js"></script>
+  <script defer src="./dyskusje/dyskusje.js"></script>
 </head>
 
 <body>
@@ -432,7 +422,7 @@
   <div class="container header-inner">
     <div class="brand">
       <span class="brand-icon">🧹</span>
-      <span>Sprzątanie mieszkania</span>
+      <span>Goleszan 19</span>
     </div>
     <div class="header-actions">
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
@@ -501,30 +491,34 @@
     <span class="guide-entry-arrow" aria-hidden="true">→</span>
   </a>
 
-  <section class="card">
-    <h2>🏠 Mój pokój</h2>
-    <label class="field-label">
-      Wybierz numer swojego pokoju:
-    </label>
-    <div class="room-buttons" id="room-buttons"></div>
-    <div class="personal-result" id="personal-result">
-      Wybierz pokój, aby zobaczyć swój najbliższy dyżur.
-    </div>
-    <p class="muted" style="font-size:12px">
-      Twój wybór zostanie zapamiętany na tym urządzeniu.
-    </p>
-  </section>
+  <a class="card guide-entry discussion-entry" href="#dyskusje">
+    <span class="guide-entry-icon" aria-hidden="true">💬</span>
+    <span><strong>Dyskusje</strong><small>Wspólne sprawy mieszkańców</small></span>
+    <span class="guide-entry-arrow" aria-hidden="true">→</span>
+  </a>
 
-  <section class="card notice">
-    <div class="notice-icon">🔔</div>
-    <div>
-      <strong>Powiadomienia</strong>
-      <p class="muted">
-        Wkrótce: przypomnienia o sprzątaniu w piątki o 12:00
-        oraz ważne ogłoszenia dotyczące mieszkania.
-        Powiadomienia push nie są jeszcze aktywne.
-      </p>
-    </div>
+  <section class="card" id="ustawienia" aria-labelledby="settings-title">
+    <h2 id="settings-title" tabindex="-1">Ustawienia</h2>
+    <fieldset id="room-setup">
+      <legend>Wybierz swój pokój</legend>
+      <p class="muted">Potwierdzony pokój zostanie przypisany do tego urządzenia.</p>
+      <div class="room-buttons" id="room-buttons">
+        <button class="room-button" type="button" data-room="1" aria-pressed="false">Pokój nr 1</button>
+        <button class="room-button" type="button" data-room="2" aria-pressed="false">Pokój nr 2</button>
+        <button class="room-button" type="button" data-room="3" aria-pressed="false">Pokój nr 3</button>
+        <button class="room-button" type="button" data-room="4" aria-pressed="false">Pokój nr 4</button>
+      </div>
+      <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
+    </fieldset>
+    <p id="room-lock" hidden></p>
+    <div class="personal-result" id="personal-result" hidden></div>
+    <details class="notification-settings">
+      <summary>Ustawienia powiadomień</summary>
+      <p>Preferencje są zapisywane na tym urządzeniu. Wysyłanie powiadomień zostanie uruchomione osobno.</p>
+      <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
+      <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
+      <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
+    </details>
   </section>
 
   <section class="card">
@@ -592,6 +586,29 @@
 
 <main id="poradnik-view" hidden></main>
 
+<main class="container discussion-view" id="discussion-view" hidden>
+  <a class="discussion-back" href="#harmonogram">← Harmonogram</a>
+  <section class="card discussion-panel" aria-labelledby="discussion-title">
+    <h1 id="discussion-title" tabindex="-1">Dyskusje</h1>
+    <p class="discussion-subtitle">Wspólne sprawy mieszkańców</p>
+    <p id="discussion-status" class="discussion-status" role="status"></p>
+    <a href="#ustawienia" id="discussion-choose" hidden>Wybierz pokój w ustawieniach</a>
+    <button type="button" id="discussion-connect" hidden>Połącz urządzenie</button>
+    <div id="discussion-chat" hidden>
+      <div class="discussion-history-controls">
+        <button type="button" id="discussion-older" hidden>Starsze wiadomości</button>
+      </div>
+      <ol class="discussion-history" id="discussion-history" aria-label="Historia wiadomości" tabindex="0"></ol>
+      <button type="button" id="discussion-latest" hidden>Najnowsze wiadomości</button>
+      <form class="discussion-compose" id="discussion-compose">
+        <label for="discussion-body">Wiadomość</label>
+        <textarea id="discussion-body" rows="2" maxlength="1500" required></textarea>
+        <button type="submit" id="discussion-send" disabled>Wyślij</button>
+      </form>
+    </div>
+  </section>
+</main>
+
 <dialog id="poradnik-gallery" aria-label="Powiększone zdjęcia">
   <div class="guide-viewer">
     <button type="button" class="guide-viewer-close" data-close autofocus aria-label="Zamknij zdjęcie">×</button>
@@ -609,7 +626,7 @@
 <footer>
   <button type="button" class="announcement-restore" id="announcements-restore" hidden>Pokaż ukryte ogłoszenia</button>
   <span class="sr-only" id="announcements-status" role="status"></span>
-  Sprzątanie mieszkania · Wspólna przestrzeń
+  Goleszan 19 · Panel mieszkańców
 </footer>
 
 <script>
@@ -716,68 +733,61 @@
     scheduleExpanded = !scheduleExpanded;
     updateScheduleVisibility();
   });
-  let selectedRoom = localStorage.getItem("cleaning-room") || "";
+  let selectedRoom = localStorage.getItem("cleaning-room");
+  if (!["1", "2", "3", "4"].includes(selectedRoom)) selectedRoom = "";
+  const roomSetup = document.getElementById("room-setup");
+  const roomLock = document.getElementById("room-lock");
+  const roomConfirm = document.getElementById("room-confirm");
+  const roomButtons = [...document.querySelectorAll("#room-buttons [data-room]")];
+  let pendingRoom = "";
+
+  roomButtons.forEach(button => button.addEventListener("click", () => {
+    if (selectedRoom) return;
+    pendingRoom = button.dataset.room;
+    roomButtons.forEach(choice => choice.setAttribute("aria-pressed", String(choice === button)));
+    roomConfirm.disabled = false;
+  }));
+  roomConfirm.addEventListener("click", () => {
+    // A second open tab may have saved its choice while this one was on the form.
+    const saved = localStorage.getItem("cleaning-room");
+    if (!selectedRoom && pendingRoom) {
+      selectedRoom = ["1", "2", "3", "4"].includes(saved) ? saved : pendingRoom;
+      localStorage.setItem("cleaning-room", selectedRoom);
+      showRoomSelection();
+      document.getElementById("settings-title").focus({ preventScroll: true });
+    }
+  });
+  window.addEventListener("storage", event => {
+    if (event.key === "cleaning-room" && ["1", "2", "3", "4"].includes(event.newValue)) {
+      selectedRoom = event.newValue;
+      showRoomSelection();
+    }
+  });
 
   function showRoomSelection() {
-    const container = document.getElementById("room-buttons");
-    container.replaceChildren();
-    
-    // Podświetl dyżury wybranego pokoju.
-    document.querySelectorAll("#schedule .schedule-row")
-      .forEach((row, index) => {
-        const saturday = start + index * WEEK;
-        const isMyRoom = selectedRoom !== "" &&
-          roomFor(saturday) === Number(selectedRoom);
-
-        row.classList.toggle("my-room", isMyRoom);
-      });
-
-
-    for (let room = 1; room <= 4; room++) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "room-button";
-      if (selectedRoom === String(room)) {
-        button.classList.add("selected");
-      }
-      button.textContent = "Pokój " + room;
-      button.setAttribute(
-        "aria-pressed", selectedRoom === String(room)
-      );
-
-      button.addEventListener("click", () => {
-        selectedRoom = String(room);
-        localStorage.setItem("cleaning-room", selectedRoom);
-        showRoomSelection();
-      });
-
-      container.append(button);
-    }
-
+    roomSetup.hidden = Boolean(selectedRoom);
+    roomLock.hidden = !selectedRoom;
+    roomLock.textContent = selectedRoom ? "Przypisany pokój: Pokój nr " + selectedRoom : "";
+    document.querySelectorAll("#schedule .schedule-row").forEach((row, index) => {
+      row.classList.toggle("my-room", roomFor(start + index * WEEK) === Number(selectedRoom));
+    });
     const result = document.getElementById("personal-result");
-    if (!selectedRoom || !["1", "2", "3", "4"].includes(selectedRoom)) {
-      result.textContent =
-        "Wybierz pokój, aby zobaczyć swój najbliższy dyżur.";
-      return;
-    }
+    result.hidden = !selectedRoom;
+    if (!selectedRoom) return;
 
     let saturday = start;
-    while (roomFor(saturday) !== Number(selectedRoom)) {
-      saturday += WEEK;
-    }
-
-    result.replaceChildren();
-
-    const description = document.createTextNode(
-      "Najbliższy dyżur pokoju nr " + selectedRoom + ": "
-    );
-
-const date = document.createElement("span");
-date.className = "duty-date";
-date.textContent = weekendText(saturday);
-
-result.append(description, date, ".");
+    while (roomFor(saturday) !== Number(selectedRoom)) saturday += WEEK;
+    const date = document.createElement("span");
+    date.className = "duty-date";
+    date.textContent = weekendText(saturday);
+    result.replaceChildren("Najbliższy dyżur pokoju nr " + selectedRoom + ": ", date, ".");
   }
+
+  document.querySelectorAll(".notification-settings input").forEach(input => {
+    const key = "goleszan19-notification-" + input.name;
+    input.checked = localStorage.getItem(key) === "true";
+    input.addEventListener("change", () => localStorage.setItem(key, String(input.checked)));
+  });
 
   const themeSelect = document.getElementById("theme-select");
   themeSelect.value = ["system", "light", "dark"]

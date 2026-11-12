@@ -96,3 +96,97 @@ w katalogu projektu i otwórz `http://localhost:8000/`. Po pierwszym wczytaniu
 i aktywacji service workera można przełączyć przeglądarkę w tryb offline
 i odświeżyć bezpośredni link do karty. Test w Playwright uruchamia polecenie
 `node --test tests/poradnik.test.cjs`.
+
+## Dyskusje
+
+Goleszan 19 ma wspólny czat, jedną reakcję 👍 albo 👎 na wiadomość z każdego
+powiązania i historię z datami w Europe/Warsaw. Wybrany wcześniej pokój
+(`cleaning-room`) jest zachowany. Nowe urządzenie zatwierdza pokój w ustawieniach.
+Przy pierwszym otwarciu Dyskusji aplikacja rejestruje urządzenie na serwerze.
+Odwołane powiązanie wymaga ręcznego ponownego połączenia.
+
+### Uruchomienie na Supabase
+
+1. Utwórz dedykowany projekt Supabase na planie Free. Włącz Data API dla
+   standardowego schematu `public`. Schemat `g19_private` zostaw poza API.
+2. W uwierzytelnionym SQL Editor projektu wykonaj raz migrację
+   `supabase/migrations/202611130001_dyskusje.sql`. Jeśli projekt korzysta z
+   Supabase CLI, zastosuj tę samą migrację przez jego proces migracji.
+3. W `dyskusje/config.js` wpisz URL `https://<project-ref>.supabase.co` oraz
+   klucz **publishable** `sb_publishable_…` z ustawień projektu. Nie wpisuj
+   klucza `sb_secret_…`, service role ani danych połączenia do bazy.
+4. Na podglądzie połącz dwa niezależne profile przeglądarki, wyślij wiadomość,
+   sprawdź reakcję i odwołanie testowego urządzenia. Po akceptacji właściciela
+   opublikuj zmiany. Jeśli konfiguracja zmienia się już po pierwszym wdrożeniu
+   Dyskusji, zmień też wersję powłoki w `sw.js`, aby zaktualizować PWA.
+
+GitHub Pages nadal serwuje stronę statyczną. Plan Free Supabase ma 500 MB bazy
+i 5 GB transferu, co odpowiada małemu czatowi tekstowemu. Po tygodniu małej
+aktywności projekt może zostać wstrzymany i wtedy właściciel wznawia go z
+Dashboardu. Firebase ma darmowe odczyty i subskrypcje Firestore, ale typowa
+implementacja wymagałaby osobnego przepływu Firebase Auth i reguł Firestore.
+Tu powiązania, reakcje, odwołania i kontrola częstotliwości działają w
+transakcjach Postgresa. [Supabase Free](https://supabase.com/pricing) ·
+[Firebase](https://firebase.google.com/pricing)
+
+Czat sprawdza zmiany mniej więcej co pięć sekund w widocznym oknie. Zapytanie
+ze znaną wersją bez zmian zwraca tylko krótkie potwierdzenie. Strony historii
+mają po 40 wiadomości. Po powrocie do aplikacji historia odświeża się od razu.
+Wymiana wiadomości wymaga internetu. Historia i powiązania są zapisane w bazie.
+
+### Uprawnienia i „Zmień mieszkańca”
+
+Identyfikator urządzenia jest losowym kluczem wydanym przez serwer. Przeglądarka
+przechowuje go lokalnie i przesyła przez HTTPS w treści żądania. Baza przechowuje
+skrót SHA-256. Klucz jest dostępny dla skryptów z tego samego origin, więc na
+tym origin powinien działać wyłącznie zaufany kod. Treść wiadomości jest
+renderowana jako tekst. RLS i uprawnienia SQL blokują bezpośredni dostęp do
+tabel, a RPC weryfikuje klucz i generację pokoju. Wysłanie ma klucz
+idempotencji, limit 1500 znaków i limit częstotliwości. Reakcje też mają limit.
+
+Dowolna osoba z dostępem do adresu może zadeklarować pokój. Po powiązaniu może
+czytać wspólną rozmowę. Model nie potwierdza tożsamości mieszkańca. Usunięcie
+danych witryny albo użycie innej przeglądarki pozwala utworzyć nowe powiązanie.
+Dlatego czat nie powinien służyć do przechowywania danych wrażliwych.
+
+Właściciel zarządza pokojami w zabezpieczonym Supabase Dashboard. W SQL Editor
+zapisz zapytanie pod nazwą **Zmień mieszkańca**. Najpierw odczytaj stan:
+
+```sql
+select * from public.g19_admin_rooms();
+```
+
+Po sprawdzeniu numeru pokoju, generacji i liczby urządzeń uruchom funkcję z tymi
+wartościami. Przykład zmiany mieszkańca pokoju 2 w generacji 1 przy dwóch
+aktywnych urządzeniach:
+
+```sql
+select public.g19_admin_change_resident(2, 1, 2) as odwolane_urzadzenia;
+```
+
+Zmiana liczby urządzeń lub generacji od momentu odczytu powoduje przerwanie
+operacji. Reset odwołuje wszystkie aktywne klucze tego pokoju i otwiera nową
+generację. Stare wpisy oraz reakcje pozostają w historii. Wiadomości z
+wcześniejszych generacji mają oznaczenie „poprzedni mieszkaniec”. Nowy
+mieszkaniec może połączyć swoje urządzenie. Funkcje administracyjne nie mają
+uprawnień wykonania dla przeglądarki ani publicznego API.
+
+### Przygotowanie powiadomień
+
+Ustawienia zapisują osobno trzy lokalne preferencje, dla dyżurów, wiadomości
+i ważnych ogłoszeń. Kolejny etap może synchronizować je z subskrypcją push
+powiązaną z ID urządzenia i generacją mieszkańca. Zmiana mieszkańca odwoła
+także subskrypcje jego urządzeń. Dla wiadomości serwer będzie mógł zapisywać
+zdarzenie razem z wiadomością i deduplikować wysyłkę po ID zdarzenia i
+subskrypcji. Powiadomienia o własnej wiadomości wykluczą urządzenia z tej
+samej generacji tego pokoju. Krótko ważny sygnał aktywności będzie wymagał
+widocznego widoku Dyskusji i aktywnego okna. Powiadomienie otworzy `#dyskusje`.
+Zachowanie Web Push, szczególnie na iOS, wymaga osobnych testów platformowych.
+
+### Testy Dyskusji
+
+Po zainstalowaniu Playwright i `@electric-sql/pglite` uruchom
+`node --test tests/dyskusje.test.mjs`. Test przeglądarkowy łączy dwa konteksty
+z rzeczywistą migracją PostgreSQL w PGlite przez lokalny odpowiednik RPC.
+`CHROME_PATH` może wskazać zainstalowane Chromium. Przed publikacją pozostaje
+test połączenia z konkretnym projektem Supabase.

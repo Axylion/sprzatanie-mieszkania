@@ -57,7 +57,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     assert.ok(await page.locator('.hero + .guide-entry').isVisible());
     await page.locator('#theme-select').selectOption('dark');
-    await page.locator('.guide-entry').tap();
+    await page.getByRole('link', { name: /Poradnik sprzątania/ }).tap();
     const title = page.locator('#guide-title');
     await title.waitFor();
     assert.equal(await title.innerText(), 'Szafki kuchenne i ściana robocza');

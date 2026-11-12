@@ -12,8 +12,10 @@
   };
 
   const home = document.querySelector("#harmonogram");
-  const homeEntry = document.querySelector(".guide-entry");
+  const homeEntry = home.querySelector('a[href="#poradnik"]');
   const guide = document.querySelector("#poradnik-view");
+  const discussion = document.querySelector("#discussion-view");
+  const discussionEntry = document.querySelector(".discussion-entry");
   const footer = document.querySelector("footer");
   const gallery = document.querySelector("#poradnik-gallery");
   const galleryImage = gallery.querySelector("img");
@@ -123,21 +125,31 @@
     const hash = location.hash;
     if (hash === currentHash) return;
     const wasGuide = !guide.hidden;
+    const wasDiscussion = !discussion.hidden;
+    const showDiscussion = hash === "#dyskusje";
     const showGuide = hash === "#poradnik" || hash.startsWith("#poradnik/");
     currentHash = hash;
     if (gallery.open) gallery.close();
+    if ((showGuide || showDiscussion) && !wasGuide && !wasDiscussion) homeScroll = window.scrollY;
+    discussion.hidden = !showDiscussion;
     if (!showGuide) {
-      home.hidden = footer.hidden = false;
+      home.hidden = footer.hidden = showDiscussion;
       guide.hidden = true;
       document.title = homeTitle;
-      if (wasGuide) {
-        homeEntry.focus({ preventScroll: true });
+      if (showDiscussion) {
+        document.title = "Dyskusje · Goleszan 19";
+        discussion.querySelector("h1").focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (hash === "#ustawienia") {
+        document.getElementById("settings-title").focus({ preventScroll: true });
+        document.getElementById("ustawienia").scrollIntoView({ behavior: "instant" });
+      } else if (wasGuide || wasDiscussion) {
+        (wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
         window.scrollTo({ top: homeScroll, behavior: "instant" });
       }
       return;
     }
 
-    if (!wasGuide) homeScroll = window.scrollY;
     cardIndex = Math.max(0, guideCards.findIndex(card => cardLink(card) === hash));
     const currentCard = guideCards[cardIndex];
     photos = [...currentCard.photos, ...currentCard.steps.filter(step => step.photo).map(step => step.photo)]

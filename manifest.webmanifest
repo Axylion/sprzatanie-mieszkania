@@ -2,7 +2,7 @@
   "id": "/sprzatanie-mieszkania/",
   "name": "Goleszan 19",
   "short_name": "Goleszan 19",
-  "description": "Harmonogram sprzątania i ważne informacje dla mieszkańców",
+  "description": "Panel mieszkańców Goleszan 19",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

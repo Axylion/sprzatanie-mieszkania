@@ -214,4 +214,13 @@
 #notification-list a[data-unread] { border-inline-start: 3px solid var(--accent); padding-inline-start: 9px; }
 #notification-list time { color: var(--muted); font-size: .82rem; }
 #notification-panel button, #push-permission { min-height: 44px; color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
-#push-permission { margin-top: 12px; }
+#notification-settings-link {
+  color: #00676e;
+  text-decoration: underline;
+}
+#notification-settings-link:hover { color: #087780; }
+[data-theme="dark"] #notification-settings-link { color: #5ee1e6; }
+[data-theme="dark"] #notification-settings-link:hover { color: #a2f6f8; }
+#notification-settings-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+#push-permission { color: var(--accent-text); background: var(--accent-bg); }
+#push-help:empty { display: none; }

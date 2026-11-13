@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { announcementsForInbox, deliveryOutcome } from '../supabase/functions/g19-deliver/events.mjs';
+import { announcementsForInbox, deliveryOutcome, pushPayload } from '../supabase/functions/g19-deliver/events.mjs';
 
 test('Announcement format and push retry classifications', () => {
   const item = { id: 'news', title: 'Informacja', body: 'Tekst', publishedAt: '2026-11-13T14:00' };
@@ -19,7 +19,7 @@ test('Notification privacy, per-device read state, Warsaw duty and push lifecycl
   for (const file of [
     '202611130001_dyskusje.sql', '202611130002_pairing_codes.sql', '202611130003_scope_chat_revision_updates.sql',
     '202611130004_devices_and_reactions.sql', '202611130005_notification_inbox.sql', '202611130006_web_push.sql',
-    '202611130007_unified_notifications.sql', '202611130008_device_revocation_audit.sql'
+    '202611130007_unified_notifications.sql', '202611130008_device_revocation_audit.sql', '202611130009_push_message_preview.sql'
   ]) await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
   const value = async (sql, args = [], role = 'anon') => db.transaction(async tx => {
     await tx.exec('set local role ' + role);
@@ -62,6 +62,8 @@ test('Notification privacy, per-device read state, Warsaw duty and push lifecycl
   assert.equal((await inbox(second)).unread, 0);
   const leased = await take();
   assert.equal(leased.length, 1);
+  assert.equal(leased[0].room, 1);
+  assert.equal(leased[0].message, 'Prywatny tekst');
   assert.deepEqual(await take(), []);
   const finish = (lease, outcome) => value('select public.g19_push_finish($1,$2,$3) v',
     [lease.id,lease.lease,outcome],'service_role');
@@ -163,8 +165,13 @@ test('Service worker displays scoped push events and opens the target route', as
     handlers.get(type)({ ...details, waitUntil: promise => { done = promise; } });
     await done;
   }
-  await dispatch('push', { data: { json: () => ({ id: '7', category: 'messages', target: '#dyskusje' }) } });
-  assert.equal(shown[0][0], 'Nowa wiadomość');
+  await dispatch('push', { data: { json: () => ({ id: '7', category: 'messages', target: '#dyskusje', room: 2, preview: 'Czy <b>ktoś</b> posprząta? 😊' }) } });
+  assert.equal(shown[0][0], 'Goleszan 19 · Nowa wiadomość');
+  assert.equal(shown[0][1].body, 'Pokój nr 2: Czy <b>ktoś</b> posprząta? 😊');
+  const item = { id: '7', category: 'messages', target: '#dyskusje', room: 2 };
+  assert.equal(pushPayload({ ...item, message: '  Zażółć\r\n<b>😊</b>  ' }).preview, 'Zażółć <b>😊</b>');
+  assert.equal(pushPayload({ ...item, message: 'x'.repeat(139) + '👩‍🔬' + 'abc' }).preview, 'x'.repeat(139) + '👩‍🔬…');
+  assert.equal(pushPayload({ ...item, category: 'duties', message: 'ignored' }).preview, undefined);
   assert.equal(shown[0][1].tag, 'g19-7');
   assert.equal(shown[0][1].renotify, false);
   await dispatch('push', { data: { json: () => ({ id: '8', category: 'messages', target: 'https://elsewhere.test/' }) } });

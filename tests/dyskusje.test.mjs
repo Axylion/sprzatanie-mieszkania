@@ -25,6 +25,7 @@ const signatures = {
   react: ['p_token', 'p_message', 'p_vote'],
   notifications: ['p_token', 'p_categories'],
   notification_preferences: ['p_token', 'p_categories', 'p_initialize'],
+  push_subscription: ['p_token', 'p_endpoint', 'p_p256dh', 'p_auth', 'p_categories'],
   notification_activity: ['p_token', 'p_tab', 'p_active', 'p_seen', 'p_presented'],
   notification_read: ['p_token', 'p_id', 'p_categories'],
   my_devices: ['p_token', 'p_kind'],
@@ -237,7 +238,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     try {
       const file = relative || 'index.html';
       const contents = file === 'dyskusje/config.js'
-        ? 'window.goleszanDiscussionsConfig = {url:"https://g19test.supabase.co",publishableKey:"sb_publishable_testing"};'
+        ? 'window.goleszanDiscussionsConfig = {url:"https://g19test.supabase.co",publishableKey:"sb_publishable_testing",vapidPublicKey:"test"};'
         : await readFile(resolve(root, file));
       res.writeHead(200, { 'Content-Type': types[file.slice(file.lastIndexOf('.'))] || 'application/octet-stream' });
       res.end(contents);
@@ -294,6 +295,40 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
 
   const a = await device(320, '1');
   const b = await device(1280);
+  await b.addInitScript(() => {
+    window.notificationTones = 0;
+    window.pushPermission = "default";
+    window.pushRequests = 0;
+    window.rejectPush = false;
+    let subscription;
+    Object.defineProperty(Notification, "permission", { get: () => window.pushPermission });
+    Notification.requestPermission = async () => {
+      window.pushRequests++;
+      window.pushPermission = "granted";
+      return window.pushPermission;
+    };
+    navigator.serviceWorker.getRegistration = async () => ({
+      active: {},
+      pushManager: {
+        getSubscription: async () => subscription,
+        subscribe: async () => {
+          if (window.rejectPush) throw new Error("No test push service");
+          subscription = {
+            expirationTime: null,
+            toJSON: () => ({ endpoint: "https://fcm.googleapis.com/fcm/send/v12fixture",
+              keys: { p256dh: "A".repeat(87), auth: "B".repeat(22) } }),
+            unsubscribe: async () => { subscription = undefined; return true; }
+          };
+          return subscription;
+        }
+      }
+    });
+    const create = AudioContext.prototype.createOscillator;
+    AudioContext.prototype.createOscillator = function () {
+      window.notificationTones++;
+      return create.call(this);
+    };
+  });
   const c = await device(390);
   const d = await device(768);
   async function joinRoom(page, room) {
@@ -369,7 +404,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   }
   assert.match(await a.locator('.brand').innerText(), /Goleszan 19/);
   assert.equal(await a.locator('#room-setup').isVisible(), false);
-  assert.match(await a.locator('#room-lock').innerText(), /Pokój nr 1/);
+  assert.ok(await a.getByRole('heading', { name: 'Moje urządzenia' }).isVisible());
   await a.getByRole('link', { name: /Dyskusje/ }).click();
   await a.getByRole('heading', { name: 'Dołącz do dyskusji' }).waitFor();
   assert.equal(await a.locator('#discussion-compose').isVisible(), false);
@@ -382,7 +417,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     await b.setViewportSize({ width, height: 900 });
     const actual = await b.evaluate(() => {
       const header = document.querySelector('.header-inner').getBoundingClientRect();
-      const page = document.querySelector('.guide-frame').getBoundingClientRect();
+      const page = document.querySelector('.guide-instructions').getBoundingClientRect();
       return [header.x, header.width, page.x, page.width, document.documentElement.scrollWidth];
     });
     assert.deepEqual(actual, width === 360 ? [12, 336, 12, 336, 360] : [100, 1080, 100, 1080, 1280]);
@@ -396,6 +431,26 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await b.goto(base + '#dyskusje');
   await joinRoom(b, 2);
   await b.getByRole('link', { name: '← Harmonogram' }).click();
+  await b.getByRole('heading', { name: 'Moje urządzenia' }).waitFor();
+  const permission = b.locator('#push-permission');
+  await b.waitForFunction(() => document.querySelector('#push-permission').textContent === 'Włącz powiadomienia' &&
+    !document.querySelector('#push-permission').hidden);
+  assert.equal(await b.evaluate(() => window.pushRequests), 0);
+  await b.evaluate(() => { window.rejectPush = true; });
+  await permission.click();
+  await b.getByRole('button', { name: 'Podłącz ponownie', exact: true }).waitFor();
+  assert.equal(await b.evaluate(() => window.pushRequests), 1);
+  await b.evaluate(() => { window.rejectPush = false; });
+  await permission.click();
+  await b.waitForFunction(() => document.querySelector('#push-status').textContent === 'Powiadomienia są aktywne');
+  await b.evaluate(() => {
+    window.pushPermission = "denied";
+    window.dispatchEvent(new Event("online"));
+  });
+  await b.getByText('Powiadomienia są zablokowane w ustawieniach przeglądarki.').waitFor();
+  await b.getByText(/Otwórz ustawienia witryny/).waitFor();
+  assert.equal(await permission.isVisible(), false);
+  assert.equal(await b.evaluate(() => window.pushRequests), 1);
   await c.goto(base + '#dyskusje');
   await c.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
   losePairResponse = true;
@@ -446,24 +501,45 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   assert.equal(await a.locator('.discussion-message').count(), 1);
   assert.ok(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   assert.match(await b.locator('.discussion-meta strong').innerText(), /Pokój nr 1/);
+  await b.bringToFront();
+  await b.getByRole('link', { name: '← Harmonogram' }).click();
+  await b.locator('#notification-open').click();
+  await bell.getByRole('link', { name: /Nowa wiadomość/ }).waitFor();
+  await bell.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
+  await b.evaluate(() => { window.notificationTones = 0; });
+  const aKey = await a.evaluate(() => localStorage.getItem('goleszan19-discussion-device'));
+  await db.exec("update g19_private.devices set next_message_at = null where room = 1");
+  await rpc('send', { p_token: aKey, p_request: randomUUID(), p_body: 'Sygnał na stronie głównej' });
+  await b.locator('#notification-open').click();
+  await b.waitForFunction(() => window.notificationTones === 1);
+  await b.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
+  await b.locator('#notification-open').click();
+  assert.equal(await b.evaluate(() => window.notificationTones), 1);
+  await bell.getByRole('link', { name: /Nowa wiadomość/ }).first().click();
+  await b.getByText('Sygnał na stronie głównej', { exact: true }).waitFor();
+  await db.exec("update g19_private.devices set next_message_at = null where room = 1");
+  await rpc('send', { p_token: aKey, p_request: randomUUID(), p_body: 'Cicha wiadomość' });
+  await b.getByText('Cicha wiadomość', { exact: true }).waitFor();
+  await b.locator('#notification-count').waitFor({ state: 'hidden' });
+  assert.equal(await b.evaluate(() => window.notificationTones), 1);
+
 
   await a.locator('#notification-open').click();
   await a.getByText('Brak powiadomień.', { exact: true }).waitFor();
   await a.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
-  await b.locator('[data-reaction="1"]').click();
+  await b.locator('.discussion-message').first().locator('[data-reaction="1"]').click();
   await a.waitForFunction(() => document.querySelector('.reaction-count')?.textContent === '1');
   await b.reload();
   await b.waitForFunction(() => document.querySelector('[data-reaction="1"]')?.getAttribute('aria-pressed') === 'true');
-  await b.locator('[data-reaction="-1"]').click();
+  await b.locator('.discussion-message').first().locator('[data-reaction="-1"]').click();
   await b.waitForFunction(() => document.querySelector('[data-reaction="-1"]')?.getAttribute('aria-pressed') === 'true');
   await db.exec('update g19_private.devices set next_reaction_at = null');
-  await b.locator('[data-reaction="-1"]').click();
+  await b.locator('.discussion-message').first().locator('[data-reaction="-1"]').click();
   await b.waitForFunction(() => document.querySelector('[data-reaction="-1"]')?.getAttribute('aria-pressed') === 'false');
   await c.locator('.reaction-count').first().waitFor();
   assert.equal(await c.locator('[data-reaction]').count(), 0);
-  assert.equal(await c.locator('.reaction-count svg').count(), 2);
+  assert.equal(await c.locator('.discussion-message').first().locator('.reaction-count svg').count(), 2);
   await a.getByRole('link', { name: '← Harmonogram' }).click();
-  await a.getByText('Moje urządzenia', { exact: true }).click();
   await a.getByText('To urządzenie', { exact: true }).waitFor();
   assert.equal(await a.getByRole('button', { name: 'Podłącz', exact: true }).count(), 0);
   await a.getByRole('button', { name: /^Odłącz: urządzenie połączone/ }).waitFor();
@@ -484,11 +560,11 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   assert.equal(await a.locator('#discussion-join').isVisible(), false);
   await a.getByRole('link', { name: '← Harmonogram' }).click();
   await a.locator('#next-room').waitFor();
-  await b.getByText('Pokój nr 1 · poprzedni mieszkaniec').waitFor();
+  await b.getByText('Pokój nr 1 · poprzedni mieszkaniec', { exact: true }).first().waitFor();
   const newcomer = await device(360);
   await newcomer.goto(base + '#dyskusje');
   await joinRoom(newcomer, 1);
-  await newcomer.getByText('Pokój nr 1 · poprzedni mieszkaniec').waitFor();
+  await newcomer.getByText('Pokój nr 1 · poprzedni mieszkaniec', { exact: true }).first().waitFor();
   // Fill a page with fixtures and check that automatic refresh preserves the reader's place.
   await db.exec(`
     insert into g19_private.messages (device_id, request_id, body)

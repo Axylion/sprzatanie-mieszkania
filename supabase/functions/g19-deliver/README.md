@@ -1,8 +1,21 @@
 # Goleszan 19 — dostarczanie powiadomień w podglądzie
 
+## Aktualizacja działającego podglądu v11-1 do v12
+
+1. W `goleszan-19-test` zastosuj `202611130009_push_message_preview.sql` po 008.
+2. Wdróż aktualną funkcję `g19-deliver` z tego PR do projektu testowego.
+   Zachowaj istniejące sekrety i harmonogram. Stara funkcja ignoruje nowe pola
+   do czasu wdrożenia, a starszy service worker nadal pokaże krótki komunikat.
+3. Wgraj ZIP v12 do istniejącego projektu podglądu Cloudflare Pages. ZIP
+   zawiera publiczną konfigurację z v11-1. Sprawdź `goleszan19-shell-v12`
+   w nowym service workerze i odśwież zainstalowaną PWA.
+4. Sprawdź dźwięk po kliknięciu lub dotknięciu strony i dostawę push przy
+   zamkniętej karcie. Systemowa treść wiadomości może być widoczna również
+   na zablokowanym ekranie, zgodnie z ustawieniami systemu operacyjnego.
+
+## Konfiguracja od zera
+
 1. W projekcie **goleszan-19-test** zastosuj brakujące migracje w kolejności.
-   Jeśli v10 ma już migracje 001–006, zastosuj tylko
-   `202611130007_unified_notifications.sql` i `202611130008_device_revocation_audit.sql`.
    Stan migracji zweryfikuj przed uruchomieniem. Zachowaj schemat `g19_private` poza Data API.
 2. Włącz Supabase Cron (pg_cron), pg_net oraz Vault. Wygeneruj osobny losowy
    sekret zadania, np. `openssl rand -hex 32`. Zapisz go w Edge Function Secrets
@@ -47,7 +60,7 @@
 6. W testowym ZIP ustaw w `dyskusje/config.js` wyłącznie testowy URL, klucz
    `sb_publishable_…` i `vapidPublicKey` równy wartości G19_VAPID_PUBLIC_KEY.
    Wgraj ZIP do istniejącego projektu Cloudflare Pages. Zmień wersję cache w
-   `sw.js` jeśli aktualizujesz konfigurację po pierwszym wgraniu v11.
+   `sw.js` jeśli aktualizujesz konfigurację po pierwszym wgraniu v12.
 7. Zaznacz kategorie i użyj przycisku zezwolenia na powiadomienia w tle. Na dwóch urządzeniach z różnych pokoi
    wyślij wiadomość i sprawdź powiadomienie u odbiorcy przy zamkniętej karcie.
    Sprawdź również wyłączenie kategorii, kliknięcie w push i odwołanie
@@ -75,8 +88,8 @@ Zadanie obsługuje ograniczoną partię i ponawia błędy przejściowe do pięci
 Odpowiedzi 404/410 usuwają nieaktualną subskrypcję. Logi podają tylko liczniki.
 Tag powiadomienia i temat push ograniczają powtórzenia przy niejednoznacznym
 błędzie transportu. Push już zaakceptowany przez przeglądarkę przed odwołaniem
-może jeszcze dotrzeć, dlatego payload zawiera tylko kategorię i cel. Pełną
-historię rozmowy nadal chroni powiązanie urządzenia.
+może jeszcze dotrzeć. Pełną historię rozmowy nadal chroni powiązanie
+urządzenia.
 
 ## Dostęp administracyjny i wymiana mieszkańca
 

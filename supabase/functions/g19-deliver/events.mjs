@@ -56,3 +56,25 @@ export function deliveryOutcome(status) {
   if (!status || status === 408 || status === 429 || status >= 500) return "retry";
   return "failed";
 }
+
+const graphemes = new Intl.Segmenter("pl", { granularity: "grapheme" });
+
+export function pushPayload(item) {
+  const payload = { id: item.id, category: item.category, target: item.target };
+  if (item.category !== "messages" || ![1, 2, 3, 4].includes(item.room) || typeof item.message !== "string") {
+    return payload;
+  }
+  const normalized = item.message.replace(/\s+/gu, " ").trim();
+  let preview = "";
+  let count = 0;
+  for (const { segment } of graphemes.segment(normalized)) {
+    // Cap both visible characters and the size of unusually large graphemes.
+    if (count >= 140 || preview.length + segment.length > 400) {
+      preview = preview.trimEnd() + "…";
+      break;
+    }
+    preview += segment;
+    count++;
+  }
+  return { ...payload, room: item.room, preview };
+}

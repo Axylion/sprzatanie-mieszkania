@@ -1,5 +1,5 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v11";
+const CACHE_NAME = "goleszan19-shell-v12";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
   "./dyskusje/notifications.js",
@@ -92,8 +92,12 @@ self.addEventListener("push", event => {
   if (!data || !/^[0-9]+$/.test(data.id) || !/^#(dyskusje|calendar-title|ogloszenie-.+)$/.test(data.target)) return;
   const titles = { messages: "Nowa wiadomość", announcements: "Ważne ogłoszenie", duties: "Twój dyżur sprzątania" };
   if (!Object.hasOwn(titles, data.category)) return;
-  event.waitUntil(self.registration.showNotification(titles[data.category], {
-    body: "Otwórz Goleszan 19.", tag: "g19-" + data.id, renotify: false,
+  const message = data.category === "messages";
+  const preview = message && [1, 2, 3, 4].includes(data.room) &&
+    typeof data.preview === "string" && data.preview.length <= 401 && data.preview.trim();
+  const title = message ? "Goleszan 19 · Nowa wiadomość" : titles[data.category];
+  event.waitUntil(self.registration.showNotification(title, {
+    body: preview ? "Pokój nr " + data.room + ": " + preview : "Otwórz Goleszan 19.", tag: "g19-" + data.id, renotify: false,
     icon: new URL("icon-192.png", self.registration.scope).href,
     data: { target: data.target }
   }));

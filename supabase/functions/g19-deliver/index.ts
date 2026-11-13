@@ -1,6 +1,6 @@
 import webpush from "npm:web-push@3.6.7";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { announcementsForInbox, deliveryOutcome } from "./events.mjs";
+import { announcementsForInbox, deliveryOutcome, pushPayload } from "./events.mjs";
 
 const env = (key: string) => Deno.env.get(key) ?? "";
 const api = env("SUPABASE_URL");
@@ -45,14 +45,14 @@ Deno.serve(async request => {
     if (!publicKey || !privateKey || !subject) return Response.json({ sourceAvailable, pushConfigured: false });
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const batch = await rpc("push_take");
-    const outcomes = await Promise.all(batch.map(async (item: Record<string, string>) => {
+    const outcomes = await Promise.all(batch.map(async (item: { id: string; lease: string; endpoint: string; p256dh: string; auth: string; category: string; target: string; room?: number; message?: string }) => {
       let outcome = "failed";
       const endpoint = new URL(item.endpoint);
       if (endpoint.protocol === "https:" && !endpoint.port && !endpoint.username && !endpoint.password && allowedHosts.test(endpoint.hostname)) {
         try {
           await webpush.sendNotification({
             endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth }
-          }, JSON.stringify({ id: item.id, category: item.category, target: item.target }), {
+          }, JSON.stringify(pushPayload(item)), {
             TTL: 1800, timeout: 7000, topic: hash(item.id).toString("base64url").slice(0, 32)
           });
           outcome = "sent";

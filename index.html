@@ -41,11 +41,6 @@
       color-scheme: light;
     }
 
-    .personal-result .duty-date {
-      color: #84adfa;
-      font-weight: 400;
-    }
-
     :root[data-theme="dark"] {
       --bg: #0e131c;
       --surface: #19212d;
@@ -266,15 +261,6 @@
       color: var(--text);
       font-weight: 650;
     }
-    .personal-result {
-      background: var(--surface-alt);
-      padding: 14px;
-      border-radius: 12px;
-      margin-top: 15px;
-      font-size: 14px;
-      line-height: 1.65;
-    }
-
     /* Każde aktywne ogłoszenie ma niezależne rozwijanie treści. */
     .announcement-card {
       background: #fff6af;
@@ -582,14 +568,15 @@
       <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
       <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
       <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
-      <button id="push-permission" type="button" hidden>Zezwól na powiadomienia na tym urządzeniu</button>
       <p id="push-status" role="status"></p>
+      <p id="push-help"></p>
+      <button id="push-permission" type="button" aria-describedby="push-status" hidden>Włącz powiadomienia</button>
     </details>
   </section>
     </div>
   </div>
   <section class="card" id="ustawienia" aria-labelledby="settings-title">
-    <h2 id="settings-title" tabindex="-1">Ustawienia</h2>
+    <h2 id="settings-title" tabindex="-1">Moje urządzenia</h2>
     <fieldset id="room-setup">
       <legend>Wybierz swój pokój</legend>
       <p class="muted">Potwierdzony pokój zostanie przypisany do tego urządzenia.</p>
@@ -601,10 +588,8 @@
       </div>
       <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
     </fieldset>
-    <p id="room-lock" hidden></p>
-    <div class="personal-result" id="personal-result" hidden></div>
-    <details id="device-settings" hidden>
-      <summary>Moje urządzenia</summary>
+    <p id="device-connect"><a href="#dyskusje">Podłącz urządzenie w Dyskusjach</a></p>
+    <div id="device-settings" hidden>
       <p id="device-settings-status" role="status"></p>
       <ul id="device-list" class="device-list"></ul>
       <div id="device-confirm" hidden>
@@ -612,7 +597,7 @@
         <button type="button" id="device-revoke">Odłącz urządzenie</button>
         <button type="button" id="device-cancel">Anuluj</button>
       </div>
-    </details>
+    </div>
   </section>
 </main>
 
@@ -796,7 +781,6 @@
   let selectedRoom = localStorage.getItem("cleaning-room");
   if (!["1", "2", "3", "4"].includes(selectedRoom)) selectedRoom = "";
   const roomSetup = document.getElementById("room-setup");
-  const roomLock = document.getElementById("room-lock");
   const roomConfirm = document.getElementById("room-confirm");
   const roomButtons = [...document.querySelectorAll("#room-buttons [data-room]")];
   let pendingRoom = "";
@@ -833,21 +817,9 @@
 
   function showRoomSelection() {
     roomSetup.hidden = Boolean(selectedRoom);
-    roomLock.hidden = !selectedRoom;
-    roomLock.textContent = selectedRoom ? "Przypisany pokój: Pokój nr " + selectedRoom : "";
     document.querySelectorAll("#schedule .schedule-row").forEach((row, index) => {
       row.classList.toggle("my-room", roomFor(start + index * WEEK) === Number(selectedRoom));
     });
-    const result = document.getElementById("personal-result");
-    result.hidden = !selectedRoom;
-    if (!selectedRoom) return;
-
-    let saturday = start;
-    while (roomFor(saturday) !== Number(selectedRoom)) saturday += WEEK;
-    const date = document.createElement("span");
-    date.className = "duty-date";
-    date.textContent = weekendText(saturday);
-    result.replaceChildren("Najbliższy dyżur pokoju nr " + selectedRoom + ": ", date, ".");
   }
 
   const themeSelect = document.getElementById("theme-select");

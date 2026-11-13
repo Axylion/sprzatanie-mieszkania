@@ -49,13 +49,15 @@
 }
 
 .guide-frame {
-  padding: clamp(12px, 2.8vw, 26px);
-  background: var(--guide-bg);
-  border-radius: 20px;
   overflow-wrap: anywhere;
 }
 
 .guide-top { margin-bottom: 12px; }
+:root[data-theme="light"] #poradnik-view :is(.guide-top, .guide-card-header, .guide-card-position, .guide-categories) { color: var(--text); }
+:root[data-theme="light"] .guide-card-header :is(svg, .guide-kicker) { color: #08747e; }
+:root[data-theme="light"] #poradnik-view .guide-categories a:is([aria-current], :hover) { color: #755300; }
+:root[data-theme="light"] .guide-categories a[aria-current]::after { background: #a87600; }
+:root[data-theme="light"] #poradnik-view :focus-visible { outline-color: #08747e; }
 .guide-home-link {
   display: inline-flex;
   align-items: center;

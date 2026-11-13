@@ -8,6 +8,7 @@
   const notice = document.querySelector("#notification-status");
   const readAll = document.querySelector("#notification-read-all");
   const pushStatus = document.querySelector("#push-status");
+  const pushHelp = document.querySelector("#push-help");
   const permissionButton = document.querySelector("#push-permission");
   const choices = [...document.querySelectorAll(".notification-settings input")];
   const format = new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Warsaw" });
@@ -110,7 +111,7 @@
     if (!Context) return;
     try {
       audio ||= new Context();
-      if (audio.state === "suspended") audio.resume().catch(() => {});
+      if (audio.state !== "running") audio.resume().catch(() => {});
     } catch { /* The inbox remains available when sound is blocked. */ }
   }
 
@@ -133,26 +134,33 @@
     if (!active()) return [];
     const latest = items.filter(item => !item.read && (!onChat() || item.category !== "messages"));
     const previous = baseline;
-    baseline = new Set(latest.map(item => item.id));
-    const incoming = latest.filter(item => !previous?.has(item.id) &&
-      (key ? new Date(item.receivedAt).getTime() > foregroundSince : Boolean(previous)));
-    if (incoming.length) {
+    baseline = new Set(items.map(item => item.id));
+    const incoming = latest.filter(item => !previous?.has(item.id));
+    // Keep the existing push acknowledgement separate from sound playback.
+    const presented = incoming.filter(item => key ? new Date(item.receivedAt).getTime() > foregroundSince : Boolean(previous));
+    const audible = incoming.filter(item => item.category === "messages"
+      ? previous && location.hash !== "#dyskusje" && !document.querySelector("#harmonogram").hidden
+      : presented.includes(item));
+    if (audible.length) {
       const play = () => {
         if (key !== token() || !active()) return;
         const storageKey = "goleszan19-presented-" + (key || "public");
         let shown = [];
         try { shown = JSON.parse(localStorage.getItem(storageKey)) || []; } catch { /* Start with an empty history. */ }
-        const newItems = incoming.filter(item => !shown.includes(item.id));
+        const newItems = audible.filter(item => !shown.includes(item.id));
         if (!newItems.length) return;
         localStorage.setItem(storageKey, JSON.stringify([...shown, ...newItems.map(item => item.id)].slice(-150)));
-        for (const [index] of newItems.entries()) {
-          setTimeout(() => { if (active() && key === token()) signal(); }, index * 220);
+        for (const [index, item] of newItems.entries()) {
+          setTimeout(() => {
+            if (active() && key === token() && (item.category !== "messages" ||
+                !document.querySelector("#harmonogram").hidden)) signal();
+          }, index * 220);
         }
       };
       if (navigator.locks) navigator.locks.request("g19-notification-sound", play).catch(() => {});
       else play();
     }
-    return incoming.map(item => item.id);
+    return presented.map(item => item.id);
   }
 
   function localRead() {
@@ -275,26 +283,36 @@
 
   function showPush() {
     permissionButton.hidden = true;
-    if (!supported) pushStatus.textContent = "Ta przeglądarka nie obsługuje powiadomień w tle. Na iPhonie otwórz aplikację z ekranu początkowego.";
-    else if (!ready || !config.vapidPublicKey) pushStatus.textContent = "Powiadomienia w tle czekają na konfigurację.";
-    else if (!token()) pushStatus.textContent = "Połącz urządzenie, aby otrzymywać powiadomienia w tle.";
-    else if (Notification.permission === "denied") pushStatus.textContent = "Powiadomienia w tle są zablokowane w ustawieniach przeglądarki.";
-    else if (Notification.permission === "default" && selected().length) {
+    pushHelp.textContent = "";
+    if (!supported) {
+      pushStatus.textContent = "Ta przeglądarka nie obsługuje powiadomień w tle.";
+      pushHelp.textContent = "Na iPhonie dodaj aplikację do ekranu początkowego i otwórz ją z tego ekranu.";
+    } else if (!ready || !config.vapidPublicKey) {
+      pushStatus.textContent = "Powiadomienia w tle czekają na konfigurację.";
+    } else if (!token()) {
+      pushStatus.textContent = "Połącz urządzenie, aby otrzymywać powiadomienia w tle.";
+    } else if (Notification.permission === "denied") {
+      pushStatus.textContent = "Powiadomienia są zablokowane w ustawieniach przeglądarki.";
+      pushHelp.textContent = "Otwórz ustawienia witryny przy pasku adresu, zezwól na powiadomienia i wróć do aplikacji.";
+    } else if (pushBusy) {
+      pushStatus.textContent = "Sprawdzanie powiadomień w tle…";
+    } else if (Notification.permission === "default") {
       permissionButton.hidden = false;
-      permissionButton.textContent = "Zezwól na powiadomienia na tym urządzeniu";
-      pushStatus.textContent = "Zezwól na powiadomienia, aby otrzymywać je również poza aplikacją.";
-    } else if (pushBusy) pushStatus.textContent = "Zapisywanie powiadomień w tle…";
-    else if (!selected().length) pushStatus.textContent = "";
-    else if (pushSynced) pushStatus.textContent = "To urządzenie otrzymuje powiadomienia także w tle.";
-    else {
+      permissionButton.textContent = "Włącz powiadomienia";
+      pushStatus.textContent = "Otrzymuj powiadomienia również wtedy, gdy aplikacja jest zamknięta.";
+    } else if (!selected().length) {
+      pushStatus.textContent = "Wybierz co najmniej jedną kategorię, aby otrzymywać powiadomienia.";
+    } else if (pushSynced) {
+      pushStatus.textContent = "Powiadomienia są aktywne";
+    } else {
       permissionButton.hidden = false;
-      permissionButton.textContent = "Ponów włączenie powiadomień w tle";
-      pushStatus.textContent = "Powiadomienia w tle jeszcze nie są aktywne.";
+      permissionButton.textContent = "Podłącz ponownie";
+      pushStatus.textContent = "Powiadomienia w tle nie są aktywne na tym urządzeniu.";
     }
   }
 
   let pushQueue = Promise.resolve();
-  function updatePush() {
+  function updatePush(reconnect = false) {
     const key = token();
     if (!supported || !ready || !config.vapidPublicKey || !key) return;
     pushQueue = pushQueue.catch(() => {}).then(async () => {
@@ -304,10 +322,22 @@
       showPush();
       let created;
       try {
-        const current = await subscription();
+        let current = await subscription();
+        if (current && (reconnect || (current.expirationTime != null && current.expirationTime <= Date.now()))) {
+          await current.unsubscribe();
+          current = null;
+        }
         if (Notification.permission === "granted" && selected().length) {
           if (!current) {
-            const registration = await navigator.serviceWorker.ready;
+            let registration = await navigator.serviceWorker.getRegistration();
+            if (!registration?.active) {
+              // Bound the wait on a first visit or when service workers are restricted.
+              registration = await Promise.race([
+                navigator.serviceWorker.ready,
+                new Promise(resolve => setTimeout(resolve, 4000))
+              ]);
+            }
+            if (!registration?.pushManager) throw new Error("Push unavailable");
             if (key !== token()) return;
             created = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: config.vapidPublicKey });
           }
@@ -329,8 +359,9 @@
   }
 
   permissionButton.addEventListener("click", async () => {
+    const reconnect = Notification.permission === "granted";
     if (Notification.permission === "default") await Notification.requestPermission().catch(() => "denied");
-    updatePush();
+    updatePush(reconnect);
     showPush();
   });
 
@@ -388,6 +419,7 @@
     reportActivity().catch(() => {});
     if (!document.hidden) applyServerSettings().catch(() => {}).finally(refresh);
   }
+  navigator.serviceWorker?.addEventListener("controllerchange", () => updatePush());
   window.addEventListener("focus", foregroundChanged);
   window.addEventListener("blur", foregroundChanged);
   window.addEventListener("pagehide", () => reportActivity([], true).catch(() => {}));
@@ -400,9 +432,13 @@
         baseline = undefined;
         foregroundSince = lastActivity;
       }
-      if (type !== "wheel") unlockAudio();
       if (!presence) reportActivity().catch(() => {});
     }, { passive: true });
+  }
+  for (const type of ["pointerdown", "pointerup", "touchend", "keydown", "click"]) {
+    window.addEventListener(type, event => {
+      if (event.isTrusted && (!navigator.userActivation || navigator.userActivation.hasBeenActive)) unlockAudio();
+    }, { capture: true, passive: true });
   }
   setInterval(() => {
     if (token() && (active() || presence)) reportActivity().catch(() => {});

@@ -14,6 +14,7 @@
   const pairRenew = document.getElementById("discussion-pair-renew");
   const pairBack = document.getElementById("discussion-pair-back");
   const approvalDetails = document.getElementById("discussion-approve");
+  const deviceConnect = document.getElementById("device-connect");
   const deviceSettings = document.getElementById("device-settings");
   const deviceList = document.getElementById("device-list");
   const deviceStatus = document.getElementById("device-settings-status");
@@ -112,6 +113,7 @@
     clearHistory();
     chat.hidden = join.hidden = pairPanel.hidden = true;
     deviceSettings.hidden = true;
+    deviceConnect.hidden = true;
     deviceList.replaceChildren();
     deviceConfirm.hidden = true;
     status.textContent = "Dostęp do dyskusji został zakończony.";
@@ -704,13 +706,13 @@
   }
 
   async function loadDevices() {
-    if (!configured || !token || location.hash.startsWith("#poradnik") || !view.hidden) return;
-    deviceSettings.hidden = false;
-    if (!deviceSettings.open) return;
+    deviceConnect.hidden = !configured || Boolean(token) || localStorage.getItem(revokedKey) === "true";
+    deviceSettings.hidden = !configured || !token;
+    if (deviceSettings.hidden || document.getElementById("harmonogram").hidden) return;
     const usedToken = token;
     try {
       const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind() });
-      if (token !== usedToken || !view.hidden) return;
+      if (token !== usedToken || document.getElementById("harmonogram").hidden) return;
       updateDeviceCount(devices.length);
       const rows = devices.map(device => {
         const row = deviceRow(device.kind, true, device.current);
@@ -747,15 +749,14 @@
     } catch (error) {
       if (token !== usedToken) return;
       if (error.code === "device_invalid") showRevoked();
-      else deviceStatus.textContent = "Nie udało się odczytać urządzeń. Otwórz tę sekcję ponownie.";
+      else deviceStatus.textContent = "Nie udało się odczytać urządzeń. Sprawdź połączenie z internetem.";
     }
   }
 
-  deviceSettings.addEventListener("toggle", loadDevices);
   document.getElementById("device-cancel").addEventListener("click", () => {
     deviceConfirm.hidden = true;
     deviceToRevoke = null;
-    deviceSettings.querySelector("summary").focus();
+    document.getElementById("settings-title").focus();
   });
   deviceRevoke.addEventListener("click", async () => {
     if (!token || !deviceToRevoke || deviceRevoke.disabled) return;
@@ -778,7 +779,7 @@
       await loadDevices();
       if (token === usedToken) {
         deviceStatus.textContent = "Urządzenie zostało odłączone.";
-        deviceSettings.querySelector("summary").focus();
+        document.getElementById("settings-title").focus();
       }
     } catch (error) {
       if (token !== usedToken) return;

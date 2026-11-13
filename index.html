@@ -415,6 +415,7 @@
   <link rel="stylesheet" href="./dyskusje/dyskusje.css">
   <script defer src="./dyskusje/config.js"></script>
   <script defer src="./dyskusje/dyskusje.js"></script>
+  <script defer src="./dyskusje/notifications.js"></script>
 </head>
 
 <body>
@@ -425,7 +426,7 @@
       <span>Goleszan 19</span>
     </div>
     <div class="header-actions">
-      <a href="#ustawienia" class="settings-entry" aria-label="Ustawienia">⚙</a>
+      <button type="button" class="settings-entry notification-bell" id="notification-open" aria-label="Powiadomienia" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg><span id="notification-count" hidden></span></button>
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
       <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
@@ -439,9 +440,18 @@
   </div>
 </header>
 
+<dialog id="notification-panel" class="shortcut-help" aria-labelledby="notification-title">
+  <div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" aria-label="Zamknij powiadomienia">×</button></form></div>
+  <button type="button" id="notification-read-all" hidden>Oznacz wszystkie jako przeczytane</button>
+  <p id="notification-empty">Brak powiadomień.</p>
+  <p id="notification-status" role="status"></p>
+  <ul id="notification-list"></ul>
+  <a id="notification-settings-link" href="#powiadomienia">Ustawienia powiadomień</a>
+</dialog>
+
 <dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
   <h2 id="shortcut-title">🏠 Dodaj Goleszan 19 na ekran główny</h2>
-  <p>Zainstalowana aplikacja otwiera harmonogram bez interfejsu przeglądarki i działa również offline po pierwszym wczytaniu. Powiadomienia push nie są jeszcze aktywne.</p>
+  <p>Zainstalowana aplikacja otwiera harmonogram bez interfejsu przeglądarki i działa również offline po pierwszym wczytaniu. Powiadomienia push można włączyć w ustawieniach.</p>
   <div id="android-install-instructions">
     <strong>Android (Chrome)</strong>
     <ol>
@@ -483,7 +493,7 @@
     <div class="eyebrow">Najbliższy dyżur</div>
     <div class="hero-room" id="next-room">—</div>
     <div class="hero-date" id="next-date">—</div>
-    <p>Sprzątanie części wspólnych odbywa się w weekend.</p>
+    <p>Generalne sprzątanie w weekend (±1 dzień)</p>
   </section>
       <nav class="dashboard-links" aria-label="Sekcje aplikacji">
   <a class="card guide-entry" href="#poradnik">
@@ -501,24 +511,7 @@
   </a>
 
   </nav>
-    </div>
-    <section class="card dashboard-calendar" aria-labelledby="calendar-title">
-    <h2 id="calendar-title">Kalendarz sprzątania</h2>
-    <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Najbliższy dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
-    <div id="schedule"></div>
-    <button id="toggle-schedule" class="schedule-toggle"
-        type="button" aria-expanded="false">
-      Pokaż więcej ↓
-    </button>
-    <p class="muted" style="font-size:13px">
-      Kolejność: 1 → 2 → 3 → 4.
-      Harmonogram jest kontynuowany bez przerw,
-      również po zmianie roku.
-    </p>
-  </section>
-  </div>
-  <div class="dashboard-more">
-  <section class="card">
+      <section class="card">
     <h2>📖 Zasady sprzątania</h2>
 
     <details>
@@ -565,16 +558,42 @@
       </p>
     </details>
   </section>
-  <section class="card dashboard-notifications">
+    </div>
+    <div class="dashboard-secondary">
+      <section class="card dashboard-calendar" aria-labelledby="calendar-title">
+    <h2 id="calendar-title">Kalendarz sprzątania</h2>
+    <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Najbliższy dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
+    <div id="schedule"></div>
+    <button id="toggle-schedule" class="schedule-toggle"
+        type="button" aria-expanded="false">
+      Pokaż więcej ↓
+    </button>
+    <p class="muted" style="font-size:13px">
+      Kolejność: 1 → 2 → 3 → 4.
+      Harmonogram jest kontynuowany bez przerw,
+      również po zmianie roku.
+    </p>
+  </section>
+      <section class="card dashboard-notifications" id="powiadomienia">
     <h2>Powiadomienia</h2>
     <details class="notification-settings">
       <summary>Ustawienia powiadomień</summary>
-      <p>Preferencje są zapisywane na tym urządzeniu. Wysyłanie powiadomień zostanie uruchomione osobno.</p>
+      <p>Powiadomienia w aplikacji</p>
       <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
       <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
       <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
+      <fieldset id="push-settings">
+        <legend>Powiadomienia systemowe (push)</legend>
+        <label><input type="checkbox" name="duties" checked> Dyżury sprzątania</label>
+        <label><input type="checkbox" name="messages" checked> Nowe wiadomości</label>
+        <label><input type="checkbox" name="announcements" checked> Ważne ogłoszenia</label>
+        <button id="push-toggle" type="button">Włącz push</button>
+        <p id="push-status" role="status"></p>
+      </fieldset>
     </details>
   </section>
+    </div>
+  </div>
   <section class="card" id="ustawienia" aria-labelledby="settings-title">
     <h2 id="settings-title" tabindex="-1">Ustawienia</h2>
     <fieldset id="room-setup">
@@ -601,8 +620,6 @@
       </div>
     </details>
   </section>
-
-  </div>
 </main>
 
 <main id="poradnik-view" hidden></main>
@@ -839,7 +856,7 @@
     result.replaceChildren("Najbliższy dyżur pokoju nr " + selectedRoom + ": ", date, ".");
   }
 
-  document.querySelectorAll(".notification-settings input").forEach(input => {
+  document.querySelectorAll(".notification-settings input:not(#push-settings input)").forEach(input => {
     const key = "goleszan19-notification-" + input.name;
     input.checked = localStorage.getItem(key) === "true";
     input.addEventListener("change", () => localStorage.setItem(key, String(input.checked)));
@@ -976,12 +993,14 @@
         Math.min(Math.min(...boundaries) - now, 2147483647));
     }
     const visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
+    window.dispatchEvent(new Event("g19-announcements"));
     restoreAnnouncements.hidden = !activeAnnouncements.some(item => hiddenAnnouncements.has(announcementKey(item)));
     announcementList.replaceChildren();
     announcementCard.hidden = visibleItems.length === 0;
     visibleItems.forEach((item, index) => {
       const article = document.createElement("article");
       article.className = "announcement-entry";
+      article.id = "ogloszenie-" + item.id;
       const meta = document.createElement("div");
       meta.className = "announcement-date";
       meta.textContent = "Opublikowano: " + fmtAnnouncementDate(item.publishedAt);

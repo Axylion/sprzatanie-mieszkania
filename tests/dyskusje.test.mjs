@@ -23,6 +23,8 @@ const signatures = {
   read: ['p_token', 'p_before', 'p_version'],
   send: ['p_token', 'p_request', 'p_body'],
   react: ['p_token', 'p_message', 'p_vote'],
+  notifications: ['p_token', 'p_categories'],
+  notification_read: ['p_token', 'p_id', 'p_categories'],
   my_devices: ['p_token', 'p_kind'],
   revoke_device: ['p_token', 'p_device']
 };
@@ -36,6 +38,8 @@ async function database(t, legacy = false) {
     await db.exec(numericMigration);
     await db.exec(revisionMigration);
     await db.exec(devicesMigration);
+    await db.exec(await readFile(new URL('../supabase/migrations/202611130005_notification_inbox.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../supabase/migrations/202611130006_web_push.sql', import.meta.url), 'utf8'));
   }
   const rpc = (method, args) => db.transaction(async tx => {
     await tx.exec('set local role anon');
@@ -338,6 +342,17 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
       assert.equal(await a.locator('.dashboard-main').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), width < 760 ? 1 : 2);
       assert.ok(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.ok(await a.locator('.calendar-legend').isVisible());
+      const layout = await a.evaluate(() => {
+        const rect = selector => document.querySelector(selector).getBoundingClientRect();
+        return {
+          aligned: Math.abs(rect('.header-inner').left - rect('#harmonogram').left) < 1,
+          mobileOrder: rect('.hero').top < rect('.dashboard-calendar').top && rect('.dashboard-calendar').top < rect('.dashboard-links').top,
+          stacked: rect('.dashboard-links a:first-child').top < rect('.dashboard-links a:last-child').top
+        };
+      });
+      assert.ok(layout.aligned && layout.stacked);
+      if (width < 760) assert.ok(layout.mobileOrder);
+      assert.equal(await a.locator('.hero p').textContent(), 'Generalne sprzątanie w weekend (±1 dzień)');
       await a.locator('#announcements-card').waitFor();
       if (width === 390 || width === 1280) {
         await screenshot(a, 'goleszan-home-' + (width === 390 ? 'mobile-' : 'desktop-') + theme);
@@ -362,10 +377,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await b.getByRole('heading', { name: /Szafki kuchenne/ }).waitFor();
   await b.getByRole('link', { name: '← Harmonogram' }).click();
   await b.locator('#next-room').waitFor();
-  await b.getByText('Ustawienia powiadomień', { exact: true }).click();
-  await b.getByLabel('Nowe wiadomości').check();
-  assert.equal(await b.getByLabel('Dyżury sprzątania').isChecked(), false);
-  assert.equal(await b.getByLabel('Ważne ogłoszenia').isChecked(), false);
+  await b.locator('#powiadomienia summary').click();
+  await b.locator('.notification-settings > label').getByLabel('Nowe wiadomości').check();
+  assert.equal(await b.locator('.notification-settings > label').getByLabel('Dyżury sprzątania').isChecked(), false);
+  assert.equal(await b.locator('.notification-settings > label').getByLabel('Ważne ogłoszenia').isChecked(), false);
   await b.goto(base + '#dyskusje');
   await joinRoom(b, 2);
   await c.goto(base + '#dyskusje');
@@ -412,8 +427,17 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   assert.ok(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   assert.match(await b.locator('.discussion-meta strong').innerText(), /Pokój nr 1/);
 
+  await b.locator('#notification-open').click();
+  const bell = b.locator('#notification-panel');
+  await bell.getByRole('link', { name: /Nowa wiadomość/ }).waitFor();
+  assert.equal(await b.locator('#notification-count').textContent(), '1');
+  await bell.getByRole('link', { name: /Nowa wiadomość/ }).click();
+  await b.locator('#notification-count').waitFor({ state: 'hidden' });
+  await a.locator('#notification-open').click();
+  await a.getByText('Brak powiadomień.', { exact: true }).waitFor();
+  await a.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
   await b.locator('[data-reaction="1"]').click();
-  await a.waitForFunction(() => document.querySelector('.reaction-count')?.textContent === '👍 1');
+  await a.waitForFunction(() => document.querySelector('.reaction-count')?.textContent === '1');
   await b.reload();
   await b.waitForFunction(() => document.querySelector('[data-reaction="1"]')?.getAttribute('aria-pressed') === 'true');
   await b.locator('[data-reaction="-1"]').click();
@@ -423,7 +447,8 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await b.waitForFunction(() => document.querySelector('[data-reaction="-1"]')?.getAttribute('aria-pressed') === 'false');
   await c.locator('.reaction-count').first().waitFor();
   assert.equal(await c.locator('[data-reaction]').count(), 0);
-  await a.getByRole('link', { name: 'Ustawienia' }).click();
+  assert.equal(await c.locator('.reaction-count svg').count(), 2);
+  await a.getByRole('link', { name: '← Harmonogram' }).click();
   await a.getByText('Moje urządzenia', { exact: true }).click();
   await a.getByRole('button', { name: /^Odłącz:/ }).waitFor();
   await screenshot(a, 'dyskusje-devices-mobile');

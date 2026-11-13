@@ -106,6 +106,7 @@
     localStorage.removeItem(enrollmentKey);
     localStorage.removeItem(pairingKey);
     token = pairing = null;
+    window.dispatchEvent(new Event("g19-device-changed"));
     clearInterval(pairTimer);
     clearHistory();
     chat.hidden = join.hidden = pairPanel.hidden = true;
@@ -135,7 +136,15 @@
     const button = document.createElement(message.mine ? "span" : "button");
     const label = value === 1 ? "Zgadzam się" : "Nie zgadzam się";
     const count = value === 1 ? message.up : message.down;
-    button.textContent = (value === 1 ? "👍 " : "👎 ") + count;
+    const ns = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(ns, "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", "M7 11v9H3v-9h4Zm0 0 4-7a2 2 0 0 1 2 2v4h5a2 2 0 0 1 2 2l-1 6a2 2 0 0 1-2 2H7");
+    if (value === -1) path.setAttribute("transform", "rotate(180 12 12)");
+    icon.append(path);
+    button.append(icon, document.createTextNode(String(count)));
     button.setAttribute("aria-label", label + ", liczba reakcji: " + count);
     if (message.mine) {
       button.className = "reaction-count";
@@ -310,6 +319,7 @@
     localStorage.removeItem(enrollmentKey);
     finishPairing();
     token = data.token;
+    window.dispatchEvent(new Event("g19-device-changed"));
     rpc("my_devices", { p_token: token, p_kind: deviceKind() }).catch(() => {});
     rememberRoom(data.room);
     join.hidden = true;

@@ -219,3 +219,11 @@ tests/dyskusje-safeupdate.sql`. Wymaga odizolowanej bazy PostgreSQL z rolami
 modułu. Ustaw `G19_SAFEUPDATE_LIBRARY` na nazwę lub ścieżkę biblioteki
 `safeupdate`. Test odtwarza błąd 21000 z wcześniejszą funkcją, stosuje poprawkę
 i sprawdza czat z dwoma urządzeniami oraz zachowanie uprawnień.
+
+### Powiadomienia w podglądzie
+
+Po migracjach 001–004 zastosuj kolejno 005 i 006. Dzwonek pokazuje stan odczytu
+bieżącego urządzenia. Kategorie w aplikacji i push mają osobne ustawienia.
+Przypomnienie o dyżurze przypada w piątek o 14:00 czasu Europe/Warsaw.
+
+[Instrukcja wdrożenia zadania i konfiguracji VAPID](supabase/functions/g19-deliver/README.md).

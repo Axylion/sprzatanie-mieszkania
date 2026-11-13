@@ -76,7 +76,10 @@
 .discussion-meta time { color: var(--muted); font-size: .85rem; }
 .discussion-message p { margin: 6px 0; white-space: pre-wrap; }
 .discussion-reactions { display: flex; flex-wrap: wrap; gap: 6px; }
-.discussion-reactions button[aria-pressed="true"] { border-color: var(--chat-line); background: var(--chat-own); }
+.discussion-reactions button, .discussion-reactions .reaction-count { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.discussion-reactions svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.55; stroke-linejoin: round; }
+.discussion-reactions button[aria-pressed="true"] svg { color: #866100; }
+[data-theme="dark"] .discussion-reactions button[aria-pressed="true"] svg { color: #ffe273; }
 .discussion-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: end; }
 .discussion-compose label { grid-column: 1 / -1; }
 .discussion-compose textarea {
@@ -180,17 +183,30 @@
 #device-settings button { min-height: 44px; color: var(--text); border: 1px solid var(--border); background: var(--surface-alt); border-radius: 8px; padding: 6px 10px; }
 .discussion-reactions .reaction-count { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: var(--muted); }
 
-@media (min-width: 760px) {
-  #harmonogram.container { width: min(100% - 48px, 1080px); }
-  .dashboard-main, .dashboard-links, .dashboard-more, .device-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dashboard-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
-  .dashboard-primary, .dashboard-links { margin-bottom: 0; }
-  .dashboard-more { align-items: start; }
-  #ustawienia { grid-column: 1 / -1; }
-}
 
-.dashboard-primary, .dashboard-primary .dashboard-links { margin-bottom: 0; }
+.dashboard-primary, .dashboard-secondary { display: contents; }
+.dashboard-main .hero { order: 1; }
+.dashboard-calendar { order: 2; }
+.dashboard-links { order: 3; margin: 0; }
+.dashboard-primary > section:not(.hero) { order: 4; }
+.dashboard-notifications { order: 5; }
 .schedule-row.active .room-badge { outline: 1px solid var(--accent); outline-offset: -1px; }
-@media (min-width: 760px) and (max-width: 950px) {
-  .dashboard-primary .dashboard-links { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) {
+  #harmonogram.container, .header-inner.container { width: min(100% - 48px, 1080px); }
+  .dashboard-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
+  .dashboard-primary, .dashboard-secondary { display: grid; gap: 14px; min-width: 0; margin: 0; }
+  .dashboard-secondary > .card { margin: 0; }
+  .device-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.notification-bell { position: relative; }
+.notification-bell svg { width: 21px; height: 21px; }
+#notification-count { position: absolute; top: -5px; right: -5px; padding: 2px 5px; border-radius: 12px; background: #ffe273; color: #09242e; font-size: .7rem; }
+.notification-heading { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+#notification-list { list-style: none; margin: 12px 0; padding: 0; max-height: 55vh; overflow-y: auto; }
+#notification-list li + li { border-top: 1px solid var(--border); }
+#notification-list a { display: grid; padding: 10px 6px; gap: 3px; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+#notification-list a[data-unread] { border-inline-start: 3px solid var(--accent); padding-inline-start: 9px; }
+#notification-list time { color: var(--muted); font-size: .82rem; }
+#notification-panel button, #push-toggle { min-height: 44px; color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+#push-settings { margin-top: 14px; border: 1px solid var(--border); border-radius: 8px; }
+#push-toggle { margin-top: 12px; }

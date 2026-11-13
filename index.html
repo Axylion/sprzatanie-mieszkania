@@ -425,6 +425,7 @@
       <span>Goleszan 19</span>
     </div>
     <div class="header-actions">
+      <a href="#ustawienia" class="settings-entry" aria-label="Ustawienia">⚙</a>
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
       <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
@@ -476,13 +477,15 @@
     </p>
   </div>
 
-  <section class="card hero">
+  <div class="dashboard-main">
+    <div class="dashboard-primary">
+      <section class="card hero">
     <div class="eyebrow">Najbliższy dyżur</div>
     <div class="hero-room" id="next-room">—</div>
     <div class="hero-date" id="next-date">—</div>
     <p>Sprzątanie części wspólnych odbywa się w weekend.</p>
   </section>
-
+      <nav class="dashboard-links" aria-label="Sekcje aplikacji">
   <a class="card guide-entry" href="#poradnik">
     <span class="guide-entry-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 2Zm0 0v15"/></svg>
@@ -492,37 +495,16 @@
   </a>
 
   <a class="card guide-entry discussion-entry" href="#dyskusje">
-    <span class="guide-entry-icon" aria-hidden="true">💬</span>
+    <span class="guide-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg></span>
     <span><strong>Dyskusje</strong><small>Wspólne sprawy mieszkańców</small></span>
     <span class="guide-entry-arrow" aria-hidden="true">→</span>
   </a>
 
-  <section class="card" id="ustawienia" aria-labelledby="settings-title">
-    <h2 id="settings-title" tabindex="-1">Ustawienia</h2>
-    <fieldset id="room-setup">
-      <legend>Wybierz swój pokój</legend>
-      <p class="muted">Potwierdzony pokój zostanie przypisany do tego urządzenia.</p>
-      <div class="room-buttons" id="room-buttons">
-        <button class="room-button" type="button" data-room="1" aria-pressed="false">Pokój nr 1</button>
-        <button class="room-button" type="button" data-room="2" aria-pressed="false">Pokój nr 2</button>
-        <button class="room-button" type="button" data-room="3" aria-pressed="false">Pokój nr 3</button>
-        <button class="room-button" type="button" data-room="4" aria-pressed="false">Pokój nr 4</button>
-      </div>
-      <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
-    </fieldset>
-    <p id="room-lock" hidden></p>
-    <div class="personal-result" id="personal-result" hidden></div>
-    <details class="notification-settings">
-      <summary>Ustawienia powiadomień</summary>
-      <p>Preferencje są zapisywane na tym urządzeniu. Wysyłanie powiadomień zostanie uruchomione osobno.</p>
-      <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
-      <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
-      <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
-    </details>
-  </section>
-
-  <section class="card">
-    <h2>📅 Nadchodzące dyżury</h2>
+  </nav>
+    </div>
+    <section class="card dashboard-calendar" aria-labelledby="calendar-title">
+    <h2 id="calendar-title">Kalendarz sprzątania</h2>
+    <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Najbliższy dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
     <div id="schedule"></div>
     <button id="toggle-schedule" class="schedule-toggle"
         type="button" aria-expanded="false">
@@ -534,7 +516,8 @@
       również po zmianie roku.
     </p>
   </section>
-
+  </div>
+  <div class="dashboard-more">
   <section class="card">
     <h2>📖 Zasady sprzątania</h2>
 
@@ -582,12 +565,50 @@
       </p>
     </details>
   </section>
+  <section class="card dashboard-notifications">
+    <h2>Powiadomienia</h2>
+    <details class="notification-settings">
+      <summary>Ustawienia powiadomień</summary>
+      <p>Preferencje są zapisywane na tym urządzeniu. Wysyłanie powiadomień zostanie uruchomione osobno.</p>
+      <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
+      <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
+      <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
+    </details>
+  </section>
+  <section class="card" id="ustawienia" aria-labelledby="settings-title">
+    <h2 id="settings-title" tabindex="-1">Ustawienia</h2>
+    <fieldset id="room-setup">
+      <legend>Wybierz swój pokój</legend>
+      <p class="muted">Potwierdzony pokój zostanie przypisany do tego urządzenia.</p>
+      <div class="room-buttons" id="room-buttons">
+        <button class="room-button" type="button" data-room="1" aria-pressed="false">Pokój nr 1</button>
+        <button class="room-button" type="button" data-room="2" aria-pressed="false">Pokój nr 2</button>
+        <button class="room-button" type="button" data-room="3" aria-pressed="false">Pokój nr 3</button>
+        <button class="room-button" type="button" data-room="4" aria-pressed="false">Pokój nr 4</button>
+      </div>
+      <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
+    </fieldset>
+    <p id="room-lock" hidden></p>
+    <div class="personal-result" id="personal-result" hidden></div>
+    <details id="device-settings" hidden>
+      <summary>Moje urządzenia</summary>
+      <p id="device-settings-status" role="status"></p>
+      <ul id="device-list" class="device-list"></ul>
+      <div id="device-confirm" hidden>
+        <p id="device-confirm-text"></p>
+        <button type="button" id="device-revoke">Odłącz urządzenie</button>
+        <button type="button" id="device-cancel">Anuluj</button>
+      </div>
+    </details>
+  </section>
+
+  </div>
 </main>
 
 <main id="poradnik-view" hidden></main>
 
 <main class="container discussion-view" id="discussion-view" hidden>
-  <a class="discussion-back" href="#harmonogram">← Harmonogram</a>
+  <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
   <section class="card discussion-panel" aria-labelledby="discussion-title">
     <h1 id="discussion-title" tabindex="-1">Dyskusje</h1>
     <p class="discussion-subtitle">Wspólne sprawy mieszkańców</p>
@@ -599,8 +620,8 @@
       <button type="button" id="discussion-join-action" disabled>Połącz pokój</button>
     </section>
     <section id="discussion-pair" hidden aria-labelledby="discussion-pair-title">
-      <h2 id="discussion-pair-title">Połącz urządzenie</h2>
-      <p>Wpisz ten kod na urządzeniu, które jest już połączone z pokojem.</p>
+      <h2 id="discussion-pair-title">To urządzenie oczekuje na podłączenie.</h2>
+      <p>Wpisz wyświetlony kod na urządzeniu, które jest już połączone z pokojem.</p>
       <p id="discussion-pair-code" class="discussion-pair-code" aria-label="Kod podłączenia"></p>
       <p id="discussion-pair-time" class="discussion-pair-time" role="timer"></p>
       <button type="button" id="discussion-pair-retry" hidden>Sprawdź ponownie</button>
@@ -608,8 +629,14 @@
       <button type="button" id="discussion-pair-back">Anuluj</button>
     </section>
     <div id="discussion-chat" hidden>
-      <details id="discussion-approve">
-        <summary>Dodaj urządzenie</summary>
+      <details id="discussion-approve" hidden>
+        <summary>Podłącz kolejne urządzenie</summary>
+        <div class="device-roles">
+          <div><strong><span aria-hidden="true">✓ </span>To urządzenie jest połączone</strong>
+            <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia.</p></div>
+          <div><strong><span aria-hidden="true">＋ </span>Nowe urządzenie</strong>
+            <p>Otwórz na nim Dyskusje i odczytaj sześciocyfrowy kod.</p></div>
+        </div>
         <form id="discussion-approve-form" class="discussion-approval">
           <label for="discussion-approve-code">Kod z nowego urządzenia</label>
           <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" spellcheck="false">
@@ -828,7 +855,7 @@
     const actual = effectiveTheme(mode);
     document.documentElement.dataset.theme = actual;
     document.getElementById("theme-color").content =
-      actual === "dark" ? "#0e131c" : "#f6f7fb";
+      actual === "dark" ? "#031720" : "#f6f7fb";
   }
 
   themeSelect.addEventListener("change", () => {

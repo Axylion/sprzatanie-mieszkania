@@ -55,7 +55,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.goto(url);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
-    assert.ok(await page.locator('.hero + .guide-entry').isVisible());
+    assert.ok(await page.locator('.dashboard-links a[href="#poradnik"]').isVisible());
     await page.locator('#theme-select').selectOption('dark');
     await page.getByRole('link', { name: /Poradnik sprzątania/ }).tap();
     const title = page.locator('#guide-title');

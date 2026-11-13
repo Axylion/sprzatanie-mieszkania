@@ -158,7 +158,7 @@
     guide.innerHTML = `
       <div class="guide-frame">
         <div class="guide-top">
-          <a href="#harmonogram">← Harmonogram</a>
+          <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
         </div>
         ${cardContent(currentCard)}
       </div>

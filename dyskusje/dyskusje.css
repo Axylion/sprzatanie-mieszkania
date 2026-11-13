@@ -27,7 +27,6 @@
 .notification-settings { margin-top: 16px; }
 .notification-settings summary { padding-inline-start: 0; }
 .notification-settings label { display: block; margin-top: 10px; }
-.discussion-back { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); }
 .discussion-panel { --chat-line: #087c86; --chat-own: #e8f7f8; --chat-text: var(--text); }
 [data-theme="dark"] .discussion-panel {
   --surface: #031b23;
@@ -128,3 +127,70 @@
 }
 .discussion-pair-time { margin-top: 0; }
 #discussion-approve-code { max-width: 18rem; font-size: 1.3rem; letter-spacing: .12em; }
+
+.settings-entry {
+  display: grid; place-items: center; width: 44px; height: 44px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-alt);
+  color: var(--text); text-decoration: none;
+}
+
+:root[data-theme="dark"] {
+  --bg: #031720;
+  --surface: #062630;
+  --surface-alt: #0b3441;
+  --text: #f1fbff;
+  --muted: #a7c6d0;
+  --border: #28606d;
+  --accent: #63e5ef;
+  --accent-bg: #0a3642;
+  --accent-text: #b1f4f6;
+}
+
+:root[data-theme="dark"] #harmonogram .hero {
+  background: linear-gradient(155deg, #104653, #092d39 70%);
+  border-color: #397986;
+}
+:root[data-theme="dark"] #harmonogram .hero-date { color: #fff0a2; font-weight: 650; }
+:root[data-theme="dark"] #harmonogram .announcement-card { color: #302b16; }
+#harmonogram .card { min-width: 0; }
+.dashboard-main, .dashboard-primary, .dashboard-links, .dashboard-more {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+#harmonogram :is(.dashboard-main, .dashboard-primary, .dashboard-links, .dashboard-more) > .card { margin: 0; }
+#harmonogram .hero { min-height: 205px; align-content: center; display: grid; }
+#harmonogram .hero-room { font-size: clamp(2.1rem, 5vw, 3.4rem); }
+#harmonogram .hero p { margin-top: 12px; }
+.dashboard-links a { min-height: 76px; }
+.calendar-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 14px; list-style: none;
+  margin: 0 0 8px; padding: 0; color: var(--muted); font-size: .85rem;
+}
+.calendar-legend li { display: flex; align-items: center; gap: 6px; }
+.calendar-legend span { width: 10px; height: 10px; border-radius: 50%; }
+.legend-current { border: 2px solid var(--accent); }
+.legend-mine { background: var(--accent); }
+.dashboard-notifications .notification-settings { margin: 0; }
+.device-roles { display: grid; gap: 8px; margin: 12px 0; }
+.device-roles > div { background: var(--surface-alt); border: 1px solid var(--border); padding: 10px; border-radius: 10px; }
+.device-roles p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+.device-list { list-style: none; padding: 0; margin: 8px 0; }
+.device-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 0; }
+#device-settings button { min-height: 44px; color: var(--text); border: 1px solid var(--border); background: var(--surface-alt); border-radius: 8px; padding: 6px 10px; }
+.discussion-reactions .reaction-count { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: var(--muted); }
+
+@media (min-width: 760px) {
+  #harmonogram.container { width: min(100% - 48px, 1080px); }
+  .dashboard-main, .dashboard-links, .dashboard-more, .device-roles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
+  .dashboard-primary, .dashboard-links { margin-bottom: 0; }
+  .dashboard-more { align-items: start; }
+  #ustawienia { grid-column: 1 / -1; }
+}
+
+.dashboard-primary, .dashboard-primary .dashboard-links { margin-bottom: 0; }
+.schedule-row.active .room-badge { outline: 1px solid var(--accent); outline-offset: -1px; }
+@media (min-width: 760px) and (max-width: 950px) {
+  .dashboard-primary .dashboard-links { grid-template-columns: minmax(0, 1fr); }
+}

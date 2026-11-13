@@ -13,6 +13,12 @@
   const pairRetry = document.getElementById("discussion-pair-retry");
   const pairRenew = document.getElementById("discussion-pair-renew");
   const pairBack = document.getElementById("discussion-pair-back");
+  const approvalDetails = document.getElementById("discussion-approve");
+  const deviceSettings = document.getElementById("device-settings");
+  const deviceList = document.getElementById("device-list");
+  const deviceStatus = document.getElementById("device-settings-status");
+  const deviceConfirm = document.getElementById("device-confirm");
+  const deviceRevoke = document.getElementById("device-revoke");
   const approval = document.getElementById("discussion-approve-form");
   const approvalCode = document.getElementById("discussion-approve-code");
   const chat = document.getElementById("discussion-chat");
@@ -41,6 +47,9 @@
   let pollTimer;
   let pollDelay = 5000;
   let refreshError = false;
+  let deviceCount;
+  let deviceToRevoke;
+  let approvalNoticeTimer;
 
   let availableRooms = [];
   let chosenRoom = null;
@@ -100,6 +109,9 @@
     clearInterval(pairTimer);
     clearHistory();
     chat.hidden = join.hidden = pairPanel.hidden = true;
+    deviceSettings.hidden = true;
+    deviceList.replaceChildren();
+    deviceConfirm.hidden = true;
     status.textContent = "Dostęp do dyskusji został zakończony.";
   }
 
@@ -120,14 +132,18 @@
   }
 
   function reactionButton(message, value) {
-    const button = document.createElement("button");
+    const button = document.createElement(message.mine ? "span" : "button");
     const label = value === 1 ? "Zgadzam się" : "Nie zgadzam się";
     const count = value === 1 ? message.up : message.down;
-    button.type = "button";
-    button.dataset.reaction = String(value);
     button.textContent = (value === 1 ? "👍 " : "👎 ") + count;
     button.setAttribute("aria-label", label + ", liczba reakcji: " + count);
-    button.setAttribute("aria-pressed", String(message.vote === value));
+    if (message.mine) {
+      button.className = "reaction-count";
+    } else {
+      button.type = "button";
+      button.dataset.reaction = String(value);
+      button.setAttribute("aria-pressed", String(message.vote === value));
+    }
     return button;
   }
 
@@ -194,6 +210,7 @@
       chat.hidden = false;
       join.hidden = pairPanel.hidden = true;
       if (data.room) rememberRoom(data.room);
+      updateDeviceCount(data.deviceCount);
       if (data.unchanged) return;
 
       const nearEnd = history.scrollHeight - history.scrollTop - history.clientHeight < 55;
@@ -293,6 +310,7 @@
     localStorage.removeItem(enrollmentKey);
     finishPairing();
     token = data.token;
+    rpc("my_devices", { p_token: token, p_kind: deviceKind() }).catch(() => {});
     rememberRoom(data.room);
     join.hidden = true;
     status.textContent = "Urządzenie zostało podłączone.";
@@ -325,6 +343,7 @@
         status.textContent = {
           rejected: "Prośba o podłączenie została odrzucona.",
           cancelled: "Prośba o podłączenie została anulowana.",
+          device_limit: "Pokój ma już dwa połączone urządzenia.",
         }[data.state] || "Prośba o podłączenie jest niedostępna.";
         await showRooms();
       }
@@ -357,6 +376,7 @@
       clearInterval(pairTimer);
       clearHistory();
       chat.hidden = true;
+      approvalDetails.open = false;
       return;
     }
     if (!configured) {
@@ -420,7 +440,8 @@
       if (error.code === "room_occupied") localStorage.removeItem(enrollmentKey);
       const message = {
         room_occupied: "Pokój został już zajęty. Możesz poprosić o podłączenie urządzenia.",
-        room_free: "Pokój jest już wolny. Wybierz go, aby dołączyć."
+        room_free: "Pokój jest już wolny. Wybierz go, aby dołączyć.",
+        device_limit: "Pokój ma już dwa urządzenia. Odłącz jedno w ustawieniach."
       }[error.code];
       showRequestError(error, token, message || "Nie udało się połączyć urządzenia. Spróbuj ponownie.");
       await showRooms();
@@ -534,11 +555,20 @@
         approvalCode.value = "";
       }
       status.textContent = {
-        approved: "Podłączenie zostało potwierdzone.",
+        approved: "Urządzenie zostało pomyślnie połączone.",
         rejected: "Prośba została odrzucona.",
         unavailable: "Kod jest nieprawidłowy, wygasł lub został już użyty.",
+        device_limit: "Pokój ma już dwa urządzenia albo jedno czeka na połączenie.",
         rate_limited: "Za dużo prób. Odczekaj minutę i spróbuj ponownie."
       }[result.state] || "Nie udało się sprawdzić kodu.";
+      if (result.state === "approved") {
+        approvalDetails.open = false;
+        clearTimeout(approvalNoticeTimer);
+        approvalNoticeTimer = setTimeout(() => {
+          if (status.textContent === "Urządzenie zostało pomyślnie połączone.") status.textContent = "";
+        }, 2500);
+        await loadHistory();
+      }
     } catch (error) {
       showRequestError(error, usedToken, "Nie udało się sprawdzić kodu. Spróbuj ponownie.");
     } finally {
@@ -578,7 +608,7 @@
     const button = event.target.closest("[data-reaction]");
     if (!button || reacting || !token) return;
     const message = messages.find(item => item.id === button.closest("[data-message]").dataset.message);
-    if (!message) return;
+    if (!message || message.mine) return;
     const vote = Number(button.dataset.reaction);
     const usedToken = token;
     reacting = true;
@@ -607,6 +637,89 @@
     if (!before && history.scrollHeight - history.scrollTop - history.clientHeight < 55) latest.hidden = true;
   });
 
+  function updateDeviceCount(count) {
+    deviceCount = count;
+    approvalDetails.hidden = deviceCount !== 1;
+    if (approvalDetails.hidden) {
+      approvalDetails.open = false;
+      approvalCode.value = "";
+      updateApproval();
+    }
+  }
+
+  function deviceKind() {
+    if (/iPhone|Android.+Mobile|Windows Phone/i.test(navigator.userAgent)) return "phone";
+    if (/iPad|Android/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "other";
+    return /Windows|Macintosh|Linux/i.test(navigator.userAgent) ? "computer" : "other";
+  }
+
+  async function loadDevices() {
+    if (!configured || !token || location.hash.startsWith("#poradnik") || !view.hidden) return;
+    deviceSettings.hidden = false;
+    if (!deviceSettings.open) return;
+    const usedToken = token;
+    try {
+      const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind() });
+      if (token !== usedToken || !view.hidden) return;
+      updateDeviceCount(devices.length);
+      deviceList.replaceChildren(...devices.map(device => {
+        const row = document.createElement("li");
+        const label = { phone: "Telefon", computer: "Komputer", other: "Inne urządzenie" }[device.kind];
+        const name = document.createElement("span");
+        name.textContent = label + (device.current ? " · to urządzenie" : "");
+        row.append(name);
+        if (!device.current) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "Odłącz";
+          button.setAttribute("aria-label", "Odłącz: " + label + ", połączono " + dateFormat.format(new Date(device.createdAt)));
+          button.addEventListener("click", () => {
+            deviceToRevoke = device.id;
+            document.getElementById("device-confirm-text").textContent = "Odłączyć urządzenie „" + label + "”?";
+            deviceConfirm.hidden = false;
+            deviceRevoke.focus();
+          });
+          row.append(button);
+        }
+        return row;
+      }));
+      if (devices.length === 1) deviceStatus.textContent = "Aby zwolnić pokój, skontaktuj się z administratorem.";
+      else deviceStatus.textContent = "";
+    } catch (error) {
+      if (token !== usedToken) return;
+      if (error.code === "device_invalid") showRevoked();
+      else deviceStatus.textContent = "Nie udało się odczytać urządzeń. Otwórz tę sekcję ponownie.";
+    }
+  }
+
+  deviceSettings.addEventListener("toggle", loadDevices);
+  document.getElementById("device-cancel").addEventListener("click", () => {
+    deviceConfirm.hidden = true;
+    deviceToRevoke = null;
+    deviceSettings.querySelector("summary").focus();
+  });
+  deviceRevoke.addEventListener("click", async () => {
+    if (!token || !deviceToRevoke || deviceRevoke.disabled) return;
+    const usedToken = token;
+    deviceRevoke.disabled = true;
+    try {
+      await rpc("revoke_device", { p_token: usedToken, p_device: deviceToRevoke });
+      deviceConfirm.hidden = true;
+      deviceToRevoke = null;
+      await loadDevices();
+      if (token === usedToken) {
+        deviceStatus.textContent = "Urządzenie zostało odłączone.";
+        deviceSettings.querySelector("summary").focus();
+      }
+    } catch (error) {
+      if (token !== usedToken) return;
+      if (error.code === "device_invalid") showRevoked();
+      else deviceStatus.textContent = "Nie udało się odłączyć urządzenia. Spróbuj ponownie.";
+    } finally {
+      deviceRevoke.disabled = false;
+    }
+  });
+
   function resume() {
     if (!view.hidden && !document.hidden) {
       if (token) loadHistory().then(schedulePoll);
@@ -614,7 +727,10 @@
       else schedulePoll();
     } else schedulePoll();
   }
-  window.addEventListener("hashchange", openDiscussion);
+  window.addEventListener("hashchange", () => {
+    openDiscussion();
+    loadDevices();
+  });
   window.addEventListener("online", resume);
   window.addEventListener("pageshow", event => { if (event.persisted) resume(); });
   document.addEventListener("visibilitychange", resume);
@@ -628,7 +744,9 @@
       }
       clearHistory();
       openDiscussion();
+      loadDevices();
     }
   });
   openDiscussion();
+  loadDevices();
 })();

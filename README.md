@@ -119,12 +119,15 @@ Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich j
 2. W uwierzytelnionym SQL Editor projektu wykonaj raz migrację
    `supabase/migrations/202611130001_dyskusje.sql` (tylko dla pustej bazy),
    a potem kolejno `202611130002_pairing_codes.sql` i
-   `202611130003_scope_chat_revision_updates.sql`. W istniejącej bazie zastosuj
-   wyłącznie brakujące migracje w tej kolejności. Jeśli pierwsze dwie są już
-   zastosowane, wykonaj tylko trzecią. Jest to poprawka SQL działająca z aktualnym
-   podglądem, bez ponownego wgrywania ZIP.
+   `202611130003_scope_chat_revision_updates.sql` i
+   `202611130004_devices_and_reactions.sql`. W istniejącej bazie zastosuj
+   wyłącznie brakujące migracje w tej kolejności. Jeśli pierwsze trzy są już
+   zastosowane, wykonaj tylko czwartą. Następnie wgraj ZIP v9 do istniejącego projektu podglądu.
    Druga migracja anuluje niezakończone prośby w starym formacie. Trzecia
-   podmienia wyłącznie definicje trzech funkcji i zachowuje dane oraz uprawnienia.
+   podmienia wyłącznie definicje trzech funkcji i zachowuje dane oraz uprawnienia. Czwarta ogranicza
+   nowe połączenia do dwóch aktywnych urządzeń i usuwa własne reakcje autora.
+   Istniejące urządzenia zachowują dostęp. W ustawieniach „Moje urządzenia”
+   można odłączyć inne urządzenie po potwierdzeniu.
    Jeśli projekt korzysta z Supabase CLI, zastosuj migracje przez jego
    standardowy proces.
 3. W `dyskusje/config.js` wpisz URL `https://<project-ref>.supabase.co` oraz

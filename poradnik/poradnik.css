@@ -58,14 +58,14 @@
 }
 
 .guide-top { margin-bottom: 12px; }
-.guide-top a {
+.guide-home-link {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   text-decoration: none;
 }
 
-.guide-top a:hover { text-decoration: underline; }
+.guide-home-link:hover { text-decoration: underline; }
 
 .guide-instructions {
   display: grid;
@@ -364,3 +364,5 @@
   .guide-steps li { gap: 7px; }
   .guide-steps .guide-illustration { --tile-size: 39px; }
 }
+
+.discussion-view .guide-home-link { color: var(--text); margin-bottom: 12px; }

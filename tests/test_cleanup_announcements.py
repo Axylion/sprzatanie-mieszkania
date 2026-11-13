@@ -70,6 +70,16 @@ class RetentionTests(unittest.TestCase):
             self.assertEqual(cleanup.filter_announcements(entries, instant('2099-01-01T00:00:00Z')), (entries, []))
         self.assertEqual(len(logs.output), len(values))
 
+    def test_midnight_normalization_cannot_delete_an_invalid_record(self):
+        entries = [item('invalid', '2026-11-04T24:00'),
+                   item('expired', '2026-11-05T00:00'),
+                   item('active', '2026-12-06T00:00')]
+        with self.assertLogs(cleanup.LOG, level='WARNING') as logs:
+            kept, removed = cleanup.filter_announcements(entries, instant('2026-12-05T00:00:00Z'))
+        self.assertEqual(kept, [entries[0], entries[2]])
+        self.assertEqual(removed, ['expired'])
+        self.assertIn("id='invalid'", logs.output[0])
+
     def test_missing_or_null_expiry_never_removed(self):
         entries = [item('forever'), {**item('null'), 'expiresAt':None}]
         self.assertEqual(cleanup.filter_announcements(entries, instant('2099-01-01T00:00:00Z')), (entries, []))

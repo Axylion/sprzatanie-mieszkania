@@ -99,11 +99,17 @@ i odświeżyć bezpośredni link do karty. Test w Playwright uruchamia polecenie
 
 ## Dyskusje
 
-Goleszan 19 ma wspólny czat, jedną reakcję 👍 albo 👎 na wiadomość z każdego
-powiązania i historię z datami w Europe/Warsaw. Wybrany wcześniej pokój
-(`cleaning-room`) jest zachowany. Nowe urządzenie zatwierdza pokój w ustawieniach.
-Przy pierwszym otwarciu Dyskusji aplikacja rejestruje urządzenie na serwerze.
-Odwołane powiązanie wymaga ręcznego ponownego połączenia.
+Goleszan 19 udostępnia harmonogram, zasady, poradnik i ogłoszenia wszystkim
+odwiedzającym. Dyskusje wymagają aktywnego powiązania urządzenia. Wcześniejszy
+wybór pokoju do kalendarza (`cleaning-room`) jest zachowany. Pokój potwierdzony
+w Dyskusjach uzupełnia wybór kalendarza, jeśli urządzenie nie ma go jeszcze ustawionego.
+
+W Dyskusjach wybierz wolny pokój i użyj „Połącz pokój”. Aby podłączyć kolejne
+urządzenie, wybierz zajęty pokój i „Połącz kolejne urządzenie”. Skopiuj kod.
+Na połączonym urządzeniu otwórz „Dodaj urządzenie”, wklej kod i potwierdź.
+Nowe urządzenie uzyska dostęp automatycznie. Kod jest ważny dwie minuty.
+Zwykła karta przeglądarki i zainstalowana PWA mogą wymagać osobnych powiązań.
+Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich jego urządzeń.
 
 ### Uruchomienie na Supabase
 
@@ -144,10 +150,12 @@ renderowana jako tekst. RLS i uprawnienia SQL blokują bezpośredni dostęp do
 tabel, a RPC weryfikuje klucz i generację pokoju. Wysłanie ma klucz
 idempotencji, limit 1500 znaków i limit częstotliwości. Reakcje też mają limit.
 
-Dowolna osoba z dostępem do adresu może zadeklarować pokój. Po powiązaniu może
-czytać wspólną rozmowę. Model nie potwierdza tożsamości mieszkańca. Usunięcie
-danych witryny albo użycie innej przeglądarki pozwala utworzyć nowe powiązanie.
-Dlatego czat nie powinien służyć do przechowywania danych wrażliwych.
+Osoba z dostępem do strony może zająć wolny pokój. Zajęty pokój wymaga
+potwierdzenia z połączonego urządzenia tego mieszkańca. Model nie sprawdza
+tożsamości. Wyczyszczenie danych witryny pozwala zgłosić nowe urządzenie.
+Kod widoczny na ekranie pozwala jedynie wskazać prośbę do potwierdzenia.
+Osobny sekret nowego urządzenia służy do odebrania wyniku. Powtórne odebranie
+w okresie ważności zwraca to samo powiązanie po utracie odpowiedzi sieciowej.
 
 Właściciel zarządza pokojami w zabezpieczonym Supabase Dashboard. W SQL Editor
 zapisz zapytanie pod nazwą **Zmień mieszkańca**. Najpierw odczytaj stan:
@@ -165,10 +173,11 @@ select public.g19_admin_change_resident(2, 1, 2) as odwolane_urzadzenia;
 ```
 
 Zmiana liczby urządzeń lub generacji od momentu odczytu powoduje przerwanie
-operacji. Reset odwołuje wszystkie aktywne klucze tego pokoju i otwiera nową
-generację. Stare wpisy oraz reakcje pozostają w historii. Wiadomości z
+operacji. Reset odwołuje wszystkie aktywne klucze tego pokoju, anuluje oczekujące
+i zatwierdzone prośby, otwiera nową generację i zwalnia pokój. Stare wpisy oraz reakcje pozostają w historii. Wiadomości z
 wcześniejszych generacji mają oznaczenie „poprzedni mieszkaniec”. Nowy
-mieszkaniec może połączyć swoje urządzenie. Funkcje administracyjne nie mają
+mieszkaniec może połączyć swoje urządzenie. Odwołany profil pokazuje „Dostęp do
+dyskusji został zakończony.”. Funkcje administracyjne nie mają
 uprawnień wykonania dla przeglądarki ani publicznego API.
 
 ### Przygotowanie powiadomień
@@ -186,7 +195,7 @@ Zachowanie Web Push, szczególnie na iOS, wymaga osobnych testów platformowych.
 ### Testy Dyskusji
 
 Po zainstalowaniu Playwright i `@electric-sql/pglite` uruchom
-`node --test tests/dyskusje.test.mjs`. Test przeglądarkowy łączy dwa konteksty
+`node --test tests/dyskusje.test.mjs`. Test przeglądarkowy łączy niezależne konteksty
 z rzeczywistą migracją PostgreSQL w PGlite przez lokalny odpowiednik RPC.
 `CHROME_PATH` może wskazać zainstalowane Chromium. Przed publikacją pozostaje
 test połączenia z konkretnym projektem Supabase.

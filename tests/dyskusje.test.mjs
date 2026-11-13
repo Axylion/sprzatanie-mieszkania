@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
@@ -11,7 +11,11 @@ const { PGlite } = await import(process.env.G19_PGLITE || '@electric-sql/pglite'
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migration = await readFile(new URL('../supabase/migrations/202611130001_dyskusje.sql', import.meta.url), 'utf8');
 const signatures = {
-  bind: ['p_room'],
+  rooms: [],
+  bind: ['p_room', 'p_proof'],
+  pair_start: ['p_room'],
+  pair_decide: ['p_token', 'p_code', 'p_approve'],
+  pair_claim: ['p_secret'],
   read: ['p_token', 'p_before', 'p_version'],
   send: ['p_token', 'p_request', 'p_body'],
   react: ['p_token', 'p_message', 'p_vote']
@@ -26,6 +30,7 @@ async function database(t) {
     await tx.exec('set local role anon');
     const values = signatures[method].map(key => args[key] ?? null);
     const placeholders = values.map((_, index) => '$' + (index + 1)).join(',');
+    if (method === 'rooms') return (await tx.query('select * from public.g19_rooms()')).rows;
     const result = await tx.query(`select public.g19_${method}(${placeholders}) as value`, values);
     return result.rows[0].value;
   });
@@ -47,10 +52,50 @@ test('PostgreSQL enforces binding, history, idempotency, reactions, rate limits 
     }
   }
   await assert.rejects(rpc('read', { p_token: 'wrong' }), { code: 'PT401' });
-  await assert.rejects(rpc('bind', { p_room: 5 }), { code: 'PT400' });
-  const first = await rpc('bind', { p_room: 1 });
-  const second = await rpc('bind', { p_room: 2 });
-  const otherDevice = await rpc('bind', { p_room: 1 });
+  const proof = () => randomBytes(32).toString('hex');
+  const bind = (p_room, p_proof = proof()) => rpc('bind', { p_room, p_proof });
+  const start = p_room => rpc('pair_start', { p_room });
+  const decide = (p_token, p_code, p_approve = true) => rpc('pair_decide', { p_token, p_code, p_approve });
+  const claim = p_secret => rpc('pair_claim', { p_secret });
+  assert.deepEqual((await rpc('rooms', {})).map(room => room.occupied), [false, false, false, false]);
+  await assert.rejects(bind(5), { code: 'PT400' });
+  const firstProof = proof();
+  const attempts = await Promise.allSettled([bind(1, firstProof), bind(1)]);
+  assert.equal(attempts[0].status, 'fulfilled');
+  assert.equal(attempts[1].reason.code, 'PT409');
+  const first = attempts[0].value;
+  assert.deepEqual(await bind(1, firstProof), first);
+  await assert.rejects(bind(1), { code: 'PT409' });
+  const second = await bind(2);
+  const request2 = await start(1);
+  assert.equal((await claim(request2.secret)).state, 'pending');
+  await assert.rejects(rpc('read', { p_token: request2.secret }), { code: 'PT401' });
+  assert.equal((await claim(request2.code)).state, 'expired');
+  await assert.rejects(decide(second.token, request2.code), { code: 'PT409' });
+  const decisions = await Promise.allSettled([decide(first.token, request2.code), decide(first.token, request2.code)]);
+  assert.equal(decisions.filter(result => result.status === 'fulfilled').length, 1);
+  assert.equal(decisions.find(result => result.status === 'rejected').reason.code, 'PT409');
+  const otherDevice = await claim(request2.secret);
+  assert.equal(otherDevice.state, 'claimed');
+  assert.deepEqual(await claim(request2.secret), otherDevice);
+  await assert.rejects(decide(first.token, request2.code), { code: 'PT409' });
+  const request3 = await start(1);
+  await decide(otherDevice.token, request3.code);
+  const third = await claim(request3.secret);
+  assert.equal(third.state, 'claimed');
+  assert.notEqual(third.token, otherDevice.token);
+  const expired = await start(1);
+  await db.query("update g19_private.pairings set expires_at = now() - interval '1 second' where id = $1", [expired.code]);
+  assert.equal((await claim(expired.secret)).state, 'expired');
+  await assert.rejects(decide(first.token, expired.code), { code: 'PT409' });
+  const rejected = await start(1);
+  await decide(first.token, rejected.code, false);
+  assert.equal((await claim(rejected.secret)).state, 'rejected');
+  const pending = await start(1);
+  const approved = await start(1);
+  await decide(first.token, approved.code);
+  for (let i = 0; i < 6; i++) await start(1);
+  await assert.rejects(start(1), { code: 'PT429' });
   assert.match(first.token, /^[0-9a-f]{64}$/);
   assert.notEqual(first.token, otherDevice.token);
   const hash = (await db.query('select encode(token_hash, $$hex$$) as hash from g19_private.devices')).rows;
@@ -76,7 +121,13 @@ test('PostgreSQL enforces binding, history, idempotency, reactions, rate limits 
   await rpc('react', { ...vote, p_vote: 1 });
   await assert.rejects(rpc('react', { ...vote, p_vote: -1 }), { code: 'PT429' });
   await rpc('react', { ...vote, p_token: otherDevice.token, p_vote: 1 });
-  assert.equal((await rpc('read', { p_token: first.token })).messages[0].up, 2);
+  await rpc('react', { ...vote, p_token: third.token, p_vote: 1 });
+  assert.deepEqual((await rpc('read', { p_token: first.token })).messages.map(m => [m.up, m.vote]), [[2, 1]]);
+  assert.equal((await rpc('read', { p_token: third.token })).messages[0].mine, true);
+  await rpc('react', { ...vote, p_token: third.token, p_vote: -1 });
+  assert.deepEqual((await rpc('read', { p_token: otherDevice.token })).messages.map(m => [m.up, m.down, m.vote]), [[1, 1, -1]]);
+  await db.exec('update g19_private.devices set next_reaction_at = null');
+  await rpc('react', { ...vote, p_token: third.token, p_vote: 1 });
   await db.exec('update g19_private.devices set next_reaction_at = null');
   await rpc('react', { ...vote, p_vote: -1 });
   let message = (await rpc('read', { p_token: second.token })).messages[0];
@@ -85,22 +136,26 @@ test('PostgreSQL enforces binding, history, idempotency, reactions, rate limits 
   await rpc('react', { ...vote, p_vote: 0 });
   message = (await rpc('read', { p_token: second.token })).messages[0];
   assert.deepEqual([message.up, message.down, message.vote], [1, 0, 0]);
-  assert.equal((await db.query('select active_devices from public.g19_admin_rooms() where room=1')).rows[0].active_devices, 2);
+  assert.equal((await db.query('select active_devices from public.g19_admin_rooms() where room=1')).rows[0].active_devices, 3);
   await assert.rejects(db.query('select public.g19_admin_change_resident(1,1,1)'), { code: 'PT409' });
-  assert.equal((await db.query('select public.g19_admin_change_resident(1,1,2) as count')).rows[0].count, 2);
-  for (const token of [first.token, otherDevice.token]) {
+  assert.equal((await db.query('select public.g19_admin_change_resident(1,1,3) as count')).rows[0].count, 3);
+  assert.equal((await rpc('rooms', {}))[0].occupied, false);
+  assert.equal((await claim(pending.secret)).state, 'cancelled');
+  assert.equal((await claim(approved.secret)).state, 'cancelled');
+  await assert.rejects(bind(1, firstProof), { code: 'PT401' });
+  for (const token of [first.token, otherDevice.token, third.token]) {
     await assert.rejects(rpc('read', { p_token: token, p_version: read.version }), { code: 'PT401' });
     await assert.rejects(rpc('send', { ...send, p_token: token }), { code: 'PT401' });
     await assert.rejects(rpc('react', { ...vote, p_token: token, p_vote: 1 }), { code: 'PT401' });
   }
-  const newcomer = await rpc('bind', { p_room: 1 });
+  const newcomer = await bind(1);
   message = (await rpc('read', { p_token: newcomer.token })).messages[0];
   assert.deepEqual([message.room, message.former, message.mine], [1, true, false]);
   await rpc('send', { p_token: newcomer.token, p_request: randomUUID(), p_body: 'Nowy mieszkaniec' });
   assert.deepEqual((await rpc('read', { p_token: second.token })).messages.map(m => m.former), [true, false]);
 });
 
-test('Dyskusje on two browser devices uses real SQL, survives reload and handles a lost send response', { timeout: 45000 }, async t => {
+test('Dyskusje across devices uses real SQL, survives reload and handles a lost send response', { timeout: 70000 }, async t => {
   const { db, rpc } = await database();
   const { chromium } = createRequire(import.meta.url)('playwright');
   const types = { '.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json' };
@@ -156,28 +211,51 @@ test('Dyskusje on two browser devices uses real SQL, survives reload and handles
 
   const a = await device(320, '1');
   const b = await device(1280);
+  const c = await device(390);
+  const d = await device(768);
+  async function joinRoom(page, room) {
+    await page.locator(`#discussion-rooms [data-room="${room}"]`).click();
+    await page.getByRole('button', { name: 'Połącz pokój', exact: true }).click();
+    await page.locator('#discussion-compose').waitFor();
+  }
+  async function pairDevice(newPage) {
+    await newPage.goto(base + '#dyskusje');
+    await newPage.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
+    await newPage.getByRole('button', { name: 'Połącz kolejne urządzenie' }).click();
+    await newPage.getByText('Oczekiwanie na potwierdzenie na połączonym urządzeniu.').waitFor();
+    assert.equal(await newPage.locator('#discussion-compose').isVisible(), false);
+    const code = await newPage.getByLabel('Kod ważny przez 2 minuty').inputValue();
+    if (await a.locator('#discussion-approve').getAttribute('open') === null) {
+      await a.getByText('Dodaj urządzenie', { exact: true }).click();
+    }
+    await a.getByLabel('Kod z nowego urządzenia').fill(code);
+    await a.getByRole('button', { name: 'Potwierdź podłączenie' }).click();
+    await newPage.locator('#discussion-compose').waitFor();
+  }
   await a.goto(base);
   assert.match(await a.locator('.brand').innerText(), /Goleszan 19/);
   assert.equal(await a.locator('#room-setup').isVisible(), false);
   assert.match(await a.locator('#room-lock').innerText(), /Pokój nr 1/);
   await a.getByRole('link', { name: /Dyskusje/ }).click();
-  await a.locator('#discussion-compose').waitFor();
-  await b.goto(base + '#dyskusje');
-  await b.getByRole('link', { name: 'Wybierz pokój w ustawieniach' }).click();
-  await b.getByRole('button', { name: 'Pokój nr 2', exact: true }).click();
-  assert.equal(await b.evaluate(() => localStorage.getItem('cleaning-room')), null);
-  await b.getByRole('button', { name: 'Potwierdź pokój' }).click();
-  assert.match(await b.locator('#room-lock').innerText(), /Pokój nr 2/);
+  await a.getByRole('heading', { name: 'Dołącz do dyskusji' }).waitFor();
+  assert.equal(await a.locator('#discussion-compose').isVisible(), false);
+  assert.equal(await a.evaluate(() => localStorage.getItem('goleszan19-discussion-device')), null);
+  await joinRoom(a, 1);
+  await b.goto(base);
+  await b.getByRole('link', { name: /Poradnik sprzątania/ }).click();
+  await b.getByRole('heading', { name: /Szafki kuchenne/ }).waitFor();
+  await b.getByRole('link', { name: '← Harmonogram' }).click();
+  await b.locator('#next-room').waitFor();
   await b.getByText('Ustawienia powiadomień', { exact: true }).click();
   await b.getByLabel('Nowe wiadomości').check();
   assert.equal(await b.getByLabel('Dyżury sprzątania').isChecked(), false);
   assert.equal(await b.getByLabel('Ważne ogłoszenia').isChecked(), false);
-  await b.reload();
-  assert.equal(await b.locator('#room-setup').isVisible(), false);
-  await b.getByText('Ustawienia powiadomień', { exact: true }).click();
-  assert.equal(await b.getByLabel('Nowe wiadomości').isChecked(), true);
-  await b.getByRole('link', { name: /Dyskusje/ }).click();
-  await b.locator('#discussion-compose').waitFor();
+  await b.goto(base + '#dyskusje');
+  await joinRoom(b, 2);
+  await pairDevice(c);
+  await pairDevice(d);
+  assert.equal(new Set(await Promise.all([a, b, c, d].map(page =>
+    page.evaluate(() => localStorage.getItem('goleszan19-discussion-device'))))).size, 4);
   await a.locator('#discussion-body').fill('   ');
   assert.equal(await a.locator('#discussion-send').isDisabled(), true);
   const messageText = 'Zażółć gęślą <img src=x onerror=alert(1)> ' + 'długi'.repeat(160);
@@ -202,12 +280,26 @@ test('Dyskusje on two browser devices uses real SQL, survives reload and handles
   await db.exec('update g19_private.devices set next_reaction_at = null');
   await b.locator('[data-reaction="-1"]').click();
   await b.waitForFunction(() => document.querySelector('[data-reaction="-1"]')?.getAttribute('aria-pressed') === 'false');
-  await db.query('select public.g19_admin_change_resident(1,1,1)');
-  await a.getByText('Powiązanie urządzenia wygasło.', { exact: false }).waitFor();
+  await c.locator('[data-reaction="1"]').click();
+  await d.waitForFunction(() => document.querySelector('[data-reaction="1"]')?.getAttribute('aria-pressed') === 'true');
+  assert.equal(await d.locator('[data-reaction="1"]').textContent(), '👍 1');
+  await d.locator('[data-reaction="1"]').click();
+  await c.waitForFunction(() => document.querySelector('[data-reaction="1"]')?.getAttribute('aria-pressed') === 'false');
+  await db.query('select public.g19_admin_change_resident(1,1,3)');
+  for (const page of [a, c, d]) {
+    await page.getByText('Dostęp do dyskusji został zakończony.').waitFor();
+    assert.equal(await page.locator('#discussion-compose').isVisible(), false);
+  }
+  await a.reload();
+  await a.getByText('Dostęp do dyskusji został zakończony.').waitFor();
+  assert.equal(await a.locator('#discussion-join').isVisible(), false);
+  await a.getByRole('link', { name: '← Harmonogram' }).click();
+  await a.locator('#next-room').waitFor();
   await b.getByText('Pokój nr 1 · poprzedni mieszkaniec').waitFor();
-  assert.equal(await a.locator('#discussion-compose').isVisible(), false);
-  await a.getByRole('button', { name: 'Połącz urządzenie' }).click();
-  await a.getByText('Pokój nr 1 · poprzedni mieszkaniec').waitFor();
+  const newcomer = await device(360);
+  await newcomer.goto(base + '#dyskusje');
+  await joinRoom(newcomer, 1);
+  await newcomer.getByText('Pokój nr 1 · poprzedni mieszkaniec').waitFor();
   // Fill a page with fixtures and check that automatic refresh preserves the reader's place.
   await db.exec(`
     insert into g19_private.messages (device_id, request_id, body)
@@ -225,8 +317,8 @@ test('Dyskusje on two browser devices uses real SQL, survives reload and handles
     const row = [...el.children].find(child => child.getBoundingClientRect().bottom > el.getBoundingClientRect().top);
     return { id: row.dataset.message, offset: row.getBoundingClientRect().top - el.getBoundingClientRect().top };
   });
-  await a.locator('#discussion-body').fill('Najnowsza wiadomość');
-  await a.locator('#discussion-send').click();
+  await newcomer.locator('#discussion-body').fill('Najnowsza wiadomość');
+  await newcomer.locator('#discussion-send').click();
   await b.getByText('Najnowsza wiadomość', { exact: true }).waitFor();
   assert.ok(await b.locator('#discussion-latest').isVisible());
   const restored = await b.locator('#discussion-history').evaluate((el, id) => {

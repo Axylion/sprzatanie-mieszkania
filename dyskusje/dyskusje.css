@@ -93,3 +93,26 @@
   font: inherit;
 }
 .discussion-compose button { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
+
+.discussion-rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+.discussion-rooms button span { display: block; font-size: .85rem; }
+.discussion-rooms button[aria-pressed="true"] { border-color: var(--chat-line); background: var(--chat-own); }
+#discussion-pair-code, #discussion-approve-code {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 6px 0 10px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+  color: var(--chat-text);
+  font: inherit;
+}
+.discussion-approval { margin: 8px 0; }
+#discussion-approve summary { padding-inline-start: 0; }

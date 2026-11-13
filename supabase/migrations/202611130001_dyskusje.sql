@@ -5,7 +5,8 @@ revoke all on schema g19_private from public, anon, authenticated, service_role;
 
 create table g19_private.rooms (
   room smallint primary key check (room between 1 and 4),
-  generation integer not null default 1
+  generation integer not null default 1,
+  occupied boolean not null default false
 );
 insert into g19_private.rooms (room) values (1), (2), (3), (4);
 
@@ -17,7 +18,9 @@ create table g19_private.devices (
   created_at timestamptz not null default clock_timestamp(),
   revoked_at timestamptz,
   next_message_at timestamptz,
-  next_reaction_at timestamptz
+  next_reaction_at timestamptz,
+  enrollment_hash bytea unique,
+  enrollment_nonce uuid
 );
 create index devices_by_room on g19_private.devices (room, created_at desc);
 
@@ -32,10 +35,24 @@ create table g19_private.messages (
 
 create table g19_private.reactions (
   message_id bigint not null references g19_private.messages,
-  device_id uuid not null references g19_private.devices,
+  room smallint not null references g19_private.rooms,
+  generation integer not null,
   vote smallint not null check (vote in (-1, 1)),
-  primary key (message_id, device_id)
+  primary key (message_id, room, generation)
 );
+
+create table g19_private.pairings (
+  id uuid primary key default gen_random_uuid(),
+  room smallint not null references g19_private.rooms,
+  generation integer not null,
+  claim_hash bytea not null unique,
+  claim_nonce uuid not null default gen_random_uuid(),
+  device_id uuid references g19_private.devices,
+  state text not null default 'pending' check (state in ('pending','approved','rejected','claimed','cancelled')),
+  created_at timestamptz not null default clock_timestamp(),
+  expires_at timestamptz not null default clock_timestamp() + interval '2 minutes'
+);
+create index pairings_by_room on g19_private.pairings (room, created_at desc);
 
 create table g19_private.chat_revision (
   singleton boolean primary key default true check (singleton),
@@ -48,6 +65,7 @@ alter table g19_private.rooms enable row level security;
 alter table g19_private.devices enable row level security;
 alter table g19_private.messages enable row level security;
 alter table g19_private.reactions enable row level security;
+alter table g19_private.pairings enable row level security;
 alter table g19_private.chat_revision enable row level security;
 revoke all on all tables in schema g19_private from public, anon, authenticated, service_role;
 
@@ -77,23 +95,104 @@ begin
 end;
 $$;
 
-create function public.g19_bind(p_room integer)
+create function public.g19_rooms()
+returns table (room smallint, occupied boolean)
+language sql stable security definer set search_path = '' as $$
+  select room, occupied from g19_private.rooms order by room;
+$$;
+
+create function public.g19_bind(p_room integer, p_proof text)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
-  current_generation integer;
+  target g19_private.rooms;
+  device g19_private.devices;
+  proof_hash bytea := g19_private.token_hash(p_proof);
+  nonce uuid;
   token text;
 begin
-  select generation into current_generation from g19_private.rooms where room = p_room for update;
+  if proof_hash is null then raise sqlstate 'PT400' using message = 'proof_invalid'; end if;
+  select * into target from g19_private.rooms where room = p_room for update;
   if not found then raise sqlstate 'PT400' using message = 'room_invalid'; end if;
-  if (select count(*) from g19_private.devices
-      where room = p_room and created_at > clock_timestamp() - interval '1 minute') >= 12 then
-    raise sqlstate 'PT429' using message = 'binding_rate_limit';
-  end if;
 
-  token := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
-  insert into g19_private.devices (room, generation, token_hash)
-    values (p_room, current_generation, g19_private.token_hash(token));
+  select * into device from g19_private.devices where enrollment_hash = proof_hash;
+  if found then
+    if device.room <> p_room or device.revoked_at is not null or device.generation <> target.generation then
+      raise sqlstate 'PT401' using message = 'device_invalid';
+    end if;
+    token := encode(sha256(convert_to(p_proof || device.enrollment_nonce::text, 'UTF8')), 'hex');
+    return jsonb_build_object('token', token, 'room', p_room);
+  end if;
+  if target.occupied then raise sqlstate 'PT409' using message = 'room_occupied'; end if;
+
+  nonce := gen_random_uuid();
+  token := encode(sha256(convert_to(p_proof || nonce::text, 'UTF8')), 'hex');
+  insert into g19_private.devices (room, generation, token_hash, enrollment_hash, enrollment_nonce)
+    values (p_room, target.generation, g19_private.token_hash(token), proof_hash, nonce);
+  update g19_private.rooms set occupied = true where room = p_room;
   return jsonb_build_object('token', token, 'room', p_room);
+end;
+$$;
+
+create function public.g19_pair_start(p_room integer)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  target g19_private.rooms;
+  request g19_private.pairings;
+  secret text := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+begin
+  select * into target from g19_private.rooms where room = p_room for update;
+  if not found or not target.occupied then raise sqlstate 'PT409' using message = 'room_free'; end if;
+  if (select count(*) from g19_private.pairings where room = p_room
+      and created_at > clock_timestamp() - interval '1 minute') >= 12 then
+    raise sqlstate 'PT429' using message = 'pair_rate_limit';
+  end if;
+  delete from g19_private.pairings where room = p_room and expires_at < clock_timestamp() - interval '1 day';
+  insert into g19_private.pairings (room, generation, claim_hash)
+    values (p_room, target.generation, g19_private.token_hash(secret)) returning * into request;
+  return jsonb_build_object('code', request.id, 'secret', secret, 'expiresAt', request.expires_at);
+end;
+$$;
+
+create function public.g19_pair_decide(p_token text, p_code uuid, p_approve boolean)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  device g19_private.devices := g19_private.lock_device(p_token);
+  request g19_private.pairings;
+begin
+  select * into request from g19_private.pairings
+    where id = p_code and room = device.room and generation = device.generation for update;
+  if not found or request.state <> 'pending' or request.expires_at <= clock_timestamp() or p_approve is null then
+    raise sqlstate 'PT409' using message = 'pair_unavailable';
+  end if;
+  update g19_private.pairings set state = case when p_approve then 'approved' else 'rejected' end
+    where id = request.id;
+end;
+$$;
+
+create function public.g19_pair_claim(p_secret text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  request g19_private.pairings;
+  target g19_private.rooms;
+  new_device uuid;
+  token text;
+begin
+  select * into request from g19_private.pairings where claim_hash = g19_private.token_hash(p_secret);
+  if not found then return jsonb_build_object('state', 'expired'); end if;
+  select * into target from g19_private.rooms where room = request.room for share;
+  select * into request from g19_private.pairings where id = request.id for update;
+  if not found or request.expires_at <= clock_timestamp() then return jsonb_build_object('state', 'expired'); end if;
+  if target.generation <> request.generation then return jsonb_build_object('state', 'cancelled'); end if;
+  if request.state in ('approved', 'claimed') then
+    token := encode(sha256(convert_to(p_secret || request.claim_nonce::text, 'UTF8')), 'hex');
+  end if;
+  if request.state = 'approved' then
+    insert into g19_private.devices (room, generation, token_hash)
+      values (request.room, request.generation, g19_private.token_hash(token)) returning id into new_device;
+    update g19_private.pairings set state = 'claimed', device_id = new_device where id = request.id;
+    request.state := 'claimed';
+  end if;
+  return jsonb_build_object('state', request.state, 'token', token, 'room', request.room);
 end;
 $$;
 
@@ -121,7 +220,7 @@ begin
   ), entries as (
     select p.id, jsonb_build_object(
       'id', p.id::text, 'body', p.body, 'createdAt', p.created_at,
-      'room', d.room, 'former', d.generation <> r.generation, 'mine', d.id = viewer.id,
+      'room', d.room, 'former', d.generation <> r.generation, 'mine', d.room = viewer.room and d.generation = viewer.generation,
       'up', votes.up, 'down', votes.down, 'vote', votes.mine
     ) as entry
     from (select * from page order by id desc limit 40) p
@@ -129,7 +228,7 @@ begin
     join g19_private.rooms r on r.room = d.room
     cross join lateral (
       select count(*) filter (where vote = 1) as up, count(*) filter (where vote = -1) as down,
-        coalesce(max(vote) filter (where device_id = viewer.id), 0) as mine
+        coalesce(max(vote) filter (where room = viewer.room and generation = viewer.generation), 0) as mine
       from g19_private.reactions where message_id = p.id
     ) votes
   )
@@ -188,8 +287,10 @@ begin
     or not exists (select 1 from g19_private.messages where id = p_message) then
     raise sqlstate 'PT400' using message = 'reaction_invalid';
   end if;
+  -- Serialize cross-device changes before reading this resident's current reaction.
+  perform 1 from g19_private.chat_revision for update;
   select vote into existing_vote from g19_private.reactions
-    where message_id = p_message and device_id = device.id;
+    where message_id = p_message and room = device.room and generation = device.generation;
   if coalesce(existing_vote, 0) = p_vote then return; end if;
   if device.next_reaction_at > clock_timestamp() then
     raise sqlstate 'PT429' using message = 'reaction_rate_limit';
@@ -197,10 +298,11 @@ begin
 
   update g19_private.chat_revision set version = version + 1;
   if p_vote = 0 then
-    delete from g19_private.reactions where message_id = p_message and device_id = device.id;
+    delete from g19_private.reactions where message_id = p_message and room = device.room and generation = device.generation;
   else
-    insert into g19_private.reactions (message_id, device_id, vote) values (p_message, device.id, p_vote)
-      on conflict (message_id, device_id) do update set vote = excluded.vote;
+    insert into g19_private.reactions (message_id, room, generation, vote)
+      values (p_message, device.room, device.generation, p_vote)
+      on conflict (message_id, room, generation) do update set vote = excluded.vote;
   end if;
   update g19_private.devices set next_reaction_at = clock_timestamp() + interval '400 milliseconds'
     where id = device.id;
@@ -209,12 +311,12 @@ $$;
 
 -- Run these commands from the project owner's authenticated Supabase SQL Editor.
 create function public.g19_admin_rooms()
-returns table (room smallint, generation integer, active_devices bigint)
+returns table (room smallint, generation integer, active_devices bigint, occupied boolean)
 language sql stable set search_path = '' as $$
-  select r.room, r.generation, count(d.id)
+  select r.room, r.generation, count(d.id), r.occupied
   from g19_private.rooms r left join g19_private.devices d
     on d.room = r.room and d.generation = r.generation and d.revoked_at is null
-  group by r.room, r.generation order by r.room;
+  group by r.room, r.generation, r.occupied order by r.room;
 $$;
 
 create function public.g19_admin_change_resident(p_room integer, p_generation integer, p_active_devices integer)
@@ -233,18 +335,22 @@ begin
 
   update g19_private.devices set revoked_at = clock_timestamp()
     where room = p_room and generation = current_generation and revoked_at is null;
-  update g19_private.rooms set generation = generation + 1 where room = p_room;
+  update g19_private.pairings set state = 'cancelled'
+    where room = p_room and generation = current_generation and state in ('pending','approved');
+  update g19_private.rooms set generation = generation + 1, occupied = false where room = p_room;
   update g19_private.chat_revision set version = version + 1;
   return active;
 end;
 $$;
 
 revoke all on all functions in schema g19_private from public, anon, authenticated, service_role;
-revoke all on function public.g19_bind(integer), public.g19_read(text, bigint, bigint),
+revoke all on function public.g19_bind(integer, text), public.g19_rooms(),
+  public.g19_pair_start(integer), public.g19_pair_decide(text, uuid, boolean), public.g19_pair_claim(text), public.g19_read(text, bigint, bigint),
   public.g19_send(text, uuid, text), public.g19_react(text, bigint, integer),
   public.g19_admin_rooms(), public.g19_admin_change_resident(integer, integer, integer)
   from public, anon, authenticated, service_role;
-grant execute on function public.g19_bind(integer), public.g19_read(text, bigint, bigint),
+grant execute on function public.g19_bind(integer, text), public.g19_rooms(),
+  public.g19_pair_start(integer), public.g19_pair_decide(text, uuid, boolean), public.g19_pair_claim(text), public.g19_read(text, bigint, bigint),
   public.g19_send(text, uuid, text), public.g19_react(text, bigint, integer) to anon;
 
 commit;

@@ -114,11 +114,6 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
       await page.waitForFunction(number => document.querySelector('.guide-card-position')?.textContent === `${number} / 8`, index + 1);
     }
 
-    // A vertical drag scrolls the page, and a diagonal drag leaves the same card open.
-    await swipe(240, 400, 0, -190);
-    await page.waitForFunction(() => scrollY > 60);
-    await swipe(250, 400, -100, -110);
-    assert.equal(await position.innerText(), '1 / 8');
     await page.getByRole('navigation', { name: 'Działy poradnika' }).getByRole('link', { name: 'Toalety' }).click();
     await page.waitForURL('**/#poradnik/toaleta');
     await page.waitForFunction(() => document.querySelector('.guide-categories [aria-current]')?.textContent === 'Toalety' && scrollY === 0);
@@ -199,6 +194,15 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.getByRole('link', { name: '← Harmonogram' }).click();
     await page.locator('#next-room').waitFor();
     assert.equal(await page.locator('#schedule .schedule-row').count(), 12);
+    // Leave scrolling gestures last so native inertial scrolling does not affect later clicks.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('link', { name: /Poradnik sprzątania/ }).click();
+    await page.waitForFunction(() => document.querySelector('.guide-card-position')?.textContent === '1 / 8' && scrollY === 0);
+    // A vertical drag scrolls the page, and a diagonal drag leaves the same card open.
+    await swipe(240, 400, 0, -190);
+    await page.waitForFunction(() => scrollY > 60);
+    await swipe(250, 400, -100, -110);
+    assert.equal(await position.innerText(), '1 / 8');
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();

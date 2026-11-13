@@ -118,11 +118,15 @@ Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich j
    standardowego schematu `public`. Schemat `g19_private` zostaw poza API.
 2. W uwierzytelnionym SQL Editor projektu wykonaj raz migrację
    `supabase/migrations/202611130001_dyskusje.sql` (tylko dla pustej bazy),
-   a potem `202611130002_pairing_codes.sql`. W istniejącej bazie testowej
-   wykonaj tylko drugą migrację przed wgraniem nowego ZIP do Cloudflare Pages.
-   Migracja działa w transakcji, zachowuje urządzenia, wiadomości i reakcje
-   oraz anuluje niezakończone prośby z poprzedniej wersji. Jeśli projekt
-   korzysta z Supabase CLI, zastosuj migracje przez jego standardowy proces.
+   a potem kolejno `202611130002_pairing_codes.sql` i
+   `202611130003_scope_chat_revision_updates.sql`. W istniejącej bazie zastosuj
+   wyłącznie brakujące migracje w tej kolejności. Jeśli pierwsze dwie są już
+   zastosowane, wykonaj tylko trzecią. Jest to poprawka SQL działająca z aktualnym
+   podglądem, bez ponownego wgrywania ZIP.
+   Druga migracja anuluje niezakończone prośby w starym formacie. Trzecia
+   podmienia wyłącznie definicje trzech funkcji i zachowuje dane oraz uprawnienia.
+   Jeśli projekt korzysta z Supabase CLI, zastosuj migracje przez jego
+   standardowy proces.
 3. W `dyskusje/config.js` wpisz URL `https://<project-ref>.supabase.co` oraz
    klucz **publishable** `sb_publishable_…` z ustawień projektu. Nie wpisuj
    klucza `sb_secret_…`, service role ani danych połączenia do bazy.
@@ -205,3 +209,10 @@ Po zainstalowaniu Playwright i `@electric-sql/pglite` uruchom
 z rzeczywistą migracją PostgreSQL w PGlite przez lokalny odpowiednik RPC.
 `CHROME_PATH` może wskazać zainstalowane Chromium. Przed publikacją pozostaje
 test połączenia z konkretnym projektem Supabase.
+
+Test regresji `pg-safeupdate` uruchom przez `psql -X -d <pusta_baza_testowa> -f
+tests/dyskusje-safeupdate.sql`. Wymaga odizolowanej bazy PostgreSQL z rolami
+`anon`, `authenticated`, `service_role` i użytkownika uprawnionego do załadowania
+modułu. Ustaw `G19_SAFEUPDATE_LIBRARY` na nazwę lub ścieżkę biblioteki
+`safeupdate`. Test odtwarza błąd 21000 z wcześniejszą funkcją, stosuje poprawkę
+i sprawdza czat z dwoma urządzeniami oraz zachowanie uprawnień.

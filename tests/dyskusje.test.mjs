@@ -11,6 +11,7 @@ const { PGlite } = await import(process.env.G19_PGLITE || '@electric-sql/pglite'
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migration = await readFile(new URL('../supabase/migrations/202611130001_dyskusje.sql', import.meta.url), 'utf8');
 const numericMigration = await readFile(new URL('../supabase/migrations/202611130002_pairing_codes.sql', import.meta.url), 'utf8');
+const revisionMigration = await readFile(new URL('../supabase/migrations/202611130003_scope_chat_revision_updates.sql', import.meta.url), 'utf8');
 const signatures = {
   rooms: [],
   bind: ['p_room', 'p_proof'],
@@ -28,7 +29,10 @@ async function database(t, legacy = false) {
   t?.after(() => db.close());
   await db.exec('create role anon; create role authenticated; create role service_role;');
   await db.exec(migration);
-  if (!legacy) await db.exec(numericMigration);
+  if (!legacy) {
+    await db.exec(numericMigration);
+    await db.exec(revisionMigration);
+  }
   const rpc = (method, args) => db.transaction(async tx => {
     await tx.exec('set local role anon');
     const values = signatures[method].map(key => args[key] ?? null);

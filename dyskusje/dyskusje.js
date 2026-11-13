@@ -9,7 +9,12 @@
   const joinAction = document.getElementById("discussion-join-action");
   const pairPanel = document.getElementById("discussion-pair");
   const pairCode = document.getElementById("discussion-pair-code");
+  const pairTime = document.getElementById("discussion-pair-time");
+  const pairRetry = document.getElementById("discussion-pair-retry");
+  const pairRenew = document.getElementById("discussion-pair-renew");
+  const pairBack = document.getElementById("discussion-pair-back");
   const approval = document.getElementById("discussion-approve-form");
+  const approvalCode = document.getElementById("discussion-approve-code");
   const chat = document.getElementById("discussion-chat");
   const history = document.getElementById("discussion-history");
   const older = document.getElementById("discussion-older");
@@ -39,7 +44,10 @@
 
   let availableRooms = [];
   let chosenRoom = null;
-  let pairing = storedObject(pairingKey);
+  let pairing = storedPairing();
+  let expiredRoom;
+  let pairTimer;
+  let cancellingPair = false;
   let joining = false;
   let checkingPair = false;
 
@@ -49,6 +57,11 @@
     } catch {
       return null;
     }
+  }
+
+  function storedPairing() {
+    const saved = storedObject(pairingKey);
+    return saved && /^[0-9]{6}$/.test(saved.code) && Number.isFinite(saved.deadline) ? saved : null;
   }
 
   function rememberRoom(room) {
@@ -84,6 +97,7 @@
     localStorage.removeItem(enrollmentKey);
     localStorage.removeItem(pairingKey);
     token = pairing = null;
+    clearInterval(pairTimer);
     clearHistory();
     chat.hidden = join.hidden = pairPanel.hidden = true;
     status.textContent = "Dostęp do dyskusji został zakończony.";
@@ -219,10 +233,10 @@
   }
 
   async function showRooms() {
-    if (view.hidden || token || pairing || localStorage.getItem(revokedKey) === "true") return;
+    if (view.hidden || token || pairing || expiredRoom || localStorage.getItem(revokedKey) === "true") return;
     try {
       const result = await rpc("rooms", {});
-      if (view.hidden || token || pairing || localStorage.getItem(revokedKey) === "true") return;
+      if (view.hidden || token || pairing || expiredRoom || localStorage.getItem(revokedKey) === "true") return;
       availableRooms = result;
       const buttons = availableRooms.map(({ room, occupied }) => {
         const button = document.createElement("button");
@@ -246,6 +260,32 @@
     pairing = null;
     localStorage.removeItem(pairingKey);
     pairPanel.hidden = true;
+    clearInterval(pairTimer);
+  }
+
+  function renderPairing() {
+    clearInterval(pairTimer);
+    join.hidden = true;
+    pairPanel.hidden = false;
+    pairCode.hidden = false;
+    pairRetry.hidden = pairRenew.hidden = true;
+    pairCode.textContent = pairing.code.slice(0, 3) + " " + pairing.code.slice(3);
+    function tick() {
+      const seconds = Math.min(120, Math.max(0, Math.ceil((pairing.deadline - Date.now()) / 1000)));
+      const minutes = String(Math.floor(seconds / 60)).padStart(2, "0");
+      pairTime.textContent = "Kod ważny przez " + minutes + ":" + String(seconds % 60).padStart(2, "0");
+    }
+    tick();
+    pairTimer = setInterval(tick, 250);
+  }
+
+  async function startPairing(room) {
+    const data = await rpc("pair_start", { p_room: room });
+    pairing = { ...data, deadline: Date.now() + Date.parse(data.expiresAt) - Date.parse(data.serverNow) };
+    localStorage.setItem(pairingKey, JSON.stringify(pairing));
+    expiredRoom = null;
+    status.textContent = "Oczekiwanie na potwierdzenie na połączonym urządzeniu.";
+    if (!view.hidden) renderPairing();
   }
 
   async function useDevice(data) {
@@ -261,26 +301,38 @@
 
   async function checkPairing() {
     const pending = pairing;
-    if (!pending || checkingPair) return;
+    if (!pending || checkingPair || cancellingPair) return;
     checkingPair = true;
     try {
       const data = await rpc("pair_claim", { p_secret: pending.secret });
-      if (pairing !== pending || token || localStorage.getItem(revokedKey) === "true") return;
+      if (pairing !== pending || cancellingPair || token || localStorage.getItem(revokedKey) === "true") return;
+      pairRetry.hidden = true;
       if (data.state === "claimed" && data.token) {
+        expiredRoom = null;
         await useDevice(data);
       } else if (data.state === "pending") {
         status.textContent = "Oczekiwanie na potwierdzenie na połączonym urządzeniu.";
+      } else if (data.state === "expired") {
+        finishPairing();
+        expiredRoom = pending.room;
+        pairPanel.hidden = false;
+        pairCode.hidden = true;
+        pairTime.textContent = "Kod wygasł.";
+        pairRenew.hidden = false;
+        status.textContent = "";
       } else {
         finishPairing();
         status.textContent = {
           rejected: "Prośba o podłączenie została odrzucona.",
           cancelled: "Prośba o podłączenie została anulowana.",
-          expired: "Kod wygasł. Utwórz nową prośbę."
         }[data.state] || "Prośba o podłączenie jest niedostępna.";
         await showRooms();
       }
     } catch (error) {
-      showRequestError(error, null, "Nie udało się sprawdzić prośby. Sprawdź połączenie z internetem.");
+      if (pairing === pending && !cancellingPair) {
+        pairRetry.hidden = false;
+        showRequestError(error, null, "Nie udało się sprawdzić prośby. Sprawdź połączenie z internetem.");
+      }
     } finally {
       checkingPair = false;
     }
@@ -293,7 +345,7 @@
       if (!loading && !joining && !document.hidden) {
         if (token) await loadHistory();
         else if (pairing) await checkPairing();
-        else await showRooms();
+        else if (!expiredRoom) await showRooms();
       }
       schedulePoll();
     }, token ? pollDelay : pairing ? 2000 : 5000);
@@ -302,6 +354,7 @@
   async function openDiscussion() {
     if (view.hidden) {
       clearTimeout(pollTimer);
+      clearInterval(pairTimer);
       clearHistory();
       chat.hidden = true;
       return;
@@ -315,11 +368,9 @@
       status.textContent = "Wczytywanie rozmowy…";
       await loadHistory({ reset: true, bottom: true });
     } else if (pairing) {
-      join.hidden = true;
-      pairCode.value = pairing.code;
-      pairPanel.hidden = false;
+      renderPairing();
       await checkPairing();
-    } else {
+    } else if (!expiredRoom) {
       await showRooms();
     }
     schedulePoll();
@@ -358,12 +409,9 @@
           localStorage.setItem(enrollmentKey, JSON.stringify(enrollment));
           await useDevice(await rpc("bind", { p_room: selected.room, p_proof: enrollment.proof }));
         } else {
-          pairing = storedObject(pairingKey) || await rpc("pair_start", { p_room: selected.room });
-          localStorage.setItem(pairingKey, JSON.stringify(pairing));
-          join.hidden = true;
-          pairCode.value = pairing.code;
-          pairPanel.hidden = false;
-          status.textContent = "Oczekiwanie na potwierdzenie na połączonym urządzeniu.";
+          pairing = storedPairing();
+          if (pairing) await openDiscussion();
+          else await startPairing(selected.room);
         }
       }
       if (navigator.locks) await navigator.locks.request(tokenKey, joinDevice);
@@ -383,41 +431,119 @@
     }
   });
 
-  document.getElementById("discussion-copy-code").addEventListener("click", async () => {
+  pairRetry.addEventListener("click", () => checkPairing().then(schedulePoll));
+  pairRenew.addEventListener("click", async () => {
+    if (!expiredRoom || joining || token || localStorage.getItem(revokedKey) === "true") return;
+    joining = true;
+    pairRenew.disabled = pairBack.disabled = true;
     try {
-      await navigator.clipboard.writeText(pairCode.value);
-      status.textContent = "Kod został skopiowany.";
-    } catch {
-      pairCode.select();
-      status.textContent = "Skopiuj zaznaczony kod.";
+      const room = expiredRoom;
+      async function renew() {
+        if (localStorage.getItem(revokedKey) === "true") return showRevoked();
+        const stored = localStorage.getItem(tokenKey);
+        if (stored) {
+          token = stored;
+          expiredRoom = null;
+          await openDiscussion();
+          return;
+        }
+        pairing = storedPairing();
+        if (pairing) {
+          expiredRoom = null;
+          await openDiscussion();
+        } else {
+          await startPairing(room);
+        }
+      }
+      if (navigator.locks) await navigator.locks.request(tokenKey, renew);
+      else await renew();
+    } catch (error) {
+      showRequestError(error, null, "Nie udało się wygenerować kodu. Spróbuj ponownie.");
+      if (error.code === "room_free") {
+        expiredRoom = null;
+        finishPairing();
+        await showRooms();
+      }
+    } finally {
+      joining = false;
+      pairRenew.disabled = pairBack.disabled = false;
+      schedulePoll();
     }
   });
-  document.getElementById("discussion-pair-back").addEventListener("click", () => {
-    finishPairing();
-    status.textContent = "";
-    showRooms().then(schedulePoll);
+
+  pairBack.addEventListener("click", async () => {
+    if (cancellingPair || joining) return;
+    cancellingPair = true;
+    pairBack.disabled = true;
+    const pending = pairing;
+    try {
+      if (pending) {
+        const result = await rpc("pair_cancel", { p_secret: pending.secret });
+        if (pairing !== pending) return;
+        if (result.state === "claimed") {
+          cancellingPair = false;
+          await checkPairing();
+          return;
+        }
+      }
+      expiredRoom = null;
+      finishPairing();
+      status.textContent = "Prośba o podłączenie została anulowana.";
+      await showRooms();
+    } catch {
+      status.textContent = "Nie udało się anulować prośby. Spróbuj ponownie.";
+    } finally {
+      cancellingPair = false;
+      pairBack.disabled = false;
+      schedulePoll();
+    }
+  });
+
+  function updateApproval() {
+    for (const button of approval.querySelectorAll("button")) {
+      button.disabled = Boolean(approval.dataset.busy) || approvalCode.value.length !== 6;
+    }
+  }
+  approvalCode.addEventListener("input", () => {
+    approvalCode.value = approvalCode.value.replace(/[^0-9]/g, "").slice(0, 6);
+    updateApproval();
+  });
+  approvalCode.addEventListener("paste", event => {
+    const pasted = event.clipboardData?.getData("text");
+    if (pasted === undefined) return;
+    event.preventDefault();
+    const start = approvalCode.selectionStart;
+    const end = approvalCode.selectionEnd;
+    approvalCode.value = (approvalCode.value.slice(0, start) + pasted.replace(/[^0-9]/g, "") +
+      approvalCode.value.slice(end)).slice(0, 6);
+    updateApproval();
   });
 
   approval.addEventListener("submit", async event => {
     event.preventDefault();
-    if (!token || approval.dataset.busy) return;
-    const code = document.getElementById("discussion-approve-code");
-    const value = code.value.trim();
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-      status.textContent = "Wklej pełny kod z nowego urządzenia.";
-      return;
-    }
+    const value = approvalCode.value;
+    if (!token || approval.dataset.busy || !/^[0-9]{6}$/.test(value)) return;
     const usedToken = token;
-    const approve = event.submitter?.value === "approve";
+    const approve = event.submitter?.value !== "reject";
     approval.dataset.busy = "true";
+    updateApproval();
     try {
-      await rpc("pair_decide", { p_token: usedToken, p_code: value, p_approve: approve });
-      code.value = "";
-      status.textContent = approve ? "Podłączenie zostało potwierdzone." : "Prośba została odrzucona.";
+      const result = await rpc("pair_decide", { p_token: usedToken, p_code: value, p_approve: approve });
+      if (token !== usedToken) return;
+      if (result.state === "approved" || result.state === "rejected") {
+        approvalCode.value = "";
+      }
+      status.textContent = {
+        approved: "Podłączenie zostało potwierdzone.",
+        rejected: "Prośba została odrzucona.",
+        unavailable: "Kod jest nieprawidłowy, wygasł lub został już użyty.",
+        rate_limited: "Za dużo prób. Odczekaj minutę i spróbuj ponownie."
+      }[result.state] || "Nie udało się sprawdzić kodu.";
     } catch (error) {
-      showRequestError(error, usedToken, "Kod wygasł, został już użyty lub dotyczy innego pokoju.");
+      showRequestError(error, usedToken, "Nie udało się sprawdzić kodu. Spróbuj ponownie.");
     } finally {
       delete approval.dataset.busy;
+      updateApproval();
     }
   });
 
@@ -495,7 +621,11 @@
   window.addEventListener("storage", event => {
     if (event.key === tokenKey || event.key === revokedKey || event.key === pairingKey || event.key === null) {
       token = localStorage.getItem(tokenKey);
-      pairing = storedObject(pairingKey);
+      pairing = storedPairing();
+      if (!pairing && !expiredRoom) {
+        pairPanel.hidden = true;
+        clearInterval(pairTimer);
+      }
       clearHistory();
       openDiscussion();
     }

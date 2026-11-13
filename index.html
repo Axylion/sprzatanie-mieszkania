@@ -599,21 +599,22 @@
       <button type="button" id="discussion-join-action" disabled>Połącz pokój</button>
     </section>
     <section id="discussion-pair" hidden aria-labelledby="discussion-pair-title">
-      <h2 id="discussion-pair-title">Połącz kolejne urządzenie</h2>
-      <p>Na połączonym urządzeniu otwórz Dyskusje, wybierz „Dodaj urządzenie” i wklej ten kod.</p>
-      <label for="discussion-pair-code">Kod ważny przez 2 minuty</label>
-      <input id="discussion-pair-code" readonly>
-      <button type="button" id="discussion-copy-code">Kopiuj kod</button>
-      <button type="button" id="discussion-pair-back">Wróć do pokoi</button>
+      <h2 id="discussion-pair-title">Połącz urządzenie</h2>
+      <p>Wpisz ten kod na urządzeniu, które jest już połączone z pokojem.</p>
+      <p id="discussion-pair-code" class="discussion-pair-code" aria-label="Kod podłączenia"></p>
+      <p id="discussion-pair-time" class="discussion-pair-time" role="timer"></p>
+      <button type="button" id="discussion-pair-retry" hidden>Sprawdź ponownie</button>
+      <button type="button" id="discussion-pair-renew" hidden>Wygeneruj nowy kod</button>
+      <button type="button" id="discussion-pair-back">Anuluj</button>
     </section>
     <div id="discussion-chat" hidden>
       <details id="discussion-approve">
         <summary>Dodaj urządzenie</summary>
         <form id="discussion-approve-form" class="discussion-approval">
           <label for="discussion-approve-code">Kod z nowego urządzenia</label>
-          <input id="discussion-approve-code" required maxlength="36" autocomplete="off" spellcheck="false">
-          <button type="submit" value="approve">Potwierdź podłączenie</button>
-          <button type="submit" value="reject">Odrzuć</button>
+          <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" spellcheck="false">
+          <button type="submit" value="approve" disabled>Potwierdź podłączenie</button>
+          <button type="submit" value="reject" disabled>Odrzuć</button>
         </form>
       </details>
       <div class="discussion-history-controls">

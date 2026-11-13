@@ -10,22 +10,25 @@ import { fileURLToPath } from 'node:url';
 const { PGlite } = await import(process.env.G19_PGLITE || '@electric-sql/pglite');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migration = await readFile(new URL('../supabase/migrations/202611130001_dyskusje.sql', import.meta.url), 'utf8');
+const numericMigration = await readFile(new URL('../supabase/migrations/202611130002_pairing_codes.sql', import.meta.url), 'utf8');
 const signatures = {
   rooms: [],
   bind: ['p_room', 'p_proof'],
   pair_start: ['p_room'],
   pair_decide: ['p_token', 'p_code', 'p_approve'],
   pair_claim: ['p_secret'],
+  pair_cancel: ['p_secret'],
   read: ['p_token', 'p_before', 'p_version'],
   send: ['p_token', 'p_request', 'p_body'],
   react: ['p_token', 'p_message', 'p_vote']
 };
 
-async function database(t) {
+async function database(t, legacy = false) {
   const db = new PGlite();
   t?.after(() => db.close());
   await db.exec('create role anon; create role authenticated; create role service_role;');
   await db.exec(migration);
+  if (!legacy) await db.exec(numericMigration);
   const rpc = (method, args) => db.transaction(async tx => {
     await tx.exec('set local role anon');
     const values = signatures[method].map(key => args[key] ?? null);
@@ -68,33 +71,41 @@ test('PostgreSQL enforces binding, history, idempotency, reactions, rate limits 
   await assert.rejects(bind(1), { code: 'PT409' });
   const second = await bind(2);
   const request2 = await start(1);
+  assert.match(request2.code, /^[0-9]{6}$/);
+  assert.ok(Date.parse(request2.expiresAt) - Date.parse(request2.serverNow) <= 120000);
   assert.equal((await claim(request2.secret)).state, 'pending');
   await assert.rejects(rpc('read', { p_token: request2.secret }), { code: 'PT401' });
   assert.equal((await claim(request2.code)).state, 'expired');
-  await assert.rejects(decide(second.token, request2.code), { code: 'PT409' });
-  const decisions = await Promise.allSettled([decide(first.token, request2.code), decide(first.token, request2.code)]);
-  assert.equal(decisions.filter(result => result.status === 'fulfilled').length, 1);
-  assert.equal(decisions.find(result => result.status === 'rejected').reason.code, 'PT409');
+  assert.equal((await decide(second.token, request2.code)).state, 'unavailable');
+  const decisions = await Promise.all([decide(first.token, request2.code), decide(first.token, request2.code)]);
+  assert.deepEqual(decisions.map(result => result.state).sort(), ['approved', 'unavailable']);
   const otherDevice = await claim(request2.secret);
   assert.equal(otherDevice.state, 'claimed');
   assert.deepEqual(await claim(request2.secret), otherDevice);
-  await assert.rejects(decide(first.token, request2.code), { code: 'PT409' });
+  assert.equal((await decide(first.token, request2.code)).state, 'unavailable');
   const request3 = await start(1);
   await decide(otherDevice.token, request3.code);
   const third = await claim(request3.secret);
   assert.equal(third.state, 'claimed');
   assert.notEqual(third.token, otherDevice.token);
   const expired = await start(1);
-  await db.query("update g19_private.pairings set expires_at = now() - interval '1 second' where id = $1", [expired.code]);
+  await db.query("update g19_private.pairings set expires_at = now() - interval '1 second' where numeric_code = $1", [expired.code]);
   assert.equal((await claim(expired.secret)).state, 'expired');
-  await assert.rejects(decide(first.token, expired.code), { code: 'PT409' });
+  assert.equal((await decide(first.token, expired.code)).state, 'unavailable');
   const rejected = await start(1);
   await decide(first.token, rejected.code, false);
   assert.equal((await claim(rejected.secret)).state, 'rejected');
+  const cancelled = await start(1);
+  assert.equal((await rpc('pair_cancel', { p_secret: cancelled.code })).state, 'expired');
+  assert.equal((await rpc('pair_cancel', { p_secret: cancelled.secret })).state, 'cancelled');
+  assert.equal((await claim(cancelled.secret)).state, 'cancelled');
+  assert.equal((await decide(first.token, cancelled.code)).state, 'rate_limited');
+  await db.exec("update g19_private.pair_attempts set window_start = now() - interval '1 minute'");
+  assert.equal((await decide(first.token, cancelled.code)).state, 'unavailable');
   const pending = await start(1);
   const approved = await start(1);
   await decide(first.token, approved.code);
-  for (let i = 0; i < 6; i++) await start(1);
+  for (let i = 0; i < 5; i++) await start(1);
   await assert.rejects(start(1), { code: 'PT429' });
   assert.match(first.token, /^[0-9a-f]{64}$/);
   assert.notEqual(first.token, otherDevice.token);
@@ -155,6 +166,20 @@ test('PostgreSQL enforces binding, history, idempotency, reactions, rate limits 
   assert.deepEqual((await rpc('read', { p_token: second.token })).messages.map(m => m.former), [true, false]);
 });
 
+test('Additional migration preserves existing chat, reactions and devices', async t => {
+  const { db, rpc } = await database(t, true);
+  const existing = await rpc('bind', { p_room: 1, p_proof: randomBytes(32).toString('hex') });
+  const id = await rpc('send', { p_token: existing.token, p_request: randomUUID(), p_body: 'Przed aktualizacją' });
+  await rpc('react', { p_token: existing.token, p_message: id, p_vote: 1 });
+  const old = await rpc('pair_start', { p_room: 1 });
+  await db.exec(numericMigration);
+  assert.equal((await rpc('pair_claim', { p_secret: old.secret })).state, 'cancelled');
+  const messages = (await rpc('read', { p_token: existing.token })).messages;
+  assert.deepEqual(messages.map(m => [m.id, m.body, m.vote]), [[id, 'Przed aktualizacją', 1]]);
+  const next = await rpc('pair_start', { p_room: 1 });
+  assert.match(next.code, /^[0-9]{6}$/);
+});
+
 test('Dyskusje across devices uses real SQL, survives reload and handles a lost send response', { timeout: 70000 }, async t => {
   const { db, rpc } = await database();
   const { chromium } = createRequire(import.meta.url)('playwright');
@@ -186,11 +211,16 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   const base = `http://127.0.0.1:${server.address().port}/sprzatanie-mieszkania/`;
   const errors = [];
   let loseSendResponse = true;
+  let losePairResponse = false;
   async function device(width, legacyRoom) {
     const context = await browser.newContext({ viewport: { width, height: 840 }, serviceWorkers: 'block' });
     await context.route('https://g19test.supabase.co/rest/v1/rpc/g19_*', async route => {
       const method = route.request().url().split('g19_').at(-1);
       try {
+        if (method === 'pair_claim' && losePairResponse) {
+          losePairResponse = false;
+          return route.abort();
+        }
         const result = await rpc(method, route.request().postDataJSON());
         if (method === 'send' && loseSendResponse) {
           loseSendResponse = false;
@@ -224,12 +254,26 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     await newPage.getByRole('button', { name: 'Połącz kolejne urządzenie' }).click();
     await newPage.getByText('Oczekiwanie na potwierdzenie na połączonym urządzeniu.').waitFor();
     assert.equal(await newPage.locator('#discussion-compose').isVisible(), false);
-    const code = await newPage.getByLabel('Kod ważny przez 2 minuty').inputValue();
+    const code = await newPage.locator('#discussion-pair-code').innerText();
+    assert.match(code, /^[0-9]{3} [0-9]{3}$/);
+    assert.match(await newPage.getByRole('timer').innerText(), /^Kod ważny przez (02:00|01:[0-5][0-9])$/);
     if (await a.locator('#discussion-approve').getAttribute('open') === null) {
       await a.getByText('Dodaj urządzenie', { exact: true }).click();
     }
-    await a.getByLabel('Kod z nowego urządzenia').fill(code);
-    await a.getByRole('button', { name: 'Potwierdź podłączenie' }).click();
+    const field = a.getByLabel('Kod z nowego urządzenia');
+    const approve = a.getByRole('button', { name: 'Potwierdź podłączenie' });
+    assert.equal(await field.getAttribute('inputmode'), 'numeric');
+    await field.fill('a123');
+    assert.equal(await field.inputValue(), '123');
+    assert.equal(await approve.isDisabled(), true);
+    await field.fill('');
+    await field.evaluate((input, value) => {
+      const data = new DataTransfer();
+      data.setData('text/plain', value);
+      input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, cancelable: true, bubbles: true }));
+    }, code);
+    assert.equal(await field.inputValue(), code.replace(' ', ''));
+    await approve.click();
     await newPage.locator('#discussion-compose').waitFor();
   }
   await a.goto(base);
@@ -252,6 +296,26 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   assert.equal(await b.getByLabel('Ważne ogłoszenia').isChecked(), false);
   await b.goto(base + '#dyskusje');
   await joinRoom(b, 2);
+  await c.goto(base + '#dyskusje');
+  await c.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
+  losePairResponse = true;
+  await c.getByRole('button', { name: 'Połącz kolejne urządzenie' }).click();
+  const retry = c.getByRole('button', { name: 'Sprawdź ponownie' });
+  await retry.waitFor();
+  await retry.click();
+  await retry.waitFor({ state: 'hidden' });
+  const oldCode = (await c.locator('#discussion-pair-code').innerText()).replace(' ', '');
+  await db.query("update g19_private.pairings set expires_at = now() - interval '1 second' where numeric_code = $1", [oldCode]);
+  await c.getByText('Kod wygasł.', { exact: true }).waitFor();
+  await c.getByRole('button', { name: 'Wygeneruj nowy kod' }).click();
+  await c.waitForFunction(old => {
+    const code = document.querySelector('#discussion-pair-code');
+    return !code.hidden && code.textContent.replace(' ', '') !== old;
+  }, oldCode);
+  const freshCode = (await c.locator('#discussion-pair-code').innerText()).replace(' ', '');
+  await c.getByRole('button', { name: 'Anuluj', exact: true }).click();
+  await c.getByText('Prośba o podłączenie została anulowana.').waitFor();
+  assert.equal((await db.query('select state from g19_private.pairings where numeric_code = $1', [freshCode])).rows[0].state, 'cancelled');
   await pairDevice(c);
   await pairDevice(d);
   assert.equal(new Set(await Promise.all([a, b, c, d].map(page =>

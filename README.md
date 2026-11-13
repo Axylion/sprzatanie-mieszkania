@@ -105,9 +105,10 @@ wybór pokoju do kalendarza (`cleaning-room`) jest zachowany. Pokój potwierdzon
 w Dyskusjach uzupełnia wybór kalendarza, jeśli urządzenie nie ma go jeszcze ustawionego.
 
 W Dyskusjach wybierz wolny pokój i użyj „Połącz pokój”. Aby podłączyć kolejne
-urządzenie, wybierz zajęty pokój i „Połącz kolejne urządzenie”. Skopiuj kod.
-Na połączonym urządzeniu otwórz „Dodaj urządzenie”, wklej kod i potwierdź.
+urządzenie, wybierz zajęty pokój i „Połącz kolejne urządzenie”. Odczytaj sześciocyfrowy kod.
+Na połączonym urządzeniu otwórz „Dodaj urządzenie”, wpisz sześć cyfr i potwierdź.
 Nowe urządzenie uzyska dostęp automatycznie. Kod jest ważny dwie minuty.
+Ekran pokazuje pozostały czas i umożliwia anulowanie lub odnowienie kodu.
 Zwykła karta przeglądarki i zainstalowana PWA mogą wymagać osobnych powiązań.
 Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich jego urządzeń.
 
@@ -116,8 +117,12 @@ Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich j
 1. Utwórz dedykowany projekt Supabase na planie Free. Włącz Data API dla
    standardowego schematu `public`. Schemat `g19_private` zostaw poza API.
 2. W uwierzytelnionym SQL Editor projektu wykonaj raz migrację
-   `supabase/migrations/202611130001_dyskusje.sql`. Jeśli projekt korzysta z
-   Supabase CLI, zastosuj tę samą migrację przez jego proces migracji.
+   `supabase/migrations/202611130001_dyskusje.sql` (tylko dla pustej bazy),
+   a potem `202611130002_pairing_codes.sql`. W istniejącej bazie testowej
+   wykonaj tylko drugą migrację przed wgraniem nowego ZIP do Cloudflare Pages.
+   Migracja działa w transakcji, zachowuje urządzenia, wiadomości i reakcje
+   oraz anuluje niezakończone prośby z poprzedniej wersji. Jeśli projekt
+   korzysta z Supabase CLI, zastosuj migracje przez jego standardowy proces.
 3. W `dyskusje/config.js` wpisz URL `https://<project-ref>.supabase.co` oraz
    klucz **publishable** `sb_publishable_…` z ustawień projektu. Nie wpisuj
    klucza `sb_secret_…`, service role ani danych połączenia do bazy.
@@ -154,6 +159,7 @@ Osoba z dostępem do strony może zająć wolny pokój. Zajęty pokój wymaga
 potwierdzenia z połączonego urządzenia tego mieszkańca. Model nie sprawdza
 tożsamości. Wyczyszczenie danych witryny pozwala zgłosić nowe urządzenie.
 Kod widoczny na ekranie pozwala jedynie wskazać prośbę do potwierdzenia.
+Pokój ma do 12 nowych próśb i do 6 prób potwierdzenia na minutę.
 Osobny sekret nowego urządzenia służy do odebrania wyniku. Powtórne odebranie
 w okresie ważności zwraca to samo powiązanie po utracie odpowiedzi sieciowej.
 

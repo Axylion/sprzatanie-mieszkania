@@ -106,7 +106,7 @@ w Dyskusjach uzupełnia wybór kalendarza, jeśli urządzenie nie ma go jeszcze 
 
 W Dyskusjach wybierz wolny pokój i użyj „Połącz pokój”. Aby podłączyć kolejne
 urządzenie, wybierz zajęty pokój i „Połącz kolejne urządzenie”. Odczytaj sześciocyfrowy kod.
-Na połączonym urządzeniu otwórz „Dodaj urządzenie”, wpisz sześć cyfr i potwierdź.
+Na połączonym urządzeniu otwórz „Podłącz kolejne urządzenie”, wpisz sześć cyfr i potwierdź.
 Nowe urządzenie uzyska dostęp automatycznie. Kod jest ważny dwie minuty.
 Ekran pokazuje pozostały czas i umożliwia anulowanie lub odnowienie kodu.
 Zwykła karta przeglądarki i zainstalowana PWA mogą wymagać osobnych powiązań.
@@ -116,20 +116,10 @@ Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich j
 
 1. Utwórz dedykowany projekt Supabase na planie Free. Włącz Data API dla
    standardowego schematu `public`. Schemat `g19_private` zostaw poza API.
-2. W uwierzytelnionym SQL Editor projektu wykonaj raz migrację
-   `supabase/migrations/202611130001_dyskusje.sql` (tylko dla pustej bazy),
-   a potem kolejno `202611130002_pairing_codes.sql` i
-   `202611130003_scope_chat_revision_updates.sql` i
-   `202611130004_devices_and_reactions.sql`. W istniejącej bazie zastosuj
-   wyłącznie brakujące migracje w tej kolejności. Jeśli pierwsze trzy są już
-   zastosowane, wykonaj tylko czwartą. Następnie wgraj ZIP v9 do istniejącego projektu podglądu.
-   Druga migracja anuluje niezakończone prośby w starym formacie. Trzecia
-   podmienia wyłącznie definicje trzech funkcji i zachowuje dane oraz uprawnienia. Czwarta ogranicza
-   nowe połączenia do dwóch aktywnych urządzeń i usuwa własne reakcje autora.
-   Istniejące urządzenia zachowują dostęp. W ustawieniach „Moje urządzenia”
-   można odłączyć inne urządzenie po potwierdzeniu.
-   Jeśli projekt korzysta z Supabase CLI, zastosuj migracje przez jego
-   standardowy proces.
+2. Zastosuj brakujące migracje z katalogu `supabase/migrations/` w kolejności
+   numerów. Migracja 001 jest przeznaczona dla pustej bazy. Jeśli podgląd v10
+   ma już migracje 001–006, zastosuj tylko 007 i 008. Następnie przygotuj
+   konfigurację testową i wgraj ZIP v11 do projektu podglądu.
 3. W `dyskusje/config.js` wpisz URL `https://<project-ref>.supabase.co` oraz
    klucz **publishable** `sb_publishable_…` z ustawień projektu. Nie wpisuj
    klucza `sb_secret_…`, service role ani danych połączenia do bazy.
@@ -193,17 +183,14 @@ mieszkaniec może połączyć swoje urządzenie. Odwołany profil pokazuje „Do
 dyskusji został zakończony.”. Funkcje administracyjne nie mają
 uprawnień wykonania dla przeglądarki ani publicznego API.
 
-### Przygotowanie powiadomień
+### Powiadomienia
 
-Ustawienia zapisują osobno trzy lokalne preferencje, dla dyżurów, wiadomości
-i ważnych ogłoszeń. Kolejny etap może synchronizować je z subskrypcją push
-powiązaną z ID urządzenia i generacją mieszkańca. Zmiana mieszkańca odwoła
-także subskrypcje jego urządzeń. Dla wiadomości serwer będzie mógł zapisywać
-zdarzenie razem z wiadomością i deduplikować wysyłkę po ID zdarzenia i
-subskrypcji. Powiadomienia o własnej wiadomości wykluczą urządzenia z tej
-samej generacji tego pokoju. Krótko ważny sygnał aktywności będzie wymagał
-widocznego widoku Dyskusji i aktywnego okna. Powiadomienie otworzy `#dyskusje`.
-Zachowanie Web Push, szczególnie na iOS, wymaga osobnych testów platformowych.
+Trzy kategorie w ustawieniach obejmują centrum i dostawę w tle. Ustawienia
+połączonych urządzeń są wspólne w obrębie aktualnej generacji pokoju.
+Przeglądarka pyta o zgodę na dostawę w tle po użyciu przycisku w ustawieniach.
+Przypomnienie dla dyżurnego pokoju przypada w piątek o 14:00 w Europe/Warsaw.
+
+[Konfiguracja podglądu, Web Push i dostępu administracyjnego](supabase/functions/g19-deliver/README.md).
 
 ### Testy Dyskusji
 

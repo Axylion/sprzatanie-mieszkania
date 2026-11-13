@@ -7,7 +7,7 @@
   "scope": "./",
   "display": "standalone",
   "background_color": "#0e131c",
-  "theme_color": "#20314a",
+  "theme_color": "#133541",
   "lang": "pl",
   "icons": [
     {
@@ -21,6 +21,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "./icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

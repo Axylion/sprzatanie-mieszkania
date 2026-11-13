@@ -49,8 +49,6 @@
 }
 
 .guide-frame {
-  width: min(100% - 24px, 980px);
-  margin-inline: auto;
   padding: clamp(12px, 2.8vw, 26px);
   background: var(--guide-bg);
   border-radius: 20px;
@@ -360,7 +358,6 @@
 }
 
 @media (max-width: 380px) {
-  .guide-frame { width: calc(100% - 16px); }
   .guide-steps li { gap: 7px; }
   .guide-steps .guide-illustration { --tile-size: 39px; }
 }

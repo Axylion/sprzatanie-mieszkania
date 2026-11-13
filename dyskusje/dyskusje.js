@@ -49,6 +49,7 @@
   let refreshError = false;
   let deviceCount;
   let deviceToRevoke;
+  let openApproval = false;
   let approvalNoticeTimer;
 
   let availableRooms = [];
@@ -220,6 +221,11 @@
       join.hidden = pairPanel.hidden = true;
       if (data.room) rememberRoom(data.room);
       updateDeviceCount(data.deviceCount);
+      if (openApproval && !approvalDetails.hidden) {
+        openApproval = false;
+        approvalDetails.open = true;
+        approvalCode.focus();
+      }
       if (data.unchanged) return;
 
       const nearEnd = history.scrollHeight - history.scrollTop - history.clientHeight < 55;
@@ -241,6 +247,9 @@
       older.hidden = !data.hasOlder;
       version = data.version;
       messages = data.messages;
+      if (!before && messages.length) window.dispatchEvent(new CustomEvent("g19-chat-loaded", {
+        detail: messages.at(-1).id
+      }));
     } catch (error) {
       if (id !== loadId || view.hidden) return;
       pollDelay = Math.min(pollDelay * 2, 30000);
@@ -663,6 +672,37 @@
     return /Windows|Macintosh|Linux/i.test(navigator.userAgent) ? "computer" : "other";
   }
 
+  function deviceRow(kind, connected, current = false) {
+    const paths = {
+      phone: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm2 17h4",
+      computer: "M3 4h18v12H3zM12 16v4m-4 0h8",
+      other: "M4 5h16v14H4zM10 16h4"
+    };
+    const row = document.createElement("li");
+    if (connected) row.dataset.connected = "";
+    const ns = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(ns, "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("aria-hidden", "true");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.6");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", paths[kind] || paths.other);
+    icon.append(path);
+    const status = document.createElement("span");
+    status.textContent = connected ? "Urządzenie podłączone" : "Urządzenie niepodłączone";
+    if (current) {
+      const label = document.createElement("small");
+      label.textContent = "To urządzenie";
+      status.append(label);
+    }
+    row.append(icon, status);
+    return row;
+  }
+
   async function loadDevices() {
     if (!configured || !token || location.hash.startsWith("#poradnik") || !view.hidden) return;
     deviceSettings.hidden = false;
@@ -672,29 +712,38 @@
       const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind() });
       if (token !== usedToken || !view.hidden) return;
       updateDeviceCount(devices.length);
-      deviceList.replaceChildren(...devices.map(device => {
-        const row = document.createElement("li");
-        const label = { phone: "Telefon", computer: "Komputer", other: "Inne urządzenie" }[device.kind];
-        const name = document.createElement("span");
-        name.textContent = label + (device.current ? " · to urządzenie" : "");
-        row.append(name);
-        if (!device.current) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.textContent = "Odłącz";
-          button.setAttribute("aria-label", "Odłącz: " + label + ", połączono " + dateFormat.format(new Date(device.createdAt)));
-          button.addEventListener("click", () => {
-            deviceToRevoke = device.id;
-            document.getElementById("device-confirm-text").textContent = "Odłączyć urządzenie „" + label + "”?";
-            deviceConfirm.hidden = false;
-            deviceRevoke.focus();
-          });
-          row.append(button);
-        }
+      const rows = devices.map(device => {
+        const row = deviceRow(device.kind, true, device.current);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Odłącz";
+        button.setAttribute("aria-label", "Odłącz: " + (device.current ? "to urządzenie" :
+          "urządzenie połączone " + dateFormat.format(new Date(device.createdAt))));
+        button.addEventListener("click", () => {
+          deviceToRevoke = device;
+          document.getElementById("device-confirm-text").textContent = device.current
+            ? "Odłączyć to urządzenie? Straci dostęp do dyskusji i powiadomień."
+            : "Odłączyć wybrane urządzenie? Straci dostęp do dyskusji i powiadomień.";
+          deviceConfirm.hidden = false;
+          deviceRevoke.focus();
+        });
+        row.append(button);
         return row;
-      }));
-      if (devices.length === 1) deviceStatus.textContent = "Aby zwolnić pokój, skontaktuj się z administratorem.";
-      else deviceStatus.textContent = "";
+      });
+      if (devices.length === 1) {
+        const row = deviceRow("other", false);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = "Podłącz";
+        button.addEventListener("click", () => {
+          openApproval = true;
+          location.hash = "#dyskusje";
+        });
+        row.append(button);
+        rows.push(row);
+      }
+      deviceList.replaceChildren(...rows);
+      deviceStatus.textContent = "";
     } catch (error) {
       if (token !== usedToken) return;
       if (error.code === "device_invalid") showRevoked();
@@ -713,7 +762,17 @@
     const usedToken = token;
     deviceRevoke.disabled = true;
     try {
-      await rpc("revoke_device", { p_token: usedToken, p_device: deviceToRevoke });
+      const current = deviceToRevoke.current;
+      await rpc("revoke_device", { p_token: usedToken, p_device: deviceToRevoke.id });
+      if (current && token === usedToken) {
+        showRevoked();
+        const notice = document.createElement("p");
+        notice.setAttribute("role", "status");
+        notice.textContent = "To urządzenie zostało odłączone.";
+        deviceSettings.after(notice);
+        document.getElementById("settings-title").focus();
+        return;
+      }
       deviceConfirm.hidden = true;
       deviceToRevoke = null;
       await loadDevices();
@@ -741,7 +800,10 @@
     openDiscussion();
     loadDevices();
   });
-  window.addEventListener("online", resume);
+  window.addEventListener("g19-device-revoked", () => { if (token) showRevoked(); });
+  window.addEventListener("online", () => { resume(); loadDevices(); });
+  window.addEventListener("focus", loadDevices);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadDevices(); });
   window.addEventListener("pageshow", event => { if (event.persisted) resume(); });
   document.addEventListener("visibilitychange", resume);
   window.addEventListener("storage", event => {

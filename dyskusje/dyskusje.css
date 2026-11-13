@@ -179,7 +179,13 @@
 .device-roles > div { background: var(--surface-alt); border: 1px solid var(--border); padding: 10px; border-radius: 10px; }
 .device-roles p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
 .device-list { list-style: none; padding: 0; margin: 8px 0; }
-.device-list li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 0; }
+.device-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border); }
+.device-list svg { width: 26px; height: 26px; flex: none; color: var(--muted); }
+.device-list [data-connected] svg { color: #23783d; }
+[data-theme="dark"] .device-list [data-connected] svg { color: #79dfa1; }
+.device-list span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.device-list small { display: block; color: var(--muted); }
+.device-list button { flex: none; }
 #device-settings button { min-height: 44px; color: var(--text); border: 1px solid var(--border); background: var(--surface-alt); border-radius: 8px; padding: 6px 10px; }
 .discussion-reactions .reaction-count { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: var(--muted); }
 
@@ -192,7 +198,7 @@
 .dashboard-notifications { order: 5; }
 .schedule-row.active .room-badge { outline: 1px solid var(--accent); outline-offset: -1px; }
 @media (min-width: 760px) {
-  #harmonogram.container, .header-inner.container { width: min(100% - 48px, 1080px); }
+  :root { --page-gutter: 24px; }
   .dashboard-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: start; }
   .dashboard-primary, .dashboard-secondary { display: grid; gap: 14px; min-width: 0; margin: 0; }
   .dashboard-secondary > .card { margin: 0; }
@@ -207,6 +213,5 @@
 #notification-list a { display: grid; padding: 10px 6px; gap: 3px; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
 #notification-list a[data-unread] { border-inline-start: 3px solid var(--accent); padding-inline-start: 9px; }
 #notification-list time { color: var(--muted); font-size: .82rem; }
-#notification-panel button, #push-toggle { min-height: 44px; color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
-#push-settings { margin-top: 14px; border: 1px solid var(--border); border-radius: 8px; }
-#push-toggle { margin-top: 12px; }
+#notification-panel button, #push-permission { min-height: 44px; color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+#push-permission { margin-top: 12px; }

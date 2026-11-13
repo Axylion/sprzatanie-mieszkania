@@ -70,8 +70,9 @@
     }
     button, select { font: inherit; }
     button { cursor: pointer; }
+    :root { --page-width: 1080px; --page-gutter: 16px; }
     .container {
-      width: min(100% - 32px, 760px);
+      width: min(100% - 2 * var(--page-gutter), var(--page-width));
       margin: 0 auto;
     }
 
@@ -128,6 +129,7 @@
       font-weight: 750;
       font-size: 16px;
     }
+    .brand-icon svg { width: 25px; fill: none; stroke: #52e3df; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
     .brand > span:last-child { white-space: nowrap; }
     .theme-picker { position: relative; width: 44px; height: 42px; }
     .theme-icon {
@@ -146,8 +148,7 @@
       width: 42px;
       height: 42px;
       border-radius: 13px;
-      background: var(--accent-bg);
-      font-size: 22px;
+      background: #133541;
     }
     select {
       background: var(--surface-alt);
@@ -379,7 +380,7 @@
     }
 
     @media(max-width: 480px) {
-      .container { width: min(100% - 24px, 760px); }
+      :root { --page-gutter: 12px; }
       .brand { font-size: 14px; }
       .brand-icon { width: 37px; height: 37px; }
       .header-actions { gap: 5px; }
@@ -422,7 +423,7 @@
 <header>
   <div class="container header-inner">
     <div class="brand">
-      <span class="brand-icon">🧹</span>
+      <span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h14V10m-9 10v-6h4v6"/></svg></span>
       <span>Goleszan 19</span>
     </div>
     <div class="header-actions">
@@ -578,18 +579,11 @@
     <h2>Powiadomienia</h2>
     <details class="notification-settings">
       <summary>Ustawienia powiadomień</summary>
-      <p>Powiadomienia w aplikacji</p>
       <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
       <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
       <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
-      <fieldset id="push-settings">
-        <legend>Powiadomienia systemowe (push)</legend>
-        <label><input type="checkbox" name="duties" checked> Dyżury sprzątania</label>
-        <label><input type="checkbox" name="messages" checked> Nowe wiadomości</label>
-        <label><input type="checkbox" name="announcements" checked> Ważne ogłoszenia</label>
-        <button id="push-toggle" type="button">Włącz push</button>
-        <p id="push-status" role="status"></p>
-      </fieldset>
+      <button id="push-permission" type="button" hidden>Zezwól na powiadomienia na tym urządzeniu</button>
+      <p id="push-status" role="status"></p>
     </details>
   </section>
     </div>
@@ -622,7 +616,7 @@
   </section>
 </main>
 
-<main id="poradnik-view" hidden></main>
+<main class="container" id="poradnik-view" hidden></main>
 
 <main class="container discussion-view" id="discussion-view" hidden>
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
@@ -855,12 +849,6 @@
     date.textContent = weekendText(saturday);
     result.replaceChildren("Najbliższy dyżur pokoju nr " + selectedRoom + ": ", date, ".");
   }
-
-  document.querySelectorAll(".notification-settings input:not(#push-settings input)").forEach(input => {
-    const key = "goleszan19-notification-" + input.name;
-    input.checked = localStorage.getItem(key) === "true";
-    input.addEventListener("change", () => localStorage.setItem(key, String(input.checked)));
-  });
 
   const themeSelect = document.getElementById("theme-select");
   themeSelect.value = ["system", "light", "dark"]

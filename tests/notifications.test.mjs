@@ -18,7 +18,8 @@ test('Notification privacy, per-device read state, Warsaw duty and push lifecycl
   await db.exec('create role anon; create role authenticated; create role service_role');
   for (const file of [
     '202611130001_dyskusje.sql', '202611130002_pairing_codes.sql', '202611130003_scope_chat_revision_updates.sql',
-    '202611130004_devices_and_reactions.sql', '202611130005_notification_inbox.sql', '202611130006_web_push.sql'
+    '202611130004_devices_and_reactions.sql', '202611130005_notification_inbox.sql', '202611130006_web_push.sql',
+    '202611130007_unified_notifications.sql', '202611130008_device_revocation_audit.sql'
   ]) await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
   const value = async (sql, args = [], role = 'anon') => db.transaction(async tx => {
     await tx.exec('set local role ' + role);
@@ -82,7 +83,63 @@ test('Notification privacy, per-device read state, Warsaw duty and push lifecycl
   assert.equal((await dut('2026-07-17T12:00:00Z'))[0].saturday, '2026-07-18');
   assert.deepEqual(await dut('2026-07-17T11:59:59Z'), []);
   assert.deepEqual(await dut('2026-11-14T14:00:00Z'), []);
-  await db.query('select public.g19_admin_change_resident(2,1,2)');
+  const activity = (key, tab, active, seen = null, presented = []) =>
+    value('select public.g19_notification_activity($1,$2,$3,$4,$5) v', [key,tab,active,seen,presented]);
+  const settings = (key, categories = null) =>
+    value('select public.g19_notification_preferences($1,$2,false) v', [key,categories]);
+  const tab = randomUUID();
+  const anotherTab = randomUUID();
+  await subscribe(reader,endpoint,['announcements']);
+  await subscribe(second,endpoint + '-second',['messages']);
+  await settings(reader, ['messages', 'announcements']);
+  assert.deepEqual(await settings(second), ['messages', 'announcements']);
+  await activity(reader, tab, true);
+  await activity(reader, anotherTab, true);
+  await activity(reader, tab, false);
+  await db.exec("update g19_private.devices set next_message_at = null where room = 1");
+  const activeMessage = await value('select public.g19_send($1,$2,$3) v', [author,randomUUID(),'W aktywnym czacie']);
+  const readerItems = (await inbox(reader)).items;
+  assert.equal(readerItems[0].read, false);
+  const foreground = await take();
+  assert.ok(foreground.some(item => item.endpoint === endpoint + '-second' && item.category === 'messages'));
+  assert.ok(foreground.every(item => item.endpoint !== endpoint || item.id !== readerItems[0].id));
+  await activity(reader, anotherTab, true, activeMessage);
+  assert.equal((await inbox(reader)).items[0].read, true);
+  const duringChat = [{ id:'chat-news',title:'Ogłoszenie w czacie',published:new Date().toISOString(),expires:null }];
+  await value('select public.g19_notification_tick($1::jsonb,false) v', [JSON.stringify(duringChat)], 'service_role');
+  const chatNews = (await inbox(reader,['announcements'])).items.find(item => item.target === '#ogloszenie-chat-news');
+  assert.equal(chatNews.read, false);
+  await activity(reader, anotherTab, true, activeMessage, [chatNews.id]);
+  await activity(reader, anotherTab, false);
+  assert.ok((await take()).every(item => item.id !== chatNews.id));
+  assert.equal((await inbox(reader,['announcements'])).items.find(item => item.id === chatNews.id).read, false);
+
+  await activity(reader, tab, true);
+  await db.exec("update g19_private.devices set next_message_at = null where room = 1");
+  await value('select public.g19_send($1,$2,$3) v', [author,randomUUID(),'Zablokowany ekran']);
+  assert.ok((await take()).every(item => item.endpoint !== endpoint || item.category !== 'messages'));
+  await db.query("update g19_private.notification_presence set active_until = now() - interval '1 second' where tab = $1", [tab]);
+  assert.ok((await take()).some(item => item.endpoint === endpoint && item.category === 'messages'));
+
+  await settings(reader, []);
+  assert.deepEqual(await settings(second), []);
+  const itemCount = async () => (await db.query('select count(*) v from g19_private.notification_inbox')).rows[0].v;
+  const beforeDisable = await itemCount();
+  await db.exec("update g19_private.devices set next_message_at = null where room = 1");
+  await value('select public.g19_send($1,$2,$3) v', [author,randomUUID(),'Wyłączona kategoria']);
+  assert.equal(await itemCount(), beforeDisable);
+  assert.equal((await inbox(reader)).unread, 0);
+  const current = (await value('select public.g19_my_devices($1) v', [second])).find(device => device.current);
+  await value('select public.g19_revoke_device($1,$2) v', [second,current.id]);
+  await assert.rejects(inbox(second), { code:'PT401' });
+  await assert.rejects(value('select public.g19_admin_change_resident(2,1,1) v', [], 'authenticated'), { code:'42501' });
+  await value('select public.g19_admin_change_resident(2,1,1) v', [], 'g19_room_admin');
+  const audit = (await db.query('select room, result, devices_revoked, administrator from g19_private.room_reset_audit')).rows[0];
+  assert.equal(audit.room, 2);
+  assert.equal(audit.result, 'revoked');
+  assert.equal(audit.devices_revoked, 1);
+  assert.ok(audit.administrator);
+  assert.ok((await db.query('select count(*) from g19_private.messages')).rows[0].count >= 4);
   assert.deepEqual(await take(), []);
   assert.equal((await db.query('select count(*) v from g19_private.push_subscriptions')).rows[0].v, 0);
   await assert.rejects(inbox(reader), { code:'PT401' });

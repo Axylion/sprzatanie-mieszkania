@@ -697,6 +697,47 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   });
   await operator.goto(base);
   await operator.getByRole('link', { name: 'Administracja' }).click();
+  const login = operator.locator('#admin-login');
+  await login.waitFor();
+  assert.equal(await login.locator('#admin-username').inputValue(), 'Admin');
+  assert.ok(await login.locator('#admin-username').isDisabled());
+  assert.ok(await login.getByRole('button', { name: 'Zaloguj się' }).isDisabled());
+  for (const width of [770, 360]) {
+    await operator.setViewportSize({ width, height: 640 });
+    const metrics = await login.evaluate(form => {
+      const rect = form.getBoundingClientRect();
+      return [rect.width, rect.left, getComputedStyle(form).backgroundColor, getComputedStyle(document.body).backgroundColor];
+    });
+    assert.deepEqual(metrics, width === 770
+      ? [380, 195, 'rgb(8, 42, 51)', 'rgb(6, 28, 35)']
+      : [336, 12, 'rgb(8, 42, 51)', 'rgb(6, 28, 35)']);
+    if (process.env.G19_LOGIN_SCREENSHOTS) {
+      await operator.screenshot({ path: resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-admin-v13-4-' + width + '.png'), fullPage: true });
+    }
+  }
+  for (const [route, main] of [['#dyskusje', '#discussion-view'], ['#poradnik', '#poradnik-view'], ['#harmonogram', '#harmonogram'], ['#administracja', '#admin-view']]) {
+    await operator.goto(base + route);
+    await operator.locator(main).waitFor();
+    await setTheme(operator, 'light');
+    assert.equal(await operator.locator('html').getAttribute('data-theme'), 'light');
+    await setTheme(operator, 'dark');
+    assert.equal(await operator.locator('html').getAttribute('data-theme'), 'dark');
+    const footer = operator.locator('footer');
+    assert.ok(await footer.isVisible());
+    assert.equal(await footer.getByRole('link', { name: 'Administracja' }).getAttribute('href'), '#administracja');
+    assert.ok(await footer.evaluate((el, selector) => el.offsetTop >= document.querySelector(selector).getBoundingClientRect().bottom + scrollY - 1, main));
+  }
+  await operator.reload();
+  assert.equal(await operator.locator('html').getAttribute('data-theme'), 'dark');
+  await operator.locator('#theme-toggle').focus();
+  await operator.keyboard.press('Enter');
+  await operator.keyboard.press('ArrowRight');
+  await operator.keyboard.press('Escape');
+  assert.equal(await operator.evaluate(() => localStorage.getItem('cleaning-theme')), 'system');
+  for (const colorScheme of ['light', 'dark']) {
+    await operator.emulateMedia({ colorScheme });
+    await operator.waitForFunction(expected => document.documentElement.dataset.theme === expected, colorScheme);
+  }
   await operator.getByLabel('Hasło').fill('wrong-fixture');
   await operator.getByRole('button', { name: 'Zaloguj się' }).click();
   await operator.getByText('Nie udało się zalogować.').waitFor();

@@ -137,7 +137,7 @@
     if ((showGuide || showDiscussion || showAdmin) && !wasGuide && !wasDiscussion && !wasAdmin) homeScroll = window.scrollY;
     discussion.hidden = !showDiscussion;
     if (!showGuide) {
-      home.hidden = footer.hidden = showDiscussion || showAdmin;
+      home.hidden = showDiscussion || showAdmin;
       guide.hidden = true;
       document.title = homeTitle;
       if (showDiscussion) {
@@ -146,7 +146,6 @@
         window.scrollTo({ top: 0, behavior: "instant" });
       } else if (showAdmin) {
         document.title = "Administracja · Goleszan 19";
-        document.getElementById("admin-title").focus({ preventScroll: true });
         window.scrollTo({ top: 0, behavior: "instant" });
       } else if (hash === "#ustawienia") {
         document.getElementById("settings-title").focus({ preventScroll: true });
@@ -171,7 +170,7 @@
         ${cardContent(currentCard)}
       </div>
     `;
-    home.hidden = footer.hidden = true;
+    home.hidden = true;
     guide.hidden = false;
     document.title = `${currentCard.title} · Poradnik sprzątania`;
     guide.querySelector("h1").focus({ preventScroll: true });

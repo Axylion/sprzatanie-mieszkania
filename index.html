@@ -59,6 +59,9 @@
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
       background: var(--bg);
       color: var(--text);
       transition: background .2s, color .2s;
@@ -300,6 +303,7 @@
       color: var(--muted);
     }
     .card > p:last-child { margin-bottom: 0; }
+    body > main:not([hidden]) { flex: 1 0 auto; }
     footer {
       padding: 0 0 30px;
       text-align: center;
@@ -601,14 +605,19 @@
 
 <main class="container" id="admin-view" hidden>
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
-  <h1 id="admin-title" tabindex="-1">Administracja — Zarządzanie pokojami</h1>
-  <form class="card" id="admin-login" method="post" hidden>
+  <form class="card" id="admin-login" method="post" aria-labelledby="admin-login-title" hidden>
+    <div class="admin-login-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6z"/><path d="m9 12 2 2 4-5"/></svg></div>
+    <h1 id="admin-login-title" tabindex="-1">Administracja</h1>
+    <p class="admin-login-caption">Panel logowania</p>
+    <label for="admin-username">Login</label>
+    <input id="admin-username" value="Admin" disabled>
     <label for="admin-password">Hasło</label>
-    <input id="admin-password" name="password" type="password" autocomplete="current-password" required>
-    <button type="submit">Zaloguj się</button>
+    <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="Wprowadź hasło" required>
+    <button type="submit" disabled>Zaloguj się</button>
   </form>
   <p id="admin-status" role="status"></p>
-  <section id="admin-panel" aria-label="Zarządzanie pokojami" hidden>
+  <section id="admin-panel" aria-labelledby="admin-title" hidden>
+    <h1 id="admin-title" tabindex="-1">Administracja — Zarządzanie pokojami</h1>
     <div class="admin-actions"><button type="button" id="admin-refresh">Odśwież</button><button type="button" id="admin-logout">Wyloguj</button></div>
     <div id="admin-rooms"></div>
   </section>
@@ -622,7 +631,7 @@
 </dialog>
 
 <footer>
-  Goleszan 19 · Panel mieszkańców <a id="admin-link" href="#administracja">Administracja</a>
+  Goleszan 19 · Panel mieszkańców · <a id="admin-link" href="#administracja">Administracja</a>
 </footer>
 
 <span class="sr-only" id="announcements-status" role="status"></span>
@@ -813,7 +822,7 @@
   function toggleThemeMenu(open, restoreFocus = false) {
     themeMenu.hidden = !open;
     themeToggle.setAttribute("aria-expanded", String(open));
-    if (open) themeMenu.querySelector(":checked").focus();
+    if (open) themeChoices.find(input => input.checked).focus();
     else if (restoreFocus) themeToggle.focus();
   }
 
@@ -828,15 +837,18 @@
       toggleThemeMenu(false, true);
     }
   });
-  document.querySelector(".theme-picker").addEventListener("focusout", event => {
-    if (!event.currentTarget.contains(event.relatedTarget)) toggleThemeMenu(false);
+  document.addEventListener("focusin", event => {
+    if (!themeMenu.hidden && !event.target.closest(".theme-picker")) toggleThemeMenu(false);
   });
   document.addEventListener("pointerdown", event => {
     if (!event.target.closest(".theme-picker")) toggleThemeMenu(false);
   });
   for (const input of themeChoices) {
     input.addEventListener("click", event => {
-      if (event.detail > 0) toggleThemeMenu(false, true);
+      if (event.detail > 0) {
+        // Let the radio finish dispatching input/change before hiding it.
+        setTimeout(() => toggleThemeMenu(false, true), 0);
+      }
     });
   }
   prefersDark.addEventListener("change", () => {

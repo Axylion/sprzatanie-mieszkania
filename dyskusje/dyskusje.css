@@ -208,10 +208,6 @@
 #notification-list a[data-unread] { border-inline-start: 3px solid var(--accent); padding-inline-start: 9px; }
 #notification-list time { color: var(--muted); font-size: .82rem; }
 #notification-panel button { min-height: 44px; color: var(--text); background: var(--surface-alt); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
-  color: #00676e;
-  text-decoration: underline;
-}
-
 
 @media (hover: hover) and (pointer: fine) {
   #shortcut-help .shortcut-close:hover { background: #c8f1f3; color: #103b46; cursor: pointer; }
@@ -268,8 +264,7 @@
 
 #admin-view > a { color: var(--text); }
 #admin-view h1 { margin-block: 0 16px; }
-#admin-login:not([hidden]), .admin-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-#admin-login input { flex: 1 1 12em; min-width: 0; }
+.admin-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 #admin-view button, #admin-view input, #admin-confirm button {
   min-height: 44px;
   padding: 8px 12px;
@@ -280,6 +275,66 @@
 }
 #admin-view button:hover, #admin-confirm button:hover { background: var(--accent-bg); }
 #admin-view :focus-visible, #admin-confirm :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) { background: #061c23; transition: none; }
+#admin-login {
+  width: min(100%, 380px);
+  margin: 16px auto 24px;
+  padding: 16px 16px 24px;
+  border: 1px solid #32616c;
+  border-radius: 16px;
+  background: #082a33;
+  color: #eef8fb;
+  color-scheme: dark;
+}
+.admin-login-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 2px;
+  border-radius: 12px;
+  color: #63e5ef;
+  background: #133e48;
+}
+.admin-login-icon svg { width: 20px; height: 20px; }
+#admin-login #admin-login-title { margin: 0; text-align: center; font-size: 28px; line-height: 1.2; }
+#admin-login .admin-login-caption { margin: 3px 0 18px; color: #a3bec6; text-align: center; font-size: 15px; }
+#admin-login label { display: block; margin: 0 0 9px; color: #d5e7ec; font-size: 15px; }
+#admin-login input, #admin-login button {
+  display: block;
+  width: 100%;
+  font: inherit;
+  border-color: #32616c;
+}
+#admin-login #admin-username {
+  height: 52px;
+  margin-bottom: 17px;
+  background: #102f38;
+  color: #91aeb7;
+  opacity: 1;
+}
+#admin-login #admin-password, #admin-login button {
+  min-height: 36px;
+  border-radius: 20px;
+  font-size: 15px;
+}
+#admin-login #admin-password { background: transparent; color: #eef8fb; padding-inline: 15px; }
+#admin-login #admin-password::placeholder { color: #91aeb7; }
+#admin-login button { margin-top: 16px; background: #5ee1e6; color: #061c23; border-color: transparent; }
+#admin-login button:enabled:hover { background: #9ef2f4; }
+#admin-login button:disabled { background: #15363e; color: #91aeb7; cursor: default; }
+#admin-login :focus-visible { outline-color: #5ee1e6; }
+#admin-status:empty { display: none; }
+#admin-view:has(#admin-login:not([hidden])) #admin-status {
+  max-width: 380px;
+  margin: -12px auto 24px;
+  color: #f4c2c8;
+  text-align: center;
+}
+#admin-view:has(#admin-login:not([hidden])) > a { color: #b0cbd3; }
+body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) footer,
+body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { color: #a3bec6; }
+
 #admin-rooms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 12px; margin-top: 12px; }
 .admin-room { margin: 0; }
 .admin-devices { list-style: none; padding: 0; }
@@ -402,3 +457,6 @@
   .header-actions .settings-entry { width: 42px; }
   .header-inner { gap: 5px; }
 }
+#admin-login { font-family: Arial, sans-serif; }
+#admin-login #admin-login-title:focus { outline: none; }
+#admin-login #admin-password, #admin-login button { height: 36px; }

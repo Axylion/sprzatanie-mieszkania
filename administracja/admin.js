@@ -2,6 +2,8 @@
   const config = window.goleszanDiscussionsConfig;
   const view = document.getElementById("admin-view");
   const form = document.getElementById("admin-login");
+  const passwordField = form.elements.password;
+  const submit = form.querySelector('button[type="submit"]');
   const panel = document.getElementById("admin-panel");
   const list = document.getElementById("admin-rooms");
   const status = document.getElementById("admin-status");
@@ -28,12 +30,19 @@
 
   const rpc = (name, args = {}) => request("/rest/v1/rpc/g19_web_admin_" + name, args);
 
+  function updateSubmit() {
+    submit.disabled = busy || !passwordField.value;
+  }
+
+  passwordField.addEventListener("input", updateSubmit);
+
   function endSession(message = "") {
     session = chosen = pending = null;
     clearTimeout(expires);
     if (confirm.open) confirm.close();
     list.replaceChildren();
     form.reset();
+    updateSubmit();
     form.hidden = !configured;
     panel.hidden = true;
     status.textContent = message;
@@ -112,9 +121,8 @@
     event.preventDefault();
     if (!configured || busy) return;
     busy = true;
-    const submit = form.querySelector("button");
-    submit.disabled = true;
-    const password = form.elements.password.value;
+    updateSubmit();
+    const password = passwordField.value;
     form.reset();
     try {
       const auth = await request("/auth/v1/token?grant_type=password", { email: config.adminEmail, password }, null);
@@ -123,12 +131,12 @@
       if (!session || !Number.isFinite(duration) || duration <= 0) throw new Error("Session unavailable");
       expires = setTimeout(() => endSession("Sesja wygasła. Zaloguj się ponownie."), duration);
       status.textContent = "";
-      await refresh();
+      if (await refresh() && !view.hidden) document.getElementById("admin-title").focus();
     } catch (error) {
       endSession(error.status === 429 ? "Za dużo prób. Spróbuj ponownie później." : "Nie udało się zalogować.");
     } finally {
-      submit.disabled = false;
       busy = false;
+      updateSubmit();
     }
   });
 
@@ -169,8 +177,14 @@
       if (confirm.open) confirm.close();
       return;
     }
-    if (session) refresh();
-    else endSession(configured ? "" : "Panel wymaga konfiguracji administratora.");
+    if (session) {
+      refresh().then(loaded => {
+        if (loaded && !view.hidden) document.getElementById("admin-title").focus({ preventScroll: true });
+      });
+    } else {
+      endSession(configured ? "" : "Panel wymaga konfiguracji administratora.");
+      if (!form.hidden) document.getElementById("admin-login-title").focus({ preventScroll: true });
+    }
   }
   window.addEventListener("hashchange", open);
   open();

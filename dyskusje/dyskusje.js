@@ -30,7 +30,15 @@
   const body = document.getElementById("discussion-body");
   const send = document.getElementById("discussion-send");
   const tokenKey = "goleszan19-discussion-device";
-  const revokedKey = "goleszan19-discussion-reconnect";
+  const browserKey = "goleszan19-discussion-browser";
+  const randomProof = () => Array.from(crypto.getRandomValues(new Uint8Array(32)),
+    byte => byte.toString(16).padStart(2, "0")).join("");
+  let browserProof = localStorage.getItem(browserKey);
+  if (!/^[0-9a-f]{64}$/.test(browserProof || "")) {
+    browserProof = randomProof();
+    localStorage.setItem(browserKey, browserProof);
+  }
+  localStorage.removeItem("goleszan19-discussion-reconnect");
   const enrollmentKey = "goleszan19-discussion-enrollment";
   const pairingKey = "goleszan19-discussion-pairing";
   const dateFormat = new Intl.DateTimeFormat("pl-PL", {
@@ -103,7 +111,6 @@
   }
 
   function showRevoked() {
-    localStorage.setItem(revokedKey, "true");
     localStorage.removeItem(tokenKey);
     localStorage.removeItem(enrollmentKey);
     localStorage.removeItem(pairingKey);
@@ -113,10 +120,11 @@
     clearHistory();
     chat.hidden = join.hidden = pairPanel.hidden = true;
     deviceSettings.hidden = true;
-    deviceConnect.hidden = true;
     deviceList.replaceChildren();
     deviceConfirm.hidden = true;
+    deviceConnect.hidden = !configured;
     status.textContent = "Dostęp do dyskusji został zakończony.";
+    if (!view.hidden) showRooms().then(schedulePoll);
   }
 
   function showRequestError(error, usedToken, fallback) {
@@ -270,10 +278,10 @@
   }
 
   async function showRooms() {
-    if (view.hidden || token || pairing || expiredRoom || localStorage.getItem(revokedKey) === "true") return;
+    if (view.hidden || token || pairing || expiredRoom) return;
     try {
       const result = await rpc("rooms", {});
-      if (view.hidden || token || pairing || expiredRoom || localStorage.getItem(revokedKey) === "true") return;
+      if (view.hidden || token || pairing || expiredRoom) return;
       availableRooms = result;
       const buttons = availableRooms.map(({ room, occupied }) => {
         const button = document.createElement("button");
@@ -317,7 +325,7 @@
   }
 
   async function startPairing(room) {
-    const data = await rpc("pair_start", { p_room: room });
+    const data = await rpc("pair_start", { p_room: room, p_browser: browserProof });
     pairing = { ...data, deadline: Date.now() + Date.parse(data.expiresAt) - Date.parse(data.serverNow) };
     localStorage.setItem(pairingKey, JSON.stringify(pairing));
     expiredRoom = null;
@@ -331,7 +339,7 @@
     finishPairing();
     token = data.token;
     window.dispatchEvent(new Event("g19-device-changed"));
-    rpc("my_devices", { p_token: token, p_kind: deviceKind() }).catch(() => {});
+    rpc("my_devices", { p_token: token, p_kind: deviceKind(), p_browser: browserProof }).catch(() => {});
     rememberRoom(data.room);
     join.hidden = true;
     status.textContent = "Urządzenie zostało podłączone.";
@@ -344,7 +352,7 @@
     checkingPair = true;
     try {
       const data = await rpc("pair_claim", { p_secret: pending.secret });
-      if (pairing !== pending || cancellingPair || token || localStorage.getItem(revokedKey) === "true") return;
+      if (pairing !== pending || cancellingPair || token) return;
       pairRetry.hidden = true;
       if (data.state === "claimed" && data.token) {
         expiredRoom = null;
@@ -380,7 +388,7 @@
 
   function schedulePoll() {
     clearTimeout(pollTimer);
-    if (!configured || view.hidden || document.hidden || localStorage.getItem(revokedKey) === "true") return;
+    if (!configured || view.hidden || document.hidden) return;
     pollTimer = setTimeout(async () => {
       if (!loading && !joining && !document.hidden) {
         if (token) await loadHistory();
@@ -404,7 +412,6 @@
       status.textContent = "Dyskusje będą dostępne po połączeniu z serwerem.";
       return;
     }
-    if (localStorage.getItem(revokedKey) === "true") return showRevoked();
     if (token) {
       status.textContent = "Wczytywanie rozmowy…";
       await loadHistory({ reset: true, bottom: true });
@@ -427,12 +434,11 @@
 
   joinAction.addEventListener("click", async () => {
     const selected = availableRooms.find(room => room.room === chosenRoom);
-    if (!selected || joining || token || localStorage.getItem(revokedKey) === "true") return;
+    if (!selected || joining || token) return;
     joining = true;
     updateJoinAction();
     try {
       async function joinDevice() {
-        if (localStorage.getItem(revokedKey) === "true") return;
         const stored = localStorage.getItem(tokenKey);
         if (stored) {
           token = stored;
@@ -446,9 +452,9 @@
           return;
         }
         if (!selected.occupied || enrollment) {
-          enrollment ||= { room: selected.room, proof: Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2, "0")).join("") };
+          enrollment ||= { room: selected.room, proof: randomProof() };
           localStorage.setItem(enrollmentKey, JSON.stringify(enrollment));
-          await useDevice(await rpc("bind", { p_room: selected.room, p_proof: enrollment.proof }));
+          await useDevice(await rpc("bind", { p_room: selected.room, p_proof: enrollment.proof, p_browser: browserProof }));
         } else {
           pairing = storedPairing();
           if (pairing) await openDiscussion();
@@ -460,6 +466,7 @@
     } catch (error) {
       if (error.code === "room_occupied") localStorage.removeItem(enrollmentKey);
       const message = {
+        browser_blocked: "Administrator zablokował ponowne podłączenie tego urządzenia do pokoju.",
         room_occupied: "Pokój został już zajęty. Możesz poprosić o podłączenie urządzenia.",
         room_free: "Pokój jest już wolny. Wybierz go, aby dołączyć.",
         device_limit: "Pokój ma już dwa urządzenia. Odłącz jedno w ustawieniach."
@@ -475,14 +482,13 @@
 
   pairRetry.addEventListener("click", () => checkPairing().then(schedulePoll));
   pairRenew.addEventListener("click", async () => {
-    if (!expiredRoom || joining || token || localStorage.getItem(revokedKey) === "true") return;
+    if (!expiredRoom || joining || token) return;
     joining = true;
     pairRenew.disabled = pairBack.disabled = true;
     try {
       const room = expiredRoom;
       async function renew() {
-        if (localStorage.getItem(revokedKey) === "true") return showRevoked();
-        const stored = localStorage.getItem(tokenKey);
+            const stored = localStorage.getItem(tokenKey);
         if (stored) {
           token = stored;
           expiredRoom = null;
@@ -706,12 +712,12 @@
   }
 
   async function loadDevices() {
-    deviceConnect.hidden = !configured || Boolean(token) || localStorage.getItem(revokedKey) === "true";
+    deviceConnect.hidden = !configured || Boolean(token);
     deviceSettings.hidden = !configured || !token;
     if (deviceSettings.hidden || document.getElementById("harmonogram").hidden) return;
     const usedToken = token;
     try {
-      const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind() });
+      const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind(), p_browser: browserProof });
       if (token !== usedToken || document.getElementById("harmonogram").hidden) return;
       updateDeviceCount(devices.length);
       const rows = devices.map(device => {
@@ -724,7 +730,9 @@
         button.addEventListener("click", () => {
           deviceToRevoke = device;
           document.getElementById("device-confirm-text").textContent = device.current
-            ? "Odłączyć to urządzenie? Straci dostęp do dyskusji i powiadomień."
+            ? devices.length === 1
+              ? "Odłączyć ostatnie urządzenie? Pokój stanie się wolny i będzie można go ponownie wybrać."
+              : "Odłączyć to urządzenie? Ponowne podłączenie wymaga potwierdzenia na drugim urządzeniu."
             : "Odłączyć wybrane urządzenie? Straci dostęp do dyskusji i powiadomień.";
           deviceConfirm.hidden = false;
           deviceRevoke.focus();
@@ -767,6 +775,7 @@
       await rpc("revoke_device", { p_token: usedToken, p_device: deviceToRevoke.id });
       if (current && token === usedToken) {
         showRevoked();
+        status.textContent = "";
         const notice = document.createElement("p");
         notice.setAttribute("role", "status");
         notice.textContent = "To urządzenie zostało odłączone.";
@@ -808,7 +817,7 @@
   window.addEventListener("pageshow", event => { if (event.persisted) resume(); });
   document.addEventListener("visibilitychange", resume);
   window.addEventListener("storage", event => {
-    if (event.key === tokenKey || event.key === revokedKey || event.key === pairingKey || event.key === null) {
+    if (event.key === tokenKey || event.key === pairingKey || event.key === null) {
       token = localStorage.getItem(tokenKey);
       pairing = storedPairing();
       if (!pairing && !expiredRoom) {
@@ -820,6 +829,7 @@
       loadDevices();
     }
   });
+  if (configured && token) rpc("my_devices", { p_token: token, p_kind: deviceKind(), p_browser: browserProof }).catch(() => {});
   openDiscussion();
   loadDevices();
 })();

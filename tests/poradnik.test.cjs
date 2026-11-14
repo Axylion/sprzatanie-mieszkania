@@ -193,7 +193,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     }
     await page.getByRole('link', { name: '← Harmonogram' }).click();
     await page.locator('#next-room').waitFor();
-    assert.equal(await page.locator('#schedule .schedule-row').count(), 12);
+    assert.ok(await page.locator('#calendar-days button').count() >= 28);
     // Leave scrolling gestures last so native inertial scrolling does not affect later clicks.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole('link', { name: /Poradnik sprzątania/ }).click();

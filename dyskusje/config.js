@@ -2,5 +2,6 @@
 window.goleszanDiscussionsConfig = {
   url: "",
   publishableKey: "",
-  vapidPublicKey: ""
+  vapidPublicKey: "",
+  adminEmail: ""
 };

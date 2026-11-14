@@ -15,8 +15,8 @@ const revisionMigration = await readFile(new URL('../supabase/migrations/2026111
 const devicesMigration = await readFile(new URL('../supabase/migrations/202611130004_devices_and_reactions.sql', import.meta.url), 'utf8');
 const signatures = {
   rooms: [],
-  bind: ['p_room', 'p_proof'],
-  pair_start: ['p_room'],
+  bind: ['p_room', 'p_proof', 'p_browser'],
+  pair_start: ['p_room', 'p_browser'],
   pair_decide: ['p_token', 'p_code', 'p_approve'],
   pair_claim: ['p_secret'],
   pair_cancel: ['p_secret'],
@@ -28,11 +28,11 @@ const signatures = {
   push_subscription: ['p_token', 'p_endpoint', 'p_p256dh', 'p_auth', 'p_categories'],
   notification_activity: ['p_token', 'p_tab', 'p_active', 'p_seen', 'p_presented'],
   notification_read: ['p_token', 'p_id', 'p_categories'],
-  my_devices: ['p_token', 'p_kind'],
+  my_devices: ['p_token', 'p_kind', 'p_browser'],
   revoke_device: ['p_token', 'p_device']
 };
 
-async function database(t, legacy = false) {
+async function database(t, legacy = false, beforeAccess = null) {
   const db = new PGlite();
   t?.after(() => db.close());
   await db.exec('create role anon; create role authenticated; create role service_role;');
@@ -45,10 +45,20 @@ async function database(t, legacy = false) {
     for (const file of ['202611130006_web_push.sql', '202611130007_unified_notifications.sql', '202611130008_device_revocation_audit.sql']) {
       await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
     }
+    await beforeAccess?.(db);
+    await db.exec(`create schema auth;
+      create table auth.users (id uuid primary key);
+      create table auth.sessions (id uuid primary key, user_id uuid references auth.users, created_at timestamptz not null default now());
+      create function auth.jwt() returns jsonb language sql as $$select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb$$;
+      create function auth.uid() returns uuid language sql as $$select (auth.jwt()->>'sub')::uuid$$;`);
+    for (const file of ['202611140010_room_access.sql', '202611140011_admin_panel.sql']) {
+      await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
+    }
   }
   const rpc = (method, args) => db.transaction(async tx => {
     await tx.exec('set local role anon');
-    const values = signatures[method].map(key => args[key] ?? null);
+    const signature = legacy ? signatures[method].filter(key => key !== 'p_browser') : signatures[method];
+    const values = signature.map(key => args[key] ?? null);
     const placeholders = values.map((_, index) => '$' + (index + 1)).join(',');
     if (method === 'rooms') return (await tx.query('select * from public.g19_rooms()')).rows;
     const result = await tx.query(`select public.g19_${method}(${placeholders}) as value`, values);
@@ -228,6 +238,73 @@ test('Device migration keeps existing bindings and removes only self-reactions',
   await assert.rejects(rpc('pair_start', { p_room: 1 }), { message: 'device_limit' });
 });
 
+test('Room access repair, self-reconnection, admin session and room-specific blocks', async t => {
+  const proof = () => randomBytes(32).toString('hex');
+  const { db, rpc } = await database(t, false, async db => {
+    await db.query('select public.g19_bind(1,$1)', [proof()]);
+    await db.exec("update g19_private.devices set revoked_at = now() where room = 1");
+  });
+  const first = proof(), second = proof();
+  const bind = (room, browser) => rpc('bind', { p_room: room, p_browser: browser, p_proof: proof() });
+  assert.equal((await rpc('rooms', {}))[0].occupied, false);
+  const a = await bind(1, first);
+  const other = await bind(2, proof());
+  const message = await rpc('send', { p_token: a.token, p_request: randomUUID(), p_body: 'Zachowana historia' });
+  await rpc('react', { p_token: other.token, p_message: message, p_vote: 1 });
+  async function pair() {
+    const request = await rpc('pair_start', { p_room: 1, p_browser: second });
+    await rpc('pair_decide', { p_token: a.token, p_code: request.code, p_approve: true });
+    return rpc('pair_claim', { p_secret: request.secret });
+  }
+  async function detach(token) {
+    const devices = await rpc('my_devices', { p_token: token });
+    await rpc('revoke_device', { p_token: token, p_device: devices.find(d => d.current).id });
+  }
+  const b = await pair();
+  await detach(b.token);
+  assert.equal((await rpc('rooms', {}))[0].occupied, true);
+  const b2 = await pair();
+  await detach(b2.token);
+  await detach(a.token);
+  assert.equal((await rpc('rooms', {}))[0].occupied, false);
+  const a2 = await bind(1, first);
+  const history = await rpc('read', { p_token: a2.token });
+  assert.deepEqual(history.messages.map(m => [m.id, m.former, m.up]), [[message, false, 1]]);
+  await assert.rejects(rpc('read', { p_token: a.token }), { code: 'PT401' });
+
+  const actor = randomUUID(), session = randomUUID(), stranger = randomUUID(), unrelated = randomUUID();
+  await db.query('insert into auth.users values ($1), ($2)', [actor, stranger]);
+  await db.query('insert into auth.sessions (id,user_id) values ($1,$2),($3,$4)', [session, actor, unrelated, stranger]);
+  await db.query('insert into g19_private.web_admin (user_id) values ($1)', [actor]);
+  const admin = (sql, params = [], sub = actor, sid = session, role = 'authenticated') => db.transaction(async tx => {
+    await tx.exec('set local role ' + role);
+    await tx.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub, session_id: sid })]);
+    return (await tx.query(sql, params)).rows[0]?.v;
+  });
+  const roomsSql = 'select public.g19_web_admin_rooms() v';
+  await assert.rejects(admin(roomsSql, [], stranger, unrelated), { code: 'PT403' });
+  await assert.rejects(admin(roomsSql, [], actor, session, 'anon'), { code: '42501' });
+  const rooms = await admin(roomsSql);
+  assert.equal(rooms.length, 4);
+  await admin('select public.g19_web_admin_detach(1,1,$1)', [rooms[0].devices[0].id]);
+  await assert.rejects(bind(1, first), { message: 'browser_blocked' });
+  await assert.rejects(rpc('read', { p_token: a2.token }), { code: 'PT401' });
+  const fresh = await bind(1, proof());
+  const current = (await admin(roomsSql))[0];
+  const release = 'select public.g19_web_admin_release(1,1,$1) v';
+  await assert.rejects(admin(release, [[]]), { message: 'room_changed' });
+  assert.equal(await admin(release, [current.devices.map(d => d.id)]), 1);
+  await assert.rejects(admin(release, [current.devices.map(d => d.id)]), { message: 'room_changed' });
+  await assert.rejects(rpc('read', { p_token: fresh.token }), { code: 'PT401' });
+  const historyAfter = await rpc('read', { p_token: other.token });
+  assert.deepEqual(historyAfter.messages.map(m => [m.id, m.former, m.up]), [[message, true, 1]]);
+  assert.ok((await bind(3, first)).token);
+  const audit = (await db.query('select action, auth_user_id from g19_private.room_reset_audit order by id')).rows;
+  assert.deepEqual(audit.map(r => [r.action, r.auth_user_id]), [['detach_device', actor], ['release_room', actor]]);
+  await db.query("update auth.sessions set created_at = now() - interval '61 minutes' where id = $1", [session]);
+  await assert.rejects(admin(roomsSql), { code: 'PT403' });
+});
+
 test('Dyskusje across devices uses real SQL, survives reload and handles a lost send response', { timeout: 90000 }, async t => {
   const { db, rpc } = await database();
   const { chromium } = createRequire(import.meta.url)('playwright');
@@ -238,7 +315,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     try {
       const file = relative || 'index.html';
       const contents = file === 'dyskusje/config.js'
-        ? 'window.goleszanDiscussionsConfig = {url:"https://g19test.supabase.co",publishableKey:"sb_publishable_testing",vapidPublicKey:"test"};'
+        ? 'window.goleszanDiscussionsConfig = {url:"https://g19test.supabase.co",publishableKey:"sb_publishable_testing",vapidPublicKey:"test",adminEmail:"admin@example.test"};'
         : await readFile(resolve(root, file));
       res.writeHead(200, { 'Content-Type': types[file.slice(file.lastIndexOf('.'))] || 'application/octet-stream' });
       res.end(contents);
@@ -556,8 +633,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     assert.equal(await page.locator('#discussion-compose').isVisible(), false);
   }
   await a.reload();
-  await a.getByText('Dostęp do dyskusji został zakończony.').waitFor();
-  assert.equal(await a.locator('#discussion-join').isVisible(), false);
+  await a.getByRole('button', { name: /Pokój nr 1 Wolny/ }).click();
+  await a.getByRole('button', { name: 'Połącz pokój', exact: true }).click();
+  await a.getByText('Administrator zablokował ponowne podłączenie tego urządzenia do pokoju.').waitFor();
+  assert.equal(await a.locator('#discussion-compose').isVisible(), false);
   await a.getByRole('link', { name: '← Harmonogram' }).click();
   await a.locator('#next-room').waitFor();
   await b.getByText('Pokój nr 1 · poprzedni mieszkaniec', { exact: true }).first().waitFor();
@@ -565,6 +644,53 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await newcomer.goto(base + '#dyskusje');
   await joinRoom(newcomer, 1);
   await newcomer.getByText('Pokój nr 1 · poprzedni mieszkaniec', { exact: true }).first().waitFor();
+  const operator = await device(320);
+  let loggedOut = false;
+  let released = false;
+  await operator.context().route('https://g19test.supabase.co/auth/v1/**', async route => {
+    if (route.request().url().includes('logout')) {
+      loggedOut = true;
+      return route.fulfill({ status: 204 });
+    }
+    const { password } = route.request().postDataJSON();
+    if (password !== 'only-a-test-fixture') return route.fulfill({ status: 400, json: {} });
+    return route.fulfill({ json: { access_token: 'fixture-session', expires_in: 3600 } });
+  });
+  await operator.context().route('https://g19test.supabase.co/rest/v1/rpc/g19_web_admin_*', async route => {
+    assert.equal(route.request().headers().authorization, 'Bearer fixture-session');
+    if (route.request().url().endsWith('_release')) {
+      const args = route.request().postDataJSON();
+      assert.equal(args.p_room, 1);
+      released = true;
+      return route.fulfill({ json: 1 });
+    }
+    return route.fulfill({ json: [1, 2, 3, 4].map(room => ({
+      room, generation: 1, occupied: room === 1 && !released,
+      devices: room === 1 && !released ? [{ id: 'fixture-device', kind: 'phone' }] : []
+    })) });
+  });
+  await operator.goto(base);
+  await operator.getByRole('link', { name: 'Administracja' }).click();
+  await operator.getByLabel('Hasło').fill('wrong-fixture');
+  await operator.getByRole('button', { name: 'Zaloguj się' }).click();
+  await operator.getByText('Nie udało się zalogować.').waitFor();
+  await operator.getByLabel('Hasło').fill('only-a-test-fixture');
+  await operator.getByRole('button', { name: 'Zaloguj się' }).click();
+  await operator.getByRole('heading', { name: 'Pokój nr 4' }).waitFor();
+  assert.equal(await operator.locator('.admin-room').count(), 4);
+  assert.ok(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await operator.getByRole('button', { name: 'Zarządzaj' }).click();
+  await operator.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
+  const confirm = operator.locator('#admin-confirm');
+  await confirm.getByRole('button', { name: 'Anuluj' }).click();
+  assert.equal(released, false);
+  await operator.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
+  await confirm.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
+  await operator.getByText('Wolny · 0 urządzeń', { exact: true }).waitFor();
+  await operator.getByRole('button', { name: 'Wyloguj' }).click();
+  await operator.getByLabel('Hasło').waitFor();
+  await operator.waitForFunction(() => !document.querySelector('#admin-login').hidden);
+  assert.ok(loggedOut);
   // Fill a page with fixtures and check that automatic refresh preserves the reader's place.
   await db.exec(`
     insert into g19_private.messages (device_id, request_id, body)

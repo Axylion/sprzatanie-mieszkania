@@ -126,25 +126,33 @@
     if (hash === currentHash) return;
     const wasGuide = !guide.hidden;
     const wasDiscussion = !discussion.hidden;
+    const admin = document.getElementById("admin-view");
+    const showAdmin = hash === "#administracja";
+    const wasAdmin = !admin.hidden;
+    admin.hidden = !showAdmin;
     const showDiscussion = hash === "#dyskusje";
     const showGuide = hash === "#poradnik" || hash.startsWith("#poradnik/");
     currentHash = hash;
     if (gallery.open) gallery.close();
-    if ((showGuide || showDiscussion) && !wasGuide && !wasDiscussion) homeScroll = window.scrollY;
+    if ((showGuide || showDiscussion || showAdmin) && !wasGuide && !wasDiscussion && !wasAdmin) homeScroll = window.scrollY;
     discussion.hidden = !showDiscussion;
     if (!showGuide) {
-      home.hidden = footer.hidden = showDiscussion;
+      home.hidden = footer.hidden = showDiscussion || showAdmin;
       guide.hidden = true;
       document.title = homeTitle;
       if (showDiscussion) {
         document.title = "Dyskusje · Goleszan 19";
         discussion.querySelector("h1").focus({ preventScroll: true });
         window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (showAdmin) {
+        document.title = "Administracja · Goleszan 19";
+        document.getElementById("admin-title").focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: "instant" });
       } else if (hash === "#ustawienia") {
         document.getElementById("settings-title").focus({ preventScroll: true });
         document.getElementById("ustawienia").scrollIntoView({ behavior: "instant" });
-      } else if (wasGuide || wasDiscussion) {
-        (wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
+      } else if (wasGuide || wasDiscussion || wasAdmin) {
+        (wasAdmin ? home.querySelector('a[href="#administracja"]') : wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
         window.scrollTo({ top: homeScroll, behavior: "instant" });
       }
       return;

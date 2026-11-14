@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Harmonogram i zasady sprzątania mieszkania">
+  <meta name="description" content="Panel mieszkańców Goleszan 19">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7fb" id="theme-color">
   <title>Goleszan 19</title>
@@ -41,11 +41,6 @@
       color-scheme: light;
     }
 
-    .personal-result .duty-date {
-      color: #84adfa;
-      font-weight: 400;
-    }
-
     :root[data-theme="dark"] {
       --bg: #0e131c;
       --surface: #19212d;
@@ -64,14 +59,18 @@
     html { scroll-behavior: smooth; }
     body {
       margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
       background: var(--bg);
       color: var(--text);
       transition: background .2s, color .2s;
     }
     button, select { font: inherit; }
     button { cursor: pointer; }
+    :root { --page-width: 1080px; --page-gutter: 16px; }
     .container {
-      width: min(100% - 32px, 760px);
+      width: min(100% - 2 * var(--page-gutter), var(--page-width));
       margin: 0 auto;
     }
 
@@ -128,17 +127,9 @@
       font-weight: 750;
       font-size: 16px;
     }
+    .brand-icon svg { width: 25px; fill: none; stroke: #52e3df; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
     .brand > span:last-child { white-space: nowrap; }
     .theme-picker { position: relative; width: 44px; height: 42px; }
-    .theme-icon {
-      position: absolute; inset: 0; display: grid; place-items: center;
-      pointer-events: none; font-size: 20px;
-    }
-    #theme-select {
-      width: 100%; height: 100%; padding: 0; cursor: pointer;
-      appearance: none; color: transparent;
-    }
-    #theme-select option { color: var(--text); }
     .brand-icon {
       display: grid;
       place-items: center;
@@ -146,8 +137,7 @@
       width: 42px;
       height: 42px;
       border-radius: 13px;
-      background: var(--accent-bg);
-      font-size: 22px;
+      background: #133541;
     }
     select {
       background: var(--surface-alt);
@@ -208,44 +198,6 @@
       flex-wrap: wrap;
     }
 
-    .schedule-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 13px 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .schedule-row:last-child { border-bottom: none; }
-    .schedule-date { font-size: 14px; }
-    .room-badge {
-      display: inline-block;
-      border-radius: 9px;
-      padding: 7px 12px;
-      background: var(--surface-alt);
-      white-space: nowrap;
-      font-weight: 650;
-      font-size: 13px;
-    }
-    .schedule-row.active .room-badge {
-      background: var(--accent-bg);
-      color: var(--accent-text);
-    }
-    
-    .schedule-row.my-room .room-badge {
-      background: var(--accent);
-      color: #ffffff;
-    }
-
-    /* Kolor daty dyżuru wybranego pokoju */
-    .schedule-row.my-room .schedule-date {
-      color: var(--accent);
-    }
-    
-    :root[data-theme="dark"] .schedule-row.my-room .room-badge {
-      color: #0e131c;
-    }
-
     .field-label {
       display: block;
       color: var(--muted);
@@ -265,20 +217,6 @@
       color: var(--text);
       font-weight: 650;
     }
-    .room-button.selected {
-      border-color: var(--accent);
-      background: var(--accent-bg);
-      color: var(--accent-text);
-    }
-    .personal-result {
-      background: var(--surface-alt);
-      padding: 14px;
-      border-radius: 12px;
-      margin-top: 15px;
-      font-size: 14px;
-      line-height: 1.65;
-    }
-
     /* Każde aktywne ogłoszenie ma niezależne rozwijanie treści. */
     .announcement-card {
       background: #fff6af;
@@ -304,18 +242,7 @@
     }
     .announcement-dismiss svg { width: 26px; height: 26px; }
     .announcement-entry + .announcement-entry .announcement-dismiss { top: 7px; }
-    .announcement-restore {
-      display: block;
-      margin: 8px auto;
-      padding: 12px;
-      border: 0;
-      background: transparent;
-      color: var(--text);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .announcement-restore[hidden] { display: none; }
-    .announcement-dismiss:focus-visible, .announcement-restore:focus-visible {
+    .announcement-dismiss:focus-visible {
       outline: 2px solid #2f8842;
       outline-offset: 2px;
       border-radius: 4px;
@@ -359,14 +286,6 @@
       outline-offset: 3px;
       border-radius: 3px;
     }
-    .notice {
-      display: flex;
-      align-items: flex-start;
-      gap: 13px;
-    }
-    .notice-icon { font-size: 25px; }
-    .notice p { margin: 4px 0 0; font-size: 14px; }
-
     details {
       border-top: 1px solid var(--border);
       padding: 15px 0;
@@ -384,6 +303,7 @@
       color: var(--muted);
     }
     .card > p:last-child { margin-bottom: 0; }
+    body > main:not([hidden]) { flex: 1 0 auto; }
     footer {
       padding: 0 0 30px;
       text-align: center;
@@ -392,7 +312,7 @@
     }
 
     @media(max-width: 480px) {
-      .container { width: min(100% - 24px, 760px); }
+      :root { --page-gutter: 12px; }
       .brand { font-size: 14px; }
       .brand-icon { width: 37px; height: 37px; }
       .header-actions { gap: 5px; }
@@ -401,56 +321,65 @@
       .card { padding: 19px; }
       main { padding-top: 25px; }
     }
-    .schedule-row[hidden] {
-  display: none;
-}
-
-.schedule-toggle {
-  display: block;
-  width: 100%;
-  margin-top: 12px;
-  padding: 12px;
-  border: none;
-  border-radius: 10px;
-  background: var(--surface-alt);
-  color: var(--accent-text);
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.schedule-toggle:hover {
-  background: var(--accent-bg);
-}
   </style>
   <link rel="stylesheet" href="./poradnik/poradnik.css">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js"></script>
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css">
+  <script defer src="./dyskusje/config.js"></script>
+  <script defer src="./dyskusje/dyskusje.js"></script>
+  <script defer src="./dyskusje/notifications.js"></script>
+  <script defer src="./administracja/admin.js"></script>
 </head>
 
 <body>
 <header>
   <div class="container header-inner">
     <div class="brand">
-      <span class="brand-icon">🧹</span>
-      <span>Sprzątanie mieszkania</span>
+      <a class="brand-icon" href="#harmonogram" title="Strona główna" aria-label="Strona główna"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h14V10m-9 10v-6h4v6"/></svg></a>
+      <span>Goleszan 19</span>
     </div>
     <div class="header-actions">
+      <button type="button" class="settings-entry notification-bell" id="notification-open" aria-label="Powiadomienia" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg><span id="notification-count" hidden></span></button>
+      <button type="button" class="settings-entry notification-bell" id="announcements-open" aria-label="Ważne ogłoszenia" aria-describedby="announcements-push-indicator" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v5h5l9 4V6l-9 4H4Zm4 5 2 5m10-10 2-2m-2 6 2 2"/></svg>
+        <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span>
+      </button>
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
-      <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
-      <select id="theme-select" aria-label="Motyw strony">
-        <option value="system">⚙ Systemowy</option>
-        <option value="light">☀ Jasny</option>
-        <option value="dark">☾ Ciemny</option>
-      </select>
+        <button type="button" class="settings-entry" id="theme-toggle" aria-label="Motyw strony" aria-expanded="false" aria-controls="theme-menu"><span id="theme-icon" aria-hidden="true">⚙</span></button>
+        <fieldset id="theme-menu" hidden>
+          <legend class="sr-only">Motyw strony</legend>
+          <label><input type="radio" name="theme" value="system"> Systemowy</label>
+          <label><input type="radio" name="theme" value="light"> Jasny</label>
+          <label><input type="radio" name="theme" value="dark"> Ciemny</label>
+        </fieldset>
       </div>
     </div>
   </div>
 </header>
 
+<dialog id="notification-panel" class="shortcut-help" aria-labelledby="notification-title">
+  <div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" aria-label="Zamknij powiadomienia">×</button></form></div>
+  <button type="button" id="notification-read-all" hidden>Oznacz wszystkie jako przeczytane</button>
+  <p id="notification-empty">Brak powiadomień.</p>
+  <p id="notification-status" role="status"></p>
+  <ul id="notification-list"></ul>
+</dialog>
+
+<dialog id="announcements-panel" class="shortcut-help" aria-labelledby="announcements-title">
+  <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" aria-label="Zamknij ogłoszenia">×</button></form></div>
+  <p id="hidden-announcements-empty">Brak ukrytych ogłoszeń.</p>
+  <ul id="hidden-announcements-list"></ul>
+  <div class="push-control">
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-announcements-status" data-push-category="announcements">Powiadomienia o ogłoszeniach</button>
+      <p class="push-feedback" id="push-announcements-status" role="status"></p>
+    </div>
+</dialog>
+
 <dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
   <h2 id="shortcut-title">🏠 Dodaj Goleszan 19 na ekran główny</h2>
-  <p>Zainstalowana aplikacja otwiera harmonogram bez interfejsu przeglądarki i działa również offline po pierwszym wczytaniu. Powiadomienia push nie są jeszcze aktywne.</p>
+  <p>Zainstalowana aplikacja otwiera harmonogram bez interfejsu przeglądarki i działa również offline po pierwszym wczytaniu. Powiadomienia push można włączyć w ustawieniach.</p>
   <div id="android-install-instructions">
     <strong>Android (Chrome)</strong>
     <ol>
@@ -486,13 +415,15 @@
     </p>
   </div>
 
-  <section class="card hero">
+  <div class="dashboard-main">
+    <div class="dashboard-primary">
+      <section class="card hero">
     <div class="eyebrow">Najbliższy dyżur</div>
     <div class="hero-room" id="next-room">—</div>
     <div class="hero-date" id="next-date">—</div>
-    <p>Sprzątanie części wspólnych odbywa się w weekend.</p>
+    <p>Generalne sprzątanie w weekend (±1 dzień)</p>
   </section>
-
+      <nav class="dashboard-links" aria-label="Sekcje aplikacji">
   <a class="card guide-entry" href="#poradnik">
     <span class="guide-entry-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 2Zm0 0v15"/></svg>
@@ -501,48 +432,15 @@
     <span class="guide-entry-arrow" aria-hidden="true">→</span>
   </a>
 
-  <section class="card">
-    <h2>🏠 Mój pokój</h2>
-    <label class="field-label">
-      Wybierz numer swojego pokoju:
-    </label>
-    <div class="room-buttons" id="room-buttons"></div>
-    <div class="personal-result" id="personal-result">
-      Wybierz pokój, aby zobaczyć swój najbliższy dyżur.
-    </div>
-    <p class="muted" style="font-size:12px">
-      Twój wybór zostanie zapamiętany na tym urządzeniu.
-    </p>
-  </section>
+  <a class="card guide-entry discussion-entry" href="#dyskusje">
+    <span class="guide-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg></span>
+    <span><strong>Dyskusje</strong><small>Wspólne sprawy mieszkańców</small></span>
+    <span class="guide-entry-arrow" aria-hidden="true">→</span>
+  </a>
 
-  <section class="card notice">
-    <div class="notice-icon">🔔</div>
-    <div>
-      <strong>Powiadomienia</strong>
-      <p class="muted">
-        Wkrótce: przypomnienia o sprzątaniu w piątki o 12:00
-        oraz ważne ogłoszenia dotyczące mieszkania.
-        Powiadomienia push nie są jeszcze aktywne.
-      </p>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>📅 Nadchodzące dyżury</h2>
-    <div id="schedule"></div>
-    <button id="toggle-schedule" class="schedule-toggle"
-        type="button" aria-expanded="false">
-      Pokaż więcej ↓
-    </button>
-    <p class="muted" style="font-size:13px">
-      Kolejność: 1 → 2 → 3 → 4.
-      Harmonogram jest kontynuowany bez przerw,
-      również po zmianie roku.
-    </p>
-  </section>
-
-  <section class="card">
-    <h2>📖 Zasady sprzątania</h2>
+  </nav>
+      <section class="card cleaning-rules">
+    <h2>Zasady sprzątania</h2>
 
     <details>
       <summary>Dyżury weekendowe</summary>
@@ -588,9 +486,108 @@
       </p>
     </details>
   </section>
+    </div>
+    <div class="dashboard-secondary">
+      <section class="card dashboard-calendar" aria-labelledby="calendar-title">
+    <h2 id="calendar-title">Kalendarz sprzątania</h2>
+    <div class="calendar-upcoming" id="calendar-upcoming"><strong>Najbliższy dyżur</strong><span id="calendar-next"></span></div>
+    <div class="calendar-month">
+      <button type="button" id="calendar-prev" aria-label="Poprzedni miesiąc">‹</button>
+      <strong id="calendar-month" aria-live="polite"></strong>
+      <button type="button" id="calendar-next-month" aria-label="Następny miesiąc">›</button>
+    </div>
+    <div class="calendar-grid" aria-label="Dni tygodnia"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span></div>
+    <div class="calendar-grid" id="calendar-days" role="group" aria-label="Wybierz datę"></div>
+    <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
+    <div class="calendar-date-info"><span id="calendar-duty" class="sr-only" aria-live="polite"></span><div class="push-control">
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status" data-push-category="duties">Powiadomienia o dyżurach</button>
+      <p class="push-feedback" id="push-duties-status" role="status"></p>
+    </div></div>
+  </section>
+    </div>
+  </div>
+  <section class="card" id="ustawienia" aria-labelledby="settings-title">
+    <h2 id="settings-title" tabindex="-1">Moje urządzenia</h2>
+    <fieldset id="room-setup">
+      <legend>Wybierz swój pokój</legend>
+      <p class="muted">Potwierdzony pokój zostanie przypisany do tego urządzenia.</p>
+      <div class="room-buttons" id="room-buttons">
+        <button class="room-button" type="button" data-room="1" aria-pressed="false">Pokój nr 1</button>
+        <button class="room-button" type="button" data-room="2" aria-pressed="false">Pokój nr 2</button>
+        <button class="room-button" type="button" data-room="3" aria-pressed="false">Pokój nr 3</button>
+        <button class="room-button" type="button" data-room="4" aria-pressed="false">Pokój nr 4</button>
+      </div>
+      <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
+    </fieldset>
+    <p id="device-connect"><a href="#dyskusje">Podłącz urządzenie w Dyskusjach</a></p>
+    <p id="device-connection-status" role="status" hidden></p>
+    <div id="device-settings" hidden>
+      <p id="device-settings-status" role="status"></p>
+      <ul id="device-list" class="device-list"></ul>
+      <div id="device-confirm" hidden>
+        <p id="device-confirm-text"></p>
+        <button type="button" id="device-revoke">Odłącz urządzenie</button>
+        <button type="button" id="device-cancel">Anuluj</button>
+      </div>
+    </div>
+  </section>
 </main>
 
-<main id="poradnik-view" hidden></main>
+<main class="container" id="poradnik-view" hidden></main>
+
+<main class="container discussion-view" id="discussion-view" hidden>
+  <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
+  <section class="card discussion-panel" aria-labelledby="discussion-title">
+    <div class="discussion-heading"><h1 id="discussion-title" tabindex="-1">Dyskusje</h1><div class="push-control" hidden>
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-messages-status" data-push-category="messages">Powiadomienia o wiadomościach</button>
+      <p class="push-feedback" id="push-messages-status" role="status"></p>
+    </div></div>
+    <p class="discussion-subtitle">Wspólne sprawy mieszkańców</p>
+    <p id="discussion-status" class="discussion-status" role="status"></p>
+    <section id="discussion-join" hidden aria-labelledby="discussion-join-title">
+      <h2 id="discussion-join-title">Dołącz do dyskusji</h2>
+      <p>Wybierz swój pokój, aby uczestniczyć w dyskusjach mieszkańców.</p>
+      <div id="discussion-rooms" class="discussion-rooms"></div>
+      <button type="button" id="discussion-join-action" disabled>Połącz pokój</button>
+    </section>
+    <section id="discussion-pair" hidden aria-labelledby="discussion-pair-title">
+      <h2 id="discussion-pair-title">To urządzenie oczekuje na podłączenie.</h2>
+      <p>Wpisz wyświetlony kod na urządzeniu, które jest już połączone z pokojem.</p>
+      <p id="discussion-pair-code" class="discussion-pair-code" aria-label="Kod podłączenia"></p>
+      <p id="discussion-pair-time" class="discussion-pair-time" role="timer"></p>
+      <button type="button" id="discussion-pair-retry" hidden>Sprawdź ponownie</button>
+      <button type="button" id="discussion-pair-renew" hidden>Wygeneruj nowy kod</button>
+      <button type="button" id="discussion-pair-back">Anuluj</button>
+    </section>
+    <div id="discussion-chat" hidden>
+      <details id="discussion-approve" hidden>
+        <summary>Podłącz kolejne urządzenie</summary>
+        <div class="device-roles">
+          <div><strong><span aria-hidden="true">✓ </span>To urządzenie jest połączone</strong>
+            <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia.</p></div>
+          <div><strong><span aria-hidden="true">＋ </span>Nowe urządzenie</strong>
+            <p>Otwórz na nim Dyskusje i odczytaj sześciocyfrowy kod.</p></div>
+        </div>
+        <form id="discussion-approve-form" class="discussion-approval">
+          <label for="discussion-approve-code">Kod z nowego urządzenia</label>
+          <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" spellcheck="false">
+          <button type="submit" value="approve" disabled>Potwierdź podłączenie</button>
+          <button type="submit" value="reject" disabled>Odrzuć</button>
+        </form>
+      </details>
+      <div class="discussion-history-controls">
+        <button type="button" id="discussion-older" hidden>Starsze wiadomości</button>
+      </div>
+      <ol class="discussion-history" id="discussion-history" aria-label="Historia wiadomości" tabindex="0"></ol>
+      <button type="button" id="discussion-latest" hidden>Najnowsze wiadomości</button>
+      <form class="discussion-compose" id="discussion-compose">
+        <label for="discussion-body">Wiadomość</label>
+        <textarea id="discussion-body" rows="2" maxlength="1500" required></textarea>
+        <button type="submit" id="discussion-send" disabled>Wyślij</button>
+      </form>
+    </div>
+  </section>
+</main>
 
 <dialog id="poradnik-gallery" aria-label="Powiększone zdjęcia">
   <div class="guide-viewer">
@@ -606,11 +603,38 @@
   </div>
 </dialog>
 
+<main class="container" id="admin-view" hidden>
+  <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
+  <form class="card" id="admin-login" method="post" aria-labelledby="admin-login-title" hidden>
+    <div class="admin-login-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6z"/><path d="m9 12 2 2 4-5"/></svg></div>
+    <h1 id="admin-login-title" tabindex="-1">Administracja</h1>
+    <p class="admin-login-caption">Panel logowania</p>
+    <label for="admin-username">Login</label>
+    <input id="admin-username" value="Admin" disabled>
+    <label for="admin-password">Hasło</label>
+    <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="Wprowadź hasło" required>
+    <button type="submit" disabled>Zaloguj się</button>
+  </form>
+  <p id="admin-status" role="status"></p>
+  <section id="admin-panel" aria-labelledby="admin-title" hidden>
+    <h1 id="admin-title" tabindex="-1">Administracja — Zarządzanie pokojami</h1>
+    <div class="admin-actions"><button type="button" id="admin-refresh">Odśwież</button><button type="button" id="admin-logout">Wyloguj</button></div>
+    <div id="admin-rooms"></div>
+  </section>
+</main>
+<dialog id="admin-confirm" class="shortcut-help" aria-labelledby="admin-confirm-text">
+  <p id="admin-confirm-text"></p>
+  <form method="dialog" class="admin-actions">
+    <button type="submit">Anuluj</button>
+    <button type="button" id="admin-confirm-action">Zwolnij pokój</button>
+  </form>
+</dialog>
+
 <footer>
-  <button type="button" class="announcement-restore" id="announcements-restore" hidden>Pokaż ukryte ogłoszenia</button>
-  <span class="sr-only" id="announcements-status" role="status"></span>
-  Sprzątanie mieszkania · Wspólna przestrzeń
+  Goleszan 19 · Panel mieszkańców · <a id="admin-link" href="#administracja">Administracja</a>
 </footer>
+
+<span class="sr-only" id="announcements-status" role="status"></span>
 
 <script>
   // Punkt odniesienia: 31.10–01.11.2026, pokój nr 3.
@@ -665,151 +689,182 @@
     return dateText(saturday) + " – " + dateText(end);
   }
 
-  const start = nearestSaturday();
+  const dayMs = 86400000;
+  const initialDay = todayInPoland();
+  const monthFormat = new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric", timeZone: "UTC" });
+  const calendarDays = document.getElementById("calendar-days");
+  let calendarMonth = new Date(initialDay);
+  calendarMonth.setUTCDate(1);
+  let calendarDate = initialDay;
 
-  function showSchedule() {
-    document.getElementById("next-room").textContent =
-      "Pokój nr " + roomFor(start);
-    document.getElementById("next-date").textContent =
-      weekendText(start);
+  function dutyOn(timestamp) {
+    const weekday = new Date(timestamp).getUTCDay();
+    if (weekday === 6) return roomFor(timestamp);
+    if (weekday === 0) return roomFor(timestamp - dayMs);
+    return null;
+  }
 
-    const container = document.getElementById("schedule");
-    container.replaceChildren();
-
-    for (let i = 0; i < 12; i++) {
-      const saturday = start + i * WEEK;
-      const row = document.createElement("div");
-      row.className = "schedule-row" + (i === 0 ? " active" : "");
-
-      const date = document.createElement("span");
-      date.className = "schedule-date";
-      date.textContent = weekendText(saturday);
-
-      const badge = document.createElement("span");
-      badge.className = "room-badge";
-      badge.textContent = "Pokój " + roomFor(saturday);
-
-      row.append(date, badge);
-      container.append(row);
+  function selectCalendarDate(timestamp) {
+    calendarDate = timestamp;
+    for (const button of calendarDays.querySelectorAll("button")) {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.date) === timestamp));
     }
+    const room = dutyOn(timestamp);
+    document.getElementById("calendar-duty").textContent = room
+      ? "Pokój " + room + " · Dyżur sprzątania"
+      : "Brak zaplanowanego dyżuru";
   }
-  const toggleSchedule = document.getElementById("toggle-schedule");
-  let scheduleExpanded = false;
-  
-  function updateScheduleVisibility() {
-    const rows = document.querySelectorAll("#schedule .schedule-row");
-  
-    rows.forEach((row, index) => {
-      row.hidden = !scheduleExpanded && index >= 4;
+
+  function renderCalendar() {
+    const start = nearestSaturday();
+    const room = roomFor(start);
+    document.getElementById("next-room").textContent = "Pokój nr " + room;
+    document.getElementById("next-date").textContent = weekendText(start);
+    document.getElementById("calendar-next").textContent = weekendText(start) + " · Pokój " + room;
+    document.getElementById("calendar-upcoming").classList.toggle("calendar-own", room === Number(selectedRoom));
+    document.getElementById("calendar-month").textContent = monthFormat.format(calendarMonth);
+    const end = new Date(calendarMonth);
+    end.setUTCMonth(end.getUTCMonth() + 1);
+    const today = todayInPoland();
+    const cells = [];
+    const blank = () => {
+      const span = document.createElement("span");
+      span.setAttribute("aria-hidden", "true");
+      cells.push(span);
+    };
+    for (let i = 0; i < (calendarMonth.getUTCDay() + 6) % 7; i++) blank();
+    for (let timestamp = +calendarMonth; timestamp < +end; timestamp += dayMs) {
+      const button = document.createElement("button");
+      const duty = dutyOn(timestamp);
+      button.type = "button";
+      button.dataset.date = String(timestamp);
+      button.textContent = new Date(timestamp).getUTCDate();
+      button.setAttribute("aria-label", dateText(timestamp) + (duty ? ", dyżur: pokój " + duty : ""));
+      if (timestamp === today) button.setAttribute("aria-current", "date");
+      if (duty) button.classList.add("calendar-weekend");
+      if (duty === Number(selectedRoom)) button.classList.add("calendar-own");
+      button.addEventListener("click", () => selectCalendarDate(timestamp));
+      cells.push(button);
+    }
+    while (cells.length % 7) blank();
+    calendarDays.replaceChildren(...cells);
+    selectCalendarDate(calendarDate);
+  }
+
+  for (const [selector, offset] of [["calendar-prev", -1], ["calendar-next-month", 1]]) {
+    document.getElementById(selector).addEventListener("click", () => {
+      calendarMonth.setUTCMonth(calendarMonth.getUTCMonth() + offset);
+      const today = todayInPoland();
+      calendarDate = monthFormat.format(today) === monthFormat.format(calendarMonth) ? today : +calendarMonth;
+      renderCalendar();
     });
-  
-    toggleSchedule.textContent = scheduleExpanded
-      ? "Pokaż mniej ↑"
-      : "Pokaż więcej ↓";
-  
-    toggleSchedule.setAttribute(
-      "aria-expanded", String(scheduleExpanded)
-    );
   }
-  
-  toggleSchedule.addEventListener("click", () => {
-    scheduleExpanded = !scheduleExpanded;
-    updateScheduleVisibility();
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) renderCalendar();
   });
-  let selectedRoom = localStorage.getItem("cleaning-room") || "";
+  let selectedRoom = localStorage.getItem("cleaning-room");
+  if (!["1", "2", "3", "4"].includes(selectedRoom)) selectedRoom = "";
+  const roomSetup = document.getElementById("room-setup");
+  const roomConfirm = document.getElementById("room-confirm");
+  const roomButtons = [...document.querySelectorAll("#room-buttons [data-room]")];
+  let pendingRoom = "";
+
+  roomButtons.forEach(button => button.addEventListener("click", () => {
+    if (selectedRoom) return;
+    pendingRoom = button.dataset.room;
+    roomButtons.forEach(choice => choice.setAttribute("aria-pressed", String(choice === button)));
+    roomConfirm.disabled = false;
+  }));
+  roomConfirm.addEventListener("click", () => {
+    // A second open tab may have saved its choice while this one was on the form.
+    const saved = localStorage.getItem("cleaning-room");
+    if (!selectedRoom && pendingRoom) {
+      selectedRoom = ["1", "2", "3", "4"].includes(saved) ? saved : pendingRoom;
+      localStorage.setItem("cleaning-room", selectedRoom);
+      showRoomSelection();
+      document.getElementById("settings-title").focus({ preventScroll: true });
+    }
+  });
+  window.addEventListener("g19-room-linked", event => {
+    const room = String(event.detail);
+    if (selectedRoom || !["1", "2", "3", "4"].includes(room)) return;
+    selectedRoom = room;
+    localStorage.setItem("cleaning-room", room);
+    showRoomSelection();
+  });
+  window.addEventListener("storage", event => {
+    if (event.key === "cleaning-room" && ["1", "2", "3", "4"].includes(event.newValue)) {
+      selectedRoom = event.newValue;
+      showRoomSelection();
+    }
+  });
 
   function showRoomSelection() {
-    const container = document.getElementById("room-buttons");
-    container.replaceChildren();
-    
-    // Podświetl dyżury wybranego pokoju.
-    document.querySelectorAll("#schedule .schedule-row")
-      .forEach((row, index) => {
-        const saturday = start + index * WEEK;
-        const isMyRoom = selectedRoom !== "" &&
-          roomFor(saturday) === Number(selectedRoom);
-
-        row.classList.toggle("my-room", isMyRoom);
-      });
-
-
-    for (let room = 1; room <= 4; room++) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "room-button";
-      if (selectedRoom === String(room)) {
-        button.classList.add("selected");
-      }
-      button.textContent = "Pokój " + room;
-      button.setAttribute(
-        "aria-pressed", selectedRoom === String(room)
-      );
-
-      button.addEventListener("click", () => {
-        selectedRoom = String(room);
-        localStorage.setItem("cleaning-room", selectedRoom);
-        showRoomSelection();
-      });
-
-      container.append(button);
-    }
-
-    const result = document.getElementById("personal-result");
-    if (!selectedRoom || !["1", "2", "3", "4"].includes(selectedRoom)) {
-      result.textContent =
-        "Wybierz pokój, aby zobaczyć swój najbliższy dyżur.";
-      return;
-    }
-
-    let saturday = start;
-    while (roomFor(saturday) !== Number(selectedRoom)) {
-      saturday += WEEK;
-    }
-
-    result.replaceChildren();
-
-    const description = document.createTextNode(
-      "Najbliższy dyżur pokoju nr " + selectedRoom + ": "
-    );
-
-const date = document.createElement("span");
-date.className = "duty-date";
-date.textContent = weekendText(saturday);
-
-result.append(description, date, ".");
+    roomSetup.hidden = Boolean(selectedRoom);
+    renderCalendar();
   }
 
-  const themeSelect = document.getElementById("theme-select");
-  themeSelect.value = ["system", "light", "dark"]
-    .includes(savedTheme) ? savedTheme : "system";
+  const themeToggle = document.getElementById("theme-toggle");
+  const themeMenu = document.getElementById("theme-menu");
+  const themeChoices = [...themeMenu.querySelectorAll("input")];
+  let themeMode = themeChoices.some(input => input.value === savedTheme) ? savedTheme : "system";
 
   function applyTheme(mode) {
+    themeMode = mode;
+    for (const input of themeChoices) input.checked = input.value === mode;
     document.getElementById("theme-icon").textContent =
       { system: "⚙", light: "☀", dark: "☾" }[mode];
     const actual = effectiveTheme(mode);
     document.documentElement.dataset.theme = actual;
-    document.getElementById("theme-color").content =
-      actual === "dark" ? "#0e131c" : "#f6f7fb";
+    document.getElementById("theme-color").content = actual === "dark" ? "#031720" : "#f6f7fb";
   }
 
-  themeSelect.addEventListener("change", () => {
-    localStorage.setItem("cleaning-theme", themeSelect.value);
-    applyTheme(themeSelect.value);
-  });
+  function toggleThemeMenu(open, restoreFocus = false) {
+    themeMenu.hidden = !open;
+    themeToggle.setAttribute("aria-expanded", String(open));
+    if (open) themeChoices.find(input => input.checked).focus();
+    else if (restoreFocus) themeToggle.focus();
+  }
 
+  themeToggle.addEventListener("click", () => toggleThemeMenu(themeMenu.hidden));
+  themeMenu.addEventListener("change", event => {
+    localStorage.setItem("cleaning-theme", event.target.value);
+    applyTheme(event.target.value);
+  });
+  themeMenu.addEventListener("keydown", event => {
+    if (event.key === "Escape" || event.key === "Enter") {
+      event.preventDefault();
+      toggleThemeMenu(false, true);
+    }
+  });
+  document.addEventListener("focusin", event => {
+    if (!themeMenu.hidden && !event.target.closest(".theme-picker")) toggleThemeMenu(false);
+  });
+  document.addEventListener("pointerdown", event => {
+    if (!event.target.closest(".theme-picker")) toggleThemeMenu(false);
+  });
+  for (const input of themeChoices) {
+    input.addEventListener("click", event => {
+      if (event.detail > 0) {
+        // Let the radio finish dispatching input/change before hiding it.
+        setTimeout(() => toggleThemeMenu(false, true), 0);
+      }
+    });
+  }
   prefersDark.addEventListener("change", () => {
-    if (themeSelect.value === "system") applyTheme("system");
+    if (themeMode === "system") applyTheme(themeMode);
   });
-
-  applyTheme(themeSelect.value);
-  showSchedule();
-  updateScheduleVisibility();
+  applyTheme(themeMode);
   showRoomSelection();
   // Ogłoszenia są publiczne. Nie umieszczaj tu danych poufnych.
   const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");
   const expandedAnnouncements = new Set();
-  const restoreAnnouncements = document.getElementById("announcements-restore");
+  const announcementsOpen = document.getElementById("announcements-open");
+  const announcementsPanel = document.getElementById("announcements-panel");
+  const hiddenList = document.getElementById("hidden-announcements-list");
+  const hiddenEmpty = document.getElementById("hidden-announcements-empty");
+  const excerpt = new Intl.Segmenter("pl", { granularity: "grapheme" });
   const announcementStatus = document.getElementById("announcements-status");
   const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
   let activeAnnouncements = [];
@@ -910,12 +965,14 @@ result.append(description, date, ".");
         Math.min(Math.min(...boundaries) - now, 2147483647));
     }
     const visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
-    restoreAnnouncements.hidden = !activeAnnouncements.some(item => hiddenAnnouncements.has(announcementKey(item)));
+    window.dispatchEvent(new Event("g19-announcements"));
+    if (announcementsPanel.open) renderHiddenAnnouncements();
     announcementList.replaceChildren();
     announcementCard.hidden = visibleItems.length === 0;
     visibleItems.forEach((item, index) => {
       const article = document.createElement("article");
       article.className = "announcement-entry";
+      article.id = "ogloszenie-" + item.id;
       const meta = document.createElement("div");
       meta.className = "announcement-date";
       meta.textContent = "Opublikowano: " + fmtAnnouncementDate(item.publishedAt);
@@ -940,9 +997,9 @@ result.append(description, date, ".");
         hiddenAnnouncements.add(key);
         saveHiddenAnnouncements();
         renderAnnouncements(loadedAnnouncements);
-        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić linkiem w stopce.";
+        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić w oknie Ważne ogłoszenia.";
         const remaining = announcementList.querySelectorAll(".announcement-dismiss");
-        (remaining[Math.min(index, remaining.length - 1)] || restoreAnnouncements).focus();
+        (remaining[Math.min(index, remaining.length - 1)] || announcementsOpen).focus();
       });
       function updateExpanded() {
         const expanded = expandedAnnouncements.has(key);
@@ -961,13 +1018,52 @@ result.append(description, date, ".");
     });
     updateAnnouncementToggles();
   }
-  restoreAnnouncements.addEventListener("click", () => {
-    activeAnnouncements.filter(item => isActiveAnnouncement(item, Date.now()))
-      .forEach(item => hiddenAnnouncements.delete(announcementKey(item)));
-    saveHiddenAnnouncements();
-    renderAnnouncements(loadedAnnouncements);
-    announcementStatus.textContent = "Przywrócono ukryte ogłoszenia na tym urządzeniu.";
-    announcementList.querySelector(".announcement-dismiss")?.focus();
+  function renderHiddenAnnouncements() {
+    const items = activeAnnouncements.filter(item =>
+      isActiveAnnouncement(item, Date.now()) && hiddenAnnouncements.has(announcementKey(item)));
+    const focusedKey = document.activeElement?.dataset.announcementKey;
+    const buttons = items.map(item => {
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.announcementKey = announcementKey(item);
+      const title = document.createElement("strong");
+      title.textContent = item.title;
+      const sample = document.createElement("span");
+      const pieces = [...excerpt.segment(item.body.replace(/\s+/gu, " ").trim())];
+      sample.textContent = pieces.slice(0, 130).map(part => part.segment).join("") + (pieces.length > 130 ? "…" : "");
+      button.append(title, sample);
+      button.addEventListener("click", () => {
+        if (!isActiveAnnouncement(item, Date.now())) return renderAnnouncements(loadedAnnouncements);
+        hiddenAnnouncements.delete(announcementKey(item));
+        saveHiddenAnnouncements();
+        announcementsPanel.close();
+        renderAnnouncements(loadedAnnouncements);
+        announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
+        const targetId = "ogloszenie-" + item.id;
+        location.hash = targetId;
+        requestAnimationFrame(() => {
+          const target = document.getElementById(targetId);
+          if (!target) return;
+          target.tabIndex = -1;
+          target.focus({ preventScroll: true });
+          target.scrollIntoView({ block: "start" });
+        });
+      });
+      li.append(button);
+      return li;
+    });
+    hiddenList.replaceChildren(...buttons);
+    hiddenEmpty.hidden = items.length !== 0;
+    if (focusedKey) {
+      const matching = [...hiddenList.querySelectorAll("button")].find(button => button.dataset.announcementKey === focusedKey);
+      (matching || announcementsPanel.querySelector("form button")).focus();
+    }
+  }
+
+  announcementsOpen.addEventListener("click", () => {
+    renderHiddenAnnouncements();
+    announcementsPanel.showModal();
   });
   window.addEventListener("storage", event => {
     if (event.key === HIDDEN_ANNOUNCEMENTS_KEY || event.key === null) {

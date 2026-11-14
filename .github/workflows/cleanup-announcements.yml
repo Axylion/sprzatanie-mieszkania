@@ -5,16 +5,38 @@ on:
     # Once a day at 04:17 UTC (05:17 CET / 06:17 CEST in Warsaw).
     - cron: '17 4 * * *'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/cleanup-announcements.yml'
+      - 'scripts/cleanup-announcements.py'
+      - 'scripts/publish-announcements.sh'
+      - 'tests/test_cleanup_announcements.py'
 
 permissions: {}
 
 concurrency:
-  group: cleanup-announcements-main
+  group: cleanup-announcements-${{ github.event_name == 'pull_request' && github.ref || 'main' }}
   cancel-in-progress: false
 
 jobs:
+  validate-pr:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Test calendar retention and safe publication
+        run: |
+          python3 --version
+          python3 -m unittest discover -s tests -p 'test_cleanup*.py' -v
+          bash -n scripts/publish-announcements.sh
+
   cleanup:
-    if: github.repository == 'Axylion/sprzatanie-mieszkania' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.repository == 'Axylion/sprzatanie-mieszkania' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

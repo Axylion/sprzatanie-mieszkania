@@ -1,7 +1,9 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v6";
+const CACHE_NAME = "goleszan19-shell-v13-4";
 const SHELL = [
-  "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./manifest.webmanifest",
+  "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
+  "./dyskusje/notifications.js", "./administracja/admin.js",
+  "./dyskusje/dyskusje.css", "./dyskusje/config.js", "./dyskusje/dyskusje.js",
   "./poradnik/poradnik.css", "./poradnik/dane.js", "./poradnik/poradnik.js",
   "./poradnik/media/kabina-1.webp",
   "./poradnik/media/kabina-2.webp",
@@ -41,7 +43,7 @@ const SHELL = [
   "./poradnik/media/zlewozmywak-ikony.webp",
 ];
 self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL.map(path => new Request(path, { cache: "reload" })))));
   self.skipWaiting();
 });
 self.addEventListener("activate", event => {
@@ -82,4 +84,38 @@ self.addEventListener("fetch", event => {
   event.respondWith(caches.open(CACHE_NAME).then(cache =>
     cache.match(event.request).then(cached => cached || fetch(event.request))
   ));
+});
+
+self.addEventListener("push", event => {
+  let data;
+  try { data = event.data?.json(); } catch { return; }
+  if (!data || !/^[0-9]+$/.test(data.id) || !/^#(dyskusje|calendar-title|ogloszenie-.+)$/.test(data.target)) return;
+  const titles = { messages: "Nowa wiadomość", announcements: "Ważne ogłoszenie", duties: "Twój dyżur sprzątania" };
+  if (!Object.hasOwn(titles, data.category)) return;
+  const message = data.category === "messages";
+  const preview = message && [1, 2, 3, 4].includes(data.room) &&
+    typeof data.preview === "string" && data.preview.length <= 401 && data.preview.trim();
+  const title = message ? "Goleszan 19 · Nowa wiadomość" : titles[data.category];
+  event.waitUntil(self.registration.showNotification(title, {
+    body: preview ? "Pokój nr " + data.room + ": " + preview : "Otwórz Goleszan 19.", tag: "g19-" + data.id, renotify: false,
+    icon: new URL("icon-192.png", self.registration.scope).href,
+    data: { target: data.target }
+  }));
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const hash = event.notification.data?.target;
+  if (!/^#(dyskusje|calendar-title|ogloszenie-.+)$/.test(hash || "")) return;
+  const target = new URL(self.registration.scope);
+  target.hash = hash;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const existing = windows.find(client => client.url.startsWith(self.registration.scope));
+    if (existing) {
+      const navigated = await existing.navigate(target.href);
+      if (navigated) { await navigated.focus(); return; }
+    }
+    await self.clients.openWindow(target.href);
+  })());
 });

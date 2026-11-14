@@ -6,6 +6,11 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+async function setTheme(page, theme) {
+  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-menu input[value="' + theme + '"]').click();
+}
+
 const prefix = '/sprzatanie-mieszkania/';
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
@@ -55,9 +60,9 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.goto(url);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
-    assert.ok(await page.locator('.hero + .guide-entry').isVisible());
-    await page.locator('#theme-select').selectOption('dark');
-    await page.locator('.guide-entry').tap();
+    assert.ok(await page.locator('.dashboard-links a[href="#poradnik"]').isVisible());
+    await setTheme(page, 'dark');
+    await page.getByRole('link', { name: /Poradnik sprzątania/ }).tap();
     const title = page.locator('#guide-title');
     await title.waitFor();
     assert.equal(await title.innerText(), 'Szafki kuchenne i ściana robocza');
@@ -114,11 +119,6 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
       await page.waitForFunction(number => document.querySelector('.guide-card-position')?.textContent === `${number} / 8`, index + 1);
     }
 
-    // A vertical drag scrolls the page, and a diagonal drag leaves the same card open.
-    await swipe(240, 400, 0, -190);
-    await page.waitForFunction(() => scrollY > 60);
-    await swipe(250, 400, -100, -110);
-    assert.equal(await position.innerText(), '1 / 8');
     await page.getByRole('navigation', { name: 'Działy poradnika' }).getByRole('link', { name: 'Toalety' }).click();
     await page.waitForURL('**/#poradnik/toaleta');
     await page.waitForFunction(() => document.querySelector('.guide-categories [aria-current]')?.textContent === 'Toalety' && scrollY === 0);
@@ -166,7 +166,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.waitForURL('**/#poradnik/toaleta');
     await page.goForward();
     await page.locator('.hero').waitFor();
-    assert.equal(await page.locator('#theme-select').inputValue(), 'dark');
+    assert.equal(await page.locator('#theme-menu input:checked').inputValue(), 'dark');
 
     // All photos must be usable on their first offline visit, including photos in the steps.
     await context.setOffline(true);
@@ -198,7 +198,16 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     }
     await page.getByRole('link', { name: '← Harmonogram' }).click();
     await page.locator('#next-room').waitFor();
-    assert.equal(await page.locator('#schedule .schedule-row').count(), 12);
+    assert.ok(await page.locator('#calendar-days button').count() >= 28);
+    // Leave scrolling gestures last so native inertial scrolling does not affect later clicks.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('link', { name: /Poradnik sprzątania/ }).click();
+    await page.waitForFunction(() => document.querySelector('.guide-card-position')?.textContent === '1 / 8' && scrollY === 0);
+    // A vertical drag scrolls the page, and a diagonal drag leaves the same card open.
+    await swipe(240, 400, 0, -190);
+    await page.waitForFunction(() => scrollY > 60);
+    await swipe(250, 400, -100, -110);
+    assert.equal(await position.innerText(), '1 / 8');
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();

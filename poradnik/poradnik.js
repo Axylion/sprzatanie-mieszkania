@@ -12,8 +12,10 @@
   };
 
   const home = document.querySelector("#harmonogram");
-  const homeEntry = document.querySelector(".guide-entry");
+  const homeEntry = home.querySelector('a[href="#poradnik"]');
   const guide = document.querySelector("#poradnik-view");
+  const discussion = document.querySelector("#discussion-view");
+  const discussionEntry = document.querySelector(".discussion-entry");
   const footer = document.querySelector("footer");
   const gallery = document.querySelector("#poradnik-gallery");
   const galleryImage = gallery.querySelector("img");
@@ -123,21 +125,38 @@
     const hash = location.hash;
     if (hash === currentHash) return;
     const wasGuide = !guide.hidden;
+    const wasDiscussion = !discussion.hidden;
+    const admin = document.getElementById("admin-view");
+    const showAdmin = hash === "#administracja";
+    const wasAdmin = !admin.hidden;
+    admin.hidden = !showAdmin;
+    const showDiscussion = hash === "#dyskusje";
     const showGuide = hash === "#poradnik" || hash.startsWith("#poradnik/");
     currentHash = hash;
     if (gallery.open) gallery.close();
+    if ((showGuide || showDiscussion || showAdmin) && !wasGuide && !wasDiscussion && !wasAdmin) homeScroll = window.scrollY;
+    discussion.hidden = !showDiscussion;
     if (!showGuide) {
-      home.hidden = footer.hidden = false;
+      home.hidden = showDiscussion || showAdmin;
       guide.hidden = true;
       document.title = homeTitle;
-      if (wasGuide) {
-        homeEntry.focus({ preventScroll: true });
-        window.scrollTo({ top: homeScroll, behavior: "instant" });
+      if (showDiscussion) {
+        document.title = "Dyskusje · Goleszan 19";
+        discussion.querySelector("h1").focus({ preventScroll: true });
+        window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (showAdmin) {
+        document.title = "Administracja · Goleszan 19";
+        window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (hash === "#ustawienia") {
+        document.getElementById("settings-title").focus({ preventScroll: true });
+        document.getElementById("ustawienia").scrollIntoView({ behavior: "instant" });
+      } else if (wasGuide || wasDiscussion || wasAdmin) {
+        (wasAdmin ? footer.querySelector('a[href="#administracja"]') : wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
+        if (!hash.startsWith("#ogloszenie-")) window.scrollTo({ top: homeScroll, behavior: "instant" });
       }
       return;
     }
 
-    if (!wasGuide) homeScroll = window.scrollY;
     cardIndex = Math.max(0, guideCards.findIndex(card => cardLink(card) === hash));
     const currentCard = guideCards[cardIndex];
     photos = [...currentCard.photos, ...currentCard.steps.filter(step => step.photo).map(step => step.photo)]
@@ -146,12 +165,12 @@
     guide.innerHTML = `
       <div class="guide-frame">
         <div class="guide-top">
-          <a href="#harmonogram">← Harmonogram</a>
+          <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
         </div>
         ${cardContent(currentCard)}
       </div>
     `;
-    home.hidden = footer.hidden = true;
+    home.hidden = true;
     guide.hidden = false;
     document.title = `${currentCard.title} · Poradnik sprzątania`;
     guide.querySelector("h1").focus({ preventScroll: true });

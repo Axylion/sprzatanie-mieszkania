@@ -145,7 +145,7 @@
         discussion.querySelector("h1").focus({ preventScroll: true });
         window.scrollTo({ top: 0, behavior: "instant" });
       } else if (showAdmin) {
-        document.title = "Administracja · Goleszan 19";
+        document.title = "Administracja — Zarządzanie pokojami · Goleszan 19";
         window.scrollTo({ top: 0, behavior: "instant" });
       } else if (hash === "#ustawienia") {
         document.getElementById("settings-title").focus({ preventScroll: true });

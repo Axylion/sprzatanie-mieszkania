@@ -57,7 +57,7 @@ async function database(t, legacy = false, beforeAccess = null) {
       create table auth.sessions (id uuid primary key, user_id uuid references auth.users, created_at timestamptz not null default now());
       create function auth.jwt() returns jsonb language sql as $$select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb$$;
       create function auth.uid() returns uuid language sql as $$select (auth.jwt()->>'sub')::uuid$$;`);
-    for (const file of ['202611140010_room_access.sql', '202611140011_admin_panel.sql', '202611140012_device_push_categories.sql']) {
+    for (const file of ['202611140010_room_access.sql', '202611140011_admin_panel.sql', '202611140012_device_push_categories.sql', '202611140013_admin_history.sql']) {
       await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
     }
   }
@@ -293,7 +293,7 @@ test('Room access repair, self-reconnection, admin session and room-specific blo
   const rooms = await admin(roomsSql);
   assert.equal(rooms.length, 4);
   await admin('select public.g19_web_admin_detach(1,1,$1)', [rooms[0].devices[0].id]);
-  await assert.rejects(bind(1, first), { message: 'browser_blocked' });
+  assert.equal((await bind(1, first)).message, 'browser_blocked');
   await assert.rejects(rpc('read', { p_token: a2.token }), { code: 'PT401' });
   const fresh = await bind(1, proof());
   const current = (await admin(roomsSql))[0];
@@ -305,6 +305,23 @@ test('Room access repair, self-reconnection, admin session and room-specific blo
   const historyAfter = await rpc('read', { p_token: other.token });
   assert.deepEqual(historyAfter.messages.map(m => [m.id, m.former, m.up]), [[message, true, 1]]);
   assert.ok((await bind(3, first)).token);
+  const historySql = 'select public.g19_web_admin_history(1) v';
+  await assert.rejects(admin(historySql, [], stranger, unrelated), { code: 'PT403' });
+  const events = (await admin(historySql)).events;
+  for (const kind of ['connected_legacy', 'connected', 'reconnected', 'self_detached', 'admin_detached', 'room_released', 'blocked']) {
+    assert.ok(events.some(event => event.kind === kind), kind);
+  }
+  assert.ok(events.find(event => event.kind === 'blocked').deviceId);
+  assert.ok(events.every(event => event.at && !Object.hasOwn(event, 'browserHash')));
+  await db.exec(`insert into g19_private.blocked_attempts(room,generation)
+    select 1,2 from generate_series(1,30)`);
+  const historyPage = await admin(historySql);
+  assert.equal(historyPage.events.length, 25);
+  assert.equal(historyPage.more, true);
+  const cursor = historyPage.events.at(-1);
+  const older = await admin('select public.g19_web_admin_history(1,$1,$2) v', [cursor.at, cursor.key]);
+  assert.ok(older.events.length);
+  assert.ok(older.events.every(event => !historyPage.events.some(first => first.key === event.key)));
   const audit = (await db.query('select action, auth_user_id from g19_private.room_reset_audit order by id')).rows;
   assert.deepEqual(audit.map(r => [r.action, r.auth_user_id]), [['detach_device', actor], ['release_room', actor]]);
   await db.query("update auth.sessions set created_at = now() - interval '61 minutes' where id = $1", [session]);
@@ -353,6 +370,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
           return route.abort();
         }
         const result = await rpc(method, route.request().postDataJSON());
+        if (result?.message === 'browser_blocked') return route.fulfill({ status: 403, json: result });
         if (method === 'send' && loseSendResponse) {
           loseSendResponse = false;
           return route.abort();
@@ -690,14 +708,23 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
       released = true;
       return route.fulfill({ json: 1 });
     }
+    if (route.request().url().endsWith('_history')) {
+      return route.fulfill({ json: {more: false, events: [
+        { key:'connected:fixture', kind:'connected', at:'2026-11-14T09:20:00.000Z' },
+        { key:'revoked:fixture', kind:'admin_detached', at:'2026-11-14T09:19:00.000Z' }
+      ]} });
+    }
     return route.fulfill({ json: [1, 2, 3, 4].map(room => ({
-      room, generation: 1, occupied: room === 1 && !released,
-      devices: room === 1 && !released ? [{ id: 'fixture-device', kind: 'phone' }] : []
+      room, generation: 1, occupied: (room === 1 && !released) || room === 2,
+      devices: (room === 1 && !released ? ['computer','phone'] : room === 2 ? ['phone'] : []).map((kind,i) => ({
+        id: 'fixture-device-' + room + '-' + i, kind, known: true, connectedAt: '2026-11-14T09:20:00Z'
+      }))
     })) });
   });
   await operator.goto(base);
   await operator.getByRole('link', { name: 'Administracja' }).click();
   const login = operator.locator('#admin-login');
+  await setTheme(operator, 'dark');
   await login.waitFor();
   assert.equal(await login.locator('#admin-username').inputValue(), 'Admin');
   assert.ok(await login.locator('#admin-username').isDisabled());
@@ -712,7 +739,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
       ? [380, 195, 'rgb(8, 42, 51)', 'rgb(6, 28, 35)']
       : [336, 12, 'rgb(8, 42, 51)', 'rgb(6, 28, 35)']);
     if (process.env.G19_LOGIN_SCREENSHOTS) {
-      await operator.screenshot({ path: resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-admin-v13-4-' + width + '.png'), fullPage: true });
+      await operator.screenshot({ path: resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-admin-v13-5-' + width + '.png'), fullPage: true });
     }
   }
   for (const [route, main] of [['#dyskusje', '#discussion-view'], ['#poradnik', '#poradnik-view'], ['#harmonogram', '#harmonogram'], ['#administracja', '#admin-view']]) {
@@ -743,17 +770,44 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await operator.getByText('Nie udało się zalogować.').waitFor();
   await operator.getByLabel('Hasło').fill('only-a-test-fixture');
   await operator.getByRole('button', { name: 'Zaloguj się' }).click();
-  await operator.getByRole('heading', { name: 'Pokój nr 4' }).waitFor();
+  await operator.getByRole('button', { name: /Pokój nr 4/ }).waitFor();
   assert.equal(await operator.locator('.admin-room').count(), 4);
   assert.ok(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await operator.getByRole('button', { name: 'Zarządzaj' }).click();
+  await operator.getByRole('button', { name: /Pokój nr 4/ }).click();
+  await operator.getByText('Historia pokoju', {exact:true}).click();
+  await operator.getByText('Nowe urządzenie podłączone', {exact:true}).waitFor();
+  await operator.getByRole('button', {name:'Wszystkie pokoje'}).click();
+  await setTheme(operator, 'light');
+  const panel = operator.locator('#admin-panel');
+  assert.equal(await panel.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(246, 247, 251)');
+  await setTheme(operator, 'system');
+  await operator.emulateMedia({ colorScheme: 'dark' });
+  await operator.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  for (const width of [1280, 770, 360]) {
+    await operator.setViewportSize({width, height: 900});
+    const columns = await operator.locator('#admin-rooms').evaluate(e => getComputedStyle(e).gridTemplateColumns.split(' ').length);
+    assert.equal(columns, width === 1280 ? 4 : width === 770 ? 2 : 1);
+    if (process.env.G19_LOGIN_SCREENSHOTS) await panel.screenshot({path:resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-v13-5-rooms-' + width + '.png')});
+    await operator.getByRole('button', {name:/Pokój nr 1/}).click();
+    assert.equal(await operator.getByText('Znany identyfikator', {exact:true}).count(), 2);
+    await operator.getByText('Połączono: 14.11.2026, 10:20', {exact:true}).first().waitFor();
+    if (process.env.G19_LOGIN_SCREENSHOTS) await panel.screenshot({path:resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-v13-5-room-' + width + '.png')});
+    await operator.getByText('Historia pokoju', {exact:true}).click();
+    await operator.getByText('Nowe urządzenie podłączone', {exact:true}).waitFor();
+    assert.deepEqual(await operator.locator('.admin-event time').evaluateAll(items => items.map(item => item.dateTime)),
+      ['2026-11-14T09:19:00.000Z', '2026-11-14T09:20:00.000Z']);
+    if (width === 770 && process.env.G19_LOGIN_SCREENSHOTS) await panel.screenshot({path:resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-v13-5-history.png')});
+    assert.ok(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    if (width !== 360) await operator.getByRole('button', {name:'Wszystkie pokoje'}).click();
+  }
   await operator.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
   const confirm = operator.locator('#admin-confirm');
   await confirm.getByRole('button', { name: 'Anuluj' }).click();
   assert.equal(released, false);
   await operator.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
   await confirm.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
-  await operator.getByText('Wolny · 0 urządzeń', { exact: true }).waitFor();
+  await operator.getByRole('heading', { name: 'Pokój nr 1' }).waitFor();
+  await operator.getByText('Wolny', { exact: true }).waitFor();
   await operator.getByRole('button', { name: 'Wyloguj' }).click();
   await operator.getByLabel('Hasło').waitFor();
   await operator.waitForFunction(() => !document.querySelector('#admin-login').hidden);

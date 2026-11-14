@@ -102,7 +102,7 @@
         signal: controller.signal
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw Object.assign(new Error("Chat request failed"), {
+      if (!response.ok || payload?.message === "browser_blocked") throw Object.assign(new Error("Chat request failed"), {
         status: response.status, code: payload?.message
       });
       return payload;
@@ -470,7 +470,7 @@
       if (navigator.locks) await navigator.locks.request(tokenKey, joinDevice);
       else await joinDevice();
     } catch (error) {
-      if (error.code === "room_occupied") localStorage.removeItem(enrollmentKey);
+      if (["room_occupied", "browser_blocked"].includes(error.code)) localStorage.removeItem(enrollmentKey);
       const message = {
         browser_blocked: "Administrator zablokował ponowne podłączenie tego urządzenia do pokoju.",
         room_occupied: "Pokój został już zajęty. Możesz poprosić o podłączenie urządzenia.",

@@ -6,6 +6,11 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+async function setTheme(page, theme) {
+  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-menu input[value="' + theme + '"]').click();
+}
+
 const prefix = '/sprzatanie-mieszkania/';
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
@@ -56,7 +61,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     assert.ok(await page.locator('.dashboard-links a[href="#poradnik"]').isVisible());
-    await page.locator('#theme-select').selectOption('dark');
+    await setTheme(page, 'dark');
     await page.getByRole('link', { name: /Poradnik sprzątania/ }).tap();
     const title = page.locator('#guide-title');
     await title.waitFor();
@@ -161,7 +166,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.waitForURL('**/#poradnik/toaleta');
     await page.goForward();
     await page.locator('.hero').waitFor();
-    assert.equal(await page.locator('#theme-select').inputValue(), 'dark');
+    assert.equal(await page.locator('#theme-menu input:checked').inputValue(), 'dark');
 
     // All photos must be usable on their first offline visit, including photos in the steps.
     await context.setOffline(true);

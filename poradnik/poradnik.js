@@ -152,8 +152,8 @@
         document.getElementById("settings-title").focus({ preventScroll: true });
         document.getElementById("ustawienia").scrollIntoView({ behavior: "instant" });
       } else if (wasGuide || wasDiscussion || wasAdmin) {
-        (wasAdmin ? home.querySelector('a[href="#administracja"]') : wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
-        window.scrollTo({ top: homeScroll, behavior: "instant" });
+        (wasAdmin ? footer.querySelector('a[href="#administracja"]') : wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
+        if (!hash.startsWith("#ogloszenie-")) window.scrollTo({ top: homeScroll, behavior: "instant" });
       }
       return;
     }

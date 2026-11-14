@@ -127,15 +127,6 @@
     .brand-icon svg { width: 25px; fill: none; stroke: #52e3df; stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
     .brand > span:last-child { white-space: nowrap; }
     .theme-picker { position: relative; width: 44px; height: 42px; }
-    .theme-icon {
-      position: absolute; inset: 0; display: grid; place-items: center;
-      pointer-events: none; font-size: 20px;
-    }
-    #theme-select {
-      width: 100%; height: 100%; padding: 0; cursor: pointer;
-      appearance: none; color: transparent;
-    }
-    #theme-select option { color: var(--text); }
     .brand-icon {
       display: grid;
       place-items: center;
@@ -248,18 +239,7 @@
     }
     .announcement-dismiss svg { width: 26px; height: 26px; }
     .announcement-entry + .announcement-entry .announcement-dismiss { top: 7px; }
-    .announcement-restore {
-      display: block;
-      margin: 8px auto;
-      padding: 12px;
-      border: 0;
-      background: transparent;
-      color: var(--text);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .announcement-restore[hidden] { display: none; }
-    .announcement-dismiss:focus-visible, .announcement-restore:focus-visible {
+    .announcement-dismiss:focus-visible {
       outline: 2px solid #2f8842;
       outline-offset: 2px;
       border-radius: 4px;
@@ -352,19 +332,24 @@
 <header>
   <div class="container header-inner">
     <div class="brand">
-      <span class="brand-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h14V10m-9 10v-6h4v6"/></svg></span>
+      <a class="brand-icon" href="#harmonogram" title="Strona główna" aria-label="Strona główna"><svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 10v10h14V10m-9 10v-6h4v6"/></svg></a>
       <span>Goleszan 19</span>
     </div>
     <div class="header-actions">
       <button type="button" class="settings-entry notification-bell" id="notification-open" aria-label="Powiadomienia" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg><span id="notification-count" hidden></span></button>
+      <button type="button" class="settings-entry notification-bell" id="announcements-open" aria-label="Ważne ogłoszenia" aria-describedby="announcements-push-indicator" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v5h5l9 4V6l-9 4H4Zm4 5 2 5m10-10 2-2m-2 6 2 2"/></svg>
+        <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span>
+      </button>
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
-      <span class="theme-icon" id="theme-icon" aria-hidden="true">⚙</span>
-      <select id="theme-select" aria-label="Motyw strony">
-        <option value="system">⚙ Systemowy</option>
-        <option value="light">☀ Jasny</option>
-        <option value="dark">☾ Ciemny</option>
-      </select>
+        <button type="button" class="settings-entry" id="theme-toggle" aria-label="Motyw strony" aria-expanded="false" aria-controls="theme-menu"><span id="theme-icon" aria-hidden="true">⚙</span></button>
+        <fieldset id="theme-menu" hidden>
+          <legend class="sr-only">Motyw strony</legend>
+          <label><input type="radio" name="theme" value="system"> Systemowy</label>
+          <label><input type="radio" name="theme" value="light"> Jasny</label>
+          <label><input type="radio" name="theme" value="dark"> Ciemny</label>
+        </fieldset>
       </div>
     </div>
   </div>
@@ -376,7 +361,16 @@
   <p id="notification-empty">Brak powiadomień.</p>
   <p id="notification-status" role="status"></p>
   <ul id="notification-list"></ul>
-  <a id="notification-settings-link" href="#powiadomienia">Ustawienia powiadomień</a>
+</dialog>
+
+<dialog id="announcements-panel" class="shortcut-help" aria-labelledby="announcements-title">
+  <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" aria-label="Zamknij ogłoszenia">×</button></form></div>
+  <p id="hidden-announcements-empty">Brak ukrytych ogłoszeń.</p>
+  <ul id="hidden-announcements-list"></ul>
+  <div class="push-control">
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-announcements-status" data-push-category="announcements">Powiadomienia o ogłoszeniach</button>
+      <p class="push-feedback" id="push-announcements-status" role="status"></p>
+    </div>
 </dialog>
 
 <dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
@@ -440,13 +434,9 @@
     <span class="guide-entry-arrow" aria-hidden="true">→</span>
   </a>
 
-  <a class="card guide-entry" href="#administracja">
-    <span class="guide-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6z"/><path d="m8 12 3 3 5-6"/></svg></span>
-    <strong>Administracja</strong><span class="guide-entry-arrow" aria-hidden="true">→</span>
-  </a>
   </nav>
-      <section class="card">
-    <h2>📖 Zasady sprzątania</h2>
+      <section class="card cleaning-rules">
+    <h2>Zasady sprzątania</h2>
 
     <details>
       <summary>Dyżury weekendowe</summary>
@@ -505,19 +495,10 @@
     <div class="calendar-grid" aria-label="Dni tygodnia"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span></div>
     <div class="calendar-grid" id="calendar-days" role="group" aria-label="Wybierz datę"></div>
     <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
-    <div class="calendar-date-info" aria-live="polite"><strong id="calendar-date"></strong><span id="calendar-duty"></span></div>
-  </section>
-      <section class="card dashboard-notifications" id="powiadomienia">
-    <h2>Powiadomienia</h2>
-    <details class="notification-settings">
-      <summary>Ustawienia powiadomień</summary>
-      <label><input type="checkbox" name="duties"> Dyżury sprzątania</label>
-      <label><input type="checkbox" name="messages"> Nowe wiadomości</label>
-      <label><input type="checkbox" name="announcements"> Ważne ogłoszenia</label>
-      <p id="push-status" role="status"></p>
-      <p id="push-help"></p>
-      <button id="push-permission" type="button" aria-describedby="push-status" hidden>Włącz powiadomienia</button>
-    </details>
+    <div class="calendar-date-info"><span id="calendar-duty" class="sr-only" aria-live="polite"></span><div class="push-control">
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status" data-push-category="duties">Powiadomienia o dyżurach</button>
+      <p class="push-feedback" id="push-duties-status" role="status"></p>
+    </div></div>
   </section>
     </div>
   </div>
@@ -535,6 +516,7 @@
       <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
     </fieldset>
     <p id="device-connect"><a href="#dyskusje">Podłącz urządzenie w Dyskusjach</a></p>
+    <p id="device-connection-status" role="status" hidden></p>
     <div id="device-settings" hidden>
       <p id="device-settings-status" role="status"></p>
       <ul id="device-list" class="device-list"></ul>
@@ -552,7 +534,10 @@
 <main class="container discussion-view" id="discussion-view" hidden>
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
   <section class="card discussion-panel" aria-labelledby="discussion-title">
-    <h1 id="discussion-title" tabindex="-1">Dyskusje</h1>
+    <div class="discussion-heading"><h1 id="discussion-title" tabindex="-1">Dyskusje</h1><div class="push-control" hidden>
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-messages-status" data-push-category="messages">Powiadomienia o wiadomościach</button>
+      <p class="push-feedback" id="push-messages-status" role="status"></p>
+    </div></div>
     <p class="discussion-subtitle">Wspólne sprawy mieszkańców</p>
     <p id="discussion-status" class="discussion-status" role="status"></p>
     <section id="discussion-join" hidden aria-labelledby="discussion-join-title">
@@ -637,10 +622,10 @@
 </dialog>
 
 <footer>
-  <button type="button" class="announcement-restore" id="announcements-restore" hidden>Pokaż ukryte ogłoszenia</button>
-  <span class="sr-only" id="announcements-status" role="status"></span>
-  Goleszan 19 · Panel mieszkańców
+  Goleszan 19 · Panel mieszkańców <a id="admin-link" href="#administracja">Administracja</a>
 </footer>
+
+<span class="sr-only" id="announcements-status" role="status"></span>
 
 <script>
   // Punkt odniesienia: 31.10–01.11.2026, pokój nr 3.
@@ -715,7 +700,6 @@
     for (const button of calendarDays.querySelectorAll("button")) {
       button.setAttribute("aria-pressed", String(Number(button.dataset.date) === timestamp));
     }
-    document.getElementById("calendar-date").textContent = dateText(timestamp);
     const room = dutyOn(timestamp);
     document.getElementById("calendar-duty").textContent = room
       ? "Pokój " + room + " · Dyżur sprzątania"
@@ -811,35 +795,64 @@
     renderCalendar();
   }
 
-  const themeSelect = document.getElementById("theme-select");
-  themeSelect.value = ["system", "light", "dark"]
-    .includes(savedTheme) ? savedTheme : "system";
+  const themeToggle = document.getElementById("theme-toggle");
+  const themeMenu = document.getElementById("theme-menu");
+  const themeChoices = [...themeMenu.querySelectorAll("input")];
+  let themeMode = themeChoices.some(input => input.value === savedTheme) ? savedTheme : "system";
 
   function applyTheme(mode) {
+    themeMode = mode;
+    for (const input of themeChoices) input.checked = input.value === mode;
     document.getElementById("theme-icon").textContent =
       { system: "⚙", light: "☀", dark: "☾" }[mode];
     const actual = effectiveTheme(mode);
     document.documentElement.dataset.theme = actual;
-    document.getElementById("theme-color").content =
-      actual === "dark" ? "#031720" : "#f6f7fb";
+    document.getElementById("theme-color").content = actual === "dark" ? "#031720" : "#f6f7fb";
   }
 
-  themeSelect.addEventListener("change", () => {
-    localStorage.setItem("cleaning-theme", themeSelect.value);
-    applyTheme(themeSelect.value);
-  });
+  function toggleThemeMenu(open, restoreFocus = false) {
+    themeMenu.hidden = !open;
+    themeToggle.setAttribute("aria-expanded", String(open));
+    if (open) themeMenu.querySelector(":checked").focus();
+    else if (restoreFocus) themeToggle.focus();
+  }
 
+  themeToggle.addEventListener("click", () => toggleThemeMenu(themeMenu.hidden));
+  themeMenu.addEventListener("change", event => {
+    localStorage.setItem("cleaning-theme", event.target.value);
+    applyTheme(event.target.value);
+  });
+  themeMenu.addEventListener("keydown", event => {
+    if (event.key === "Escape" || event.key === "Enter") {
+      event.preventDefault();
+      toggleThemeMenu(false, true);
+    }
+  });
+  document.querySelector(".theme-picker").addEventListener("focusout", event => {
+    if (!event.currentTarget.contains(event.relatedTarget)) toggleThemeMenu(false);
+  });
+  document.addEventListener("pointerdown", event => {
+    if (!event.target.closest(".theme-picker")) toggleThemeMenu(false);
+  });
+  for (const input of themeChoices) {
+    input.addEventListener("click", event => {
+      if (event.detail > 0) toggleThemeMenu(false, true);
+    });
+  }
   prefersDark.addEventListener("change", () => {
-    if (themeSelect.value === "system") applyTheme("system");
+    if (themeMode === "system") applyTheme(themeMode);
   });
-
-  applyTheme(themeSelect.value);
+  applyTheme(themeMode);
   showRoomSelection();
   // Ogłoszenia są publiczne. Nie umieszczaj tu danych poufnych.
   const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");
   const expandedAnnouncements = new Set();
-  const restoreAnnouncements = document.getElementById("announcements-restore");
+  const announcementsOpen = document.getElementById("announcements-open");
+  const announcementsPanel = document.getElementById("announcements-panel");
+  const hiddenList = document.getElementById("hidden-announcements-list");
+  const hiddenEmpty = document.getElementById("hidden-announcements-empty");
+  const excerpt = new Intl.Segmenter("pl", { granularity: "grapheme" });
   const announcementStatus = document.getElementById("announcements-status");
   const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
   let activeAnnouncements = [];
@@ -941,7 +954,7 @@
     }
     const visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
     window.dispatchEvent(new Event("g19-announcements"));
-    restoreAnnouncements.hidden = !activeAnnouncements.some(item => hiddenAnnouncements.has(announcementKey(item)));
+    if (announcementsPanel.open) renderHiddenAnnouncements();
     announcementList.replaceChildren();
     announcementCard.hidden = visibleItems.length === 0;
     visibleItems.forEach((item, index) => {
@@ -972,9 +985,9 @@
         hiddenAnnouncements.add(key);
         saveHiddenAnnouncements();
         renderAnnouncements(loadedAnnouncements);
-        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić linkiem w stopce.";
+        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić w oknie Ważne ogłoszenia.";
         const remaining = announcementList.querySelectorAll(".announcement-dismiss");
-        (remaining[Math.min(index, remaining.length - 1)] || restoreAnnouncements).focus();
+        (remaining[Math.min(index, remaining.length - 1)] || announcementsOpen).focus();
       });
       function updateExpanded() {
         const expanded = expandedAnnouncements.has(key);
@@ -993,13 +1006,52 @@
     });
     updateAnnouncementToggles();
   }
-  restoreAnnouncements.addEventListener("click", () => {
-    activeAnnouncements.filter(item => isActiveAnnouncement(item, Date.now()))
-      .forEach(item => hiddenAnnouncements.delete(announcementKey(item)));
-    saveHiddenAnnouncements();
-    renderAnnouncements(loadedAnnouncements);
-    announcementStatus.textContent = "Przywrócono ukryte ogłoszenia na tym urządzeniu.";
-    announcementList.querySelector(".announcement-dismiss")?.focus();
+  function renderHiddenAnnouncements() {
+    const items = activeAnnouncements.filter(item =>
+      isActiveAnnouncement(item, Date.now()) && hiddenAnnouncements.has(announcementKey(item)));
+    const focusedKey = document.activeElement?.dataset.announcementKey;
+    const buttons = items.map(item => {
+      const li = document.createElement("li");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.announcementKey = announcementKey(item);
+      const title = document.createElement("strong");
+      title.textContent = item.title;
+      const sample = document.createElement("span");
+      const pieces = [...excerpt.segment(item.body.replace(/\s+/gu, " ").trim())];
+      sample.textContent = pieces.slice(0, 130).map(part => part.segment).join("") + (pieces.length > 130 ? "…" : "");
+      button.append(title, sample);
+      button.addEventListener("click", () => {
+        if (!isActiveAnnouncement(item, Date.now())) return renderAnnouncements(loadedAnnouncements);
+        hiddenAnnouncements.delete(announcementKey(item));
+        saveHiddenAnnouncements();
+        announcementsPanel.close();
+        renderAnnouncements(loadedAnnouncements);
+        announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
+        const targetId = "ogloszenie-" + item.id;
+        location.hash = targetId;
+        requestAnimationFrame(() => {
+          const target = document.getElementById(targetId);
+          if (!target) return;
+          target.tabIndex = -1;
+          target.focus({ preventScroll: true });
+          target.scrollIntoView({ block: "start" });
+        });
+      });
+      li.append(button);
+      return li;
+    });
+    hiddenList.replaceChildren(...buttons);
+    hiddenEmpty.hidden = items.length !== 0;
+    if (focusedKey) {
+      const matching = [...hiddenList.querySelectorAll("button")].find(button => button.dataset.announcementKey === focusedKey);
+      (matching || announcementsPanel.querySelector("form button")).focus();
+    }
+  }
+
+  announcementsOpen.addEventListener("click", () => {
+    renderHiddenAnnouncements();
+    announcementsPanel.showModal();
   });
   window.addEventListener("storage", event => {
     if (event.key === HIDDEN_ANNOUNCEMENTS_KEY || event.key === null) {

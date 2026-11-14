@@ -7,6 +7,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+async function setTheme(page, theme) {
+  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-menu input[value="' + theme + '"]').click();
+}
+
 const mimeTypes = {
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -19,7 +24,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v12 to v13 update under the GitHub Pages subpath', async () => {
+test('PWA v13-2 to v13-3 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -32,7 +37,7 @@ test('PWA v12 to v13 update under the GitHub Pages subpath', async () => {
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13', 'shell-v12')
+      ? contents.toString().replace('shell-v13-3', 'shell-v13-2')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -45,35 +50,34 @@ test('PWA v12 to v13 update under the GitHub Pages subpath', async () => {
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v12');
+      const cache = await caches.open('goleszan19-shell-v13-2');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13') && !keys.includes('goleszan19-shell-v12');
+      return keys.includes('goleszan19-shell-v13-3') && !keys.includes('goleszan19-shell-v13-2');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), JSON.parse(fs.readFileSync(path.join(root,'announcements.json'),'utf8')));
     await page.locator('.announcement-dismiss').click();
     await page.reload({waitUntil:"domcontentloaded"});
-    await page.waitForFunction(() => !document.querySelector('#announcements-restore').hidden);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     await context.setOffline(true);
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelectorAll('#calendar-days button').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
-    assert.equal(await page.locator('#announcements-restore').isVisible(), false);
+    assert.equal(await page.locator('#announcements-restore').count(), 0);
     await page.getByRole('button', {name:'Pokój nr 3',exact:true}).click();
     await page.getByRole('button', {name:'Potwierdź pokój'}).click();
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => localStorage.getItem('cleaning-room') === '3' && document.querySelector('#room-setup').hidden);
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
-    await page.waitForFunction(() => !document.querySelector('#announcements-restore').hidden);
-    await page.locator('#announcements-restore').click();
+    await page.locator('#announcements-open').click();
+    await page.locator('#hidden-announcements-list button').first().click();
     assert.equal(await page.locator('.announcement-entry').count(), 1);
   } finally {
     await browser.close();
@@ -145,7 +149,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     for (const width of [320, 360, 390, 430, 768, 1280]) {
       await page.setViewportSize({width,height:844});
       for (const theme of ['light','dark']) {
-        await page.selectOption('#theme-select', theme);
+        await setTheme(page, theme);
         await page.waitForTimeout(50);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
         assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(47, 136, 66)');
@@ -172,11 +176,12 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     const dismiss = page.locator('.announcement-dismiss').first();
     assert.match(await dismiss.getAttribute('aria-label'), /na tym urządzeniu/);
     assert.deepEqual(await dismiss.evaluate(e => ({width:e.offsetWidth,height:e.offsetHeight,bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,svg:e.querySelector('svg').getBoundingClientRect().width})), {width:44,height:44,bg:'rgba(0, 0, 0, 0)',color:'rgb(51, 51, 51)',svg:26});
-    assert.equal(await page.locator('#announcements-restore').isVisible(), false);
+    await page.locator('#announcements-open').click();
+    assert.ok(await page.getByText('Brak ukrytych ogłoszeń.', { exact:true }).isVisible());
+    await page.getByRole('button', { name: 'Zamknij ogłoszenia' }).click();
     await dismiss.focus();
     await page.keyboard.press('Enter');
     assert.equal(await page.locator('.announcement-entry').count(), 2);
-    assert.equal(await page.locator('#announcements-restore').isVisible(), true);
     assert.equal(await page.locator('.announcement-dismiss').first().evaluate(e => e === document.activeElement), true);
     await page.reload();
     await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 2);
@@ -191,22 +196,28 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.locator('.announcement-dismiss').first().click();
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     assert.equal(await page.locator('#announcements-card').evaluate(e => e.getBoundingClientRect().height), 0);
-    const restore = page.getByRole('button', {name:'Pokaż ukryte ogłoszenia',exact:true});
-    assert.equal(await restore.isVisible(), true);
-    if (process.env.AXE_PATH) {
-      await page.addScriptTag({path:process.env.AXE_PATH});
-      const violations = await page.evaluate(async () => (await axe.run({include:['#announcements-restore']})).violations);
-      assert.deepEqual(violations.map(v => v.id), []);
-    }
+    const restore = page.locator('#announcements-open');
     assert.equal(await restore.evaluate(e => e === document.activeElement), true);
     await page.reload();
-    await page.waitForFunction(() => !document.querySelector('#announcements-restore').hidden);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
-    await restore.focus();
-    await page.keyboard.press('Space');
-    assert.equal(await page.locator('.announcement-entry').count(), 3);
-    assert.equal(await restore.isVisible(), false);
-    assert.equal(await page.locator('.announcement-dismiss').first().evaluate(e => e === document.activeElement), true);
+    await restore.click();
+    const hidden = page.locator('#hidden-announcements-list button');
+    await hidden.first().waitFor();
+    assert.equal(await hidden.count(), 3);
+    if (process.env.AXE_PATH) {
+      await page.addScriptTag({path:process.env.AXE_PATH});
+      const violations = await page.evaluate(async () => (await axe.run({include:['#announcements-panel']})).violations);
+      assert.deepEqual(violations.map(v => v.id), []);
+    }
+    await hidden.filter({hasText:'Informacja a'}).click();
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(), ['Informacja a']);
+    await page.reload();
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.equal(await page.locator('.announcement-entry').count(), 1);
+    for (const title of ['Informacja b', 'Informacja short']) {
+      await restore.click();
+      await hidden.filter({hasText:title}).click();
+    }
     // Reused IDs with new publication dates/title/body/version must not inherit hiding.
     await page.locator('.announcement-dismiss').first().click();
     const original = {...data[0]};
@@ -223,10 +234,11 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.locator('.announcement-dismiss').first().click();
     assert.equal(await page.locator('.announcement-entry').count(), 2);
     await restore.click();
+    await hidden.first().click();
     assert.equal(await page.locator('.announcement-entry').count(), 3);
     // System theme follows OS changes.
     await page.reload();
-    await page.selectOption('#theme-select', 'system');
+    await setTheme(page, 'system');
     await page.emulateMedia({colorScheme:'dark'});
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
@@ -245,7 +257,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
       for (const width of [360,1280]) {
         await page.setViewportSize({width,height:900});
         for (const theme of ['light','dark']) {
-          await page.selectOption('#theme-select',theme);
+          await setTheme(page, theme);
           await page.waitForTimeout(250); // Poczekaj na przejście kolorów motywu przed zrzutem.
           await page.screenshot({path:path.join(process.env.SCREENSHOT_DIR,`sample-${width}-${theme}.png`),fullPage:true});
           if (process.env.AXE_PATH) {
@@ -276,7 +288,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13');
+      const c = await caches.open('goleszan19-shell-v13-3');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), data);
@@ -375,21 +387,29 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
     assert.equal(await page.locator('#announcements-card').isVisible(),false);
     assert.equal(await page.locator('#announcements-card').evaluate(e => e.getBoundingClientRect().height),0);
     assert.equal(await other.locator('.announcement-entry').count(),2);
-    await page.locator('#announcements-restore').click();
+    for (const id of ['permanent','instant']) {
+      await page.locator('#announcements-open').click();
+      await page.locator('#hidden-announcements-list button').filter({hasText:'Informacja '+id}).click();
+    }
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent','Informacja instant']);
     await hide('instant');
     for (const p of pages) await p.clock.runFor(2000);
-    assert.equal(await page.locator('#announcements-restore').isVisible(),false);
+    await page.locator('#announcements-open').click();
+    assert.ok(await page.getByText('Brak ukrytych ogłoszeń.', {exact:true}).isVisible());
+    await page.getByRole('button', {name:'Zamknij ogłoszenia'}).click();
     assert.deepEqual(await other.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
     // Termin nie usuwa wpisu z JSON i nie można go przywrócić lokalną funkcją.
     await hide('permanent');
-    await page.locator('#announcements-restore').click();
+    await page.locator('#announcements-open').click();
+    await page.locator('#hidden-announcements-list button').first().click();
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()),data);
     // Zaplanowana publikacja również uwzględnia Warsaw i działa bez przeładowania.
     for (const p of pages) await p.clock.runFor(1000);
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
-    assert.equal(await page.locator('#announcements-restore').isVisible(),false);
+    await page.locator('#announcements-open').click();
+    assert.ok(await page.getByText('Brak ukrytych ogłoszeń.', {exact:true}).isVisible());
+    await page.getByRole('button', {name:'Zamknij ogłoszenia'}).click();
     // Wpisy bez expiresAt pozostają aktywne także po miesiącu.
     for (const p of pages) {
       await p.clock.fastForward(16 * 86400000);

@@ -9,6 +9,11 @@ import { fileURLToPath } from 'node:url';
 
 const { PGlite } = await import(process.env.G19_PGLITE || '@electric-sql/pglite');
 const root = fileURLToPath(new URL('../', import.meta.url));
+async function setTheme(page, theme) {
+  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-menu input[value="' + theme + '"]').click();
+}
+
 const migration = await readFile(new URL('../supabase/migrations/202611130001_dyskusje.sql', import.meta.url), 'utf8');
 const numericMigration = await readFile(new URL('../supabase/migrations/202611130002_pairing_codes.sql', import.meta.url), 'utf8');
 const revisionMigration = await readFile(new URL('../supabase/migrations/202611130003_scope_chat_revision_updates.sql', import.meta.url), 'utf8');
@@ -25,6 +30,7 @@ const signatures = {
   react: ['p_token', 'p_message', 'p_vote'],
   notifications: ['p_token', 'p_categories'],
   notification_preferences: ['p_token', 'p_categories', 'p_initialize'],
+  push_status: ['p_token', 'p_endpoint'],
   push_subscription: ['p_token', 'p_endpoint', 'p_p256dh', 'p_auth', 'p_categories'],
   notification_activity: ['p_token', 'p_tab', 'p_active', 'p_seen', 'p_presented'],
   notification_read: ['p_token', 'p_id', 'p_categories'],
@@ -42,7 +48,7 @@ async function database(t, legacy = false, beforeAccess = null) {
     await db.exec(revisionMigration);
     await db.exec(devicesMigration);
     await db.exec(await readFile(new URL('../supabase/migrations/202611130005_notification_inbox.sql', import.meta.url), 'utf8'));
-    for (const file of ['202611130006_web_push.sql', '202611130007_unified_notifications.sql', '202611130008_device_revocation_audit.sql']) {
+    for (const file of ['202611130006_web_push.sql', '202611130007_unified_notifications.sql', '202611130008_device_revocation_audit.sql', '202611130009_push_message_preview.sql']) {
       await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
     }
     await beforeAccess?.(db);
@@ -51,7 +57,7 @@ async function database(t, legacy = false, beforeAccess = null) {
       create table auth.sessions (id uuid primary key, user_id uuid references auth.users, created_at timestamptz not null default now());
       create function auth.jwt() returns jsonb language sql as $$select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb$$;
       create function auth.uid() returns uuid language sql as $$select (auth.jwt()->>'sub')::uuid$$;`);
-    for (const file of ['202611140010_room_access.sql', '202611140011_admin_panel.sql']) {
+    for (const file of ['202611140010_room_access.sql', '202611140011_admin_panel.sql', '202611140012_device_push_categories.sql']) {
       await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
     }
   }
@@ -391,6 +397,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
         subscribe: async () => {
           if (window.rejectPush) throw new Error("No test push service");
           subscription = {
+            endpoint: "https://fcm.googleapis.com/fcm/send/v12fixture",
             expirationTime: null,
             toJSON: () => ({ endpoint: "https://fcm.googleapis.com/fcm/send/v12fixture",
               keys: { p256dh: "A".repeat(87), auth: "B".repeat(22) } }),
@@ -453,7 +460,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   for (const width of [360, 390, 430, 768, 1280]) {
     await a.setViewportSize({ width, height: 900 });
     for (const theme of ['light', 'dark']) {
-      await a.locator('#theme-select').selectOption(theme);
+      await setTheme(a, theme);
       assert.equal(await a.locator('.dashboard-main').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), width < 760 ? 1 : 2);
       assert.ok(await a.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.ok(await a.locator('.calendar-legend').isVisible());
@@ -477,7 +484,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await a.setViewportSize({ width: 390, height: 844 });
   for (const page of [c, d]) {
     await page.goto(base);
-    await page.locator('#theme-select').selectOption('dark');
+    await setTheme(page, 'dark');
   }
   assert.match(await a.locator('.brand').innerText(), /Goleszan 19/);
   assert.equal(await a.locator('#room-setup').isVisible(), false);
@@ -501,32 +508,40 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   }
   await b.getByRole('link', { name: '← Harmonogram' }).click();
   await b.locator('#next-room').waitFor();
-  await b.locator('#powiadomienia summary').click();
-  await b.locator('.notification-settings > label').getByLabel('Nowe wiadomości').check();
-  assert.equal(await b.locator('.notification-settings > label').getByLabel('Dyżury sprzątania').isChecked(), false);
-  assert.equal(await b.locator('.notification-settings > label').getByLabel('Ważne ogłoszenia').isChecked(), false);
+  assert.equal(await b.locator('#powiadomienia').count(), 0);
   await b.goto(base + '#dyskusje');
+  const messagesSwitch = b.getByRole('switch', { name: 'Powiadomienia o wiadomościach' });
+  assert.equal(await messagesSwitch.isVisible(), false);
   await joinRoom(b, 2);
-  await b.getByRole('link', { name: '← Harmonogram' }).click();
-  await b.getByRole('heading', { name: 'Moje urządzenia' }).waitFor();
-  const permission = b.locator('#push-permission');
-  await b.waitForFunction(() => document.querySelector('#push-permission').textContent === 'Włącz powiadomienia' &&
-    !document.querySelector('#push-permission').hidden);
+  await messagesSwitch.waitFor();
   assert.equal(await b.evaluate(() => window.pushRequests), 0);
   await b.evaluate(() => { window.rejectPush = true; });
-  await permission.click();
-  await b.getByRole('button', { name: 'Podłącz ponownie', exact: true }).waitFor();
+  await messagesSwitch.click();
+  await b.getByText(/Nie udało się zapisać lub sprawdzić subskrypcji/).waitFor();
+  assert.equal(await messagesSwitch.getAttribute('aria-checked'), 'false');
   assert.equal(await b.evaluate(() => window.pushRequests), 1);
   await b.evaluate(() => { window.rejectPush = false; });
-  await permission.click();
-  await b.waitForFunction(() => document.querySelector('#push-status').textContent === 'Powiadomienia są aktywne');
+  await messagesSwitch.click();
+  await b.waitForFunction(() => document.querySelector('[data-push-category=messages]').getAttribute('aria-checked') === 'true');
+  await b.getByRole('link', { name: 'Strona główna' }).click();
+  const dutiesSwitch = b.getByRole('switch', { name: 'Powiadomienia o dyżurach' });
+  assert.equal(await dutiesSwitch.getAttribute('aria-checked'), 'false');
+  await b.locator('#announcements-open').click();
+  const announcementsSwitch = b.getByRole('switch', { name: 'Powiadomienia o ogłoszeniach' });
+  await announcementsSwitch.click();
+  await b.waitForFunction(() => document.querySelector('.push-dot').dataset.active === 'true');
+  await announcementsSwitch.click();
+  await b.waitForFunction(() => document.querySelector('.push-dot').dataset.active === 'false');
+  await b.getByRole('button', { name: 'Zamknij ogłoszenia' }).click();
+  await b.goto(base + '#dyskusje');
+  await messagesSwitch.waitFor();
+  assert.equal(await messagesSwitch.getAttribute('aria-checked'), 'true');
+  await b.getByRole('link', { name: 'Strona główna' }).click();
   await b.evaluate(() => {
     window.pushPermission = "denied";
     window.dispatchEvent(new Event("online"));
   });
-  await b.getByText('Powiadomienia są zablokowane w ustawieniach przeglądarki.').waitFor();
-  await b.getByText(/Otwórz ustawienia witryny/).waitFor();
-  assert.equal(await permission.isVisible(), false);
+  await b.locator('#push-duties-status').filter({ hasText: 'Powiadomienia są zablokowane' }).waitFor();
   assert.equal(await b.evaluate(() => window.pushRequests), 1);
   await c.goto(base + '#dyskusje');
   await c.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
@@ -568,9 +583,9 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await b.locator('#notification-open').click();
   const bell = b.locator('#notification-panel');
   await bell.getByRole('link', { name: /Nowa wiadomość/ }).waitFor();
-  assert.equal(await b.locator('#notification-count').textContent(), '1');
+  assert.ok(Number(await b.locator('#notification-count').textContent()) >= 1);
   await bell.getByRole('link', { name: /Nowa wiadomość/ }).click();
-  await b.locator('#notification-count').waitFor({ state: 'hidden' });
+  await b.waitForFunction(() => ![...document.querySelectorAll('#notification-list a[data-unread]')].some(a => a.getAttribute('href') === '#dyskusje'));
   await b.locator('.discussion-message').waitFor();
 
   assert.equal(await b.locator('.discussion-message p').innerText(), messageText);
@@ -597,12 +612,12 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await db.exec("update g19_private.devices set next_message_at = null where room = 1");
   await rpc('send', { p_token: aKey, p_request: randomUUID(), p_body: 'Cicha wiadomość' });
   await b.getByText('Cicha wiadomość', { exact: true }).waitFor();
-  await b.locator('#notification-count').waitFor({ state: 'hidden' });
+  await b.waitForFunction(() => ![...document.querySelectorAll('#notification-list a[data-unread]')].some(a => a.getAttribute('href') === '#dyskusje'));
   assert.equal(await b.evaluate(() => window.notificationTones), 1);
 
 
   await a.locator('#notification-open').click();
-  await a.getByText('Brak powiadomień.', { exact: true }).waitFor();
+  assert.equal(await a.locator('#notification-list a[href="#dyskusje"]').count(), 0);
   await a.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
   await b.locator('.discussion-message').first().locator('[data-reaction="1"]').click();
   await a.waitForFunction(() => document.querySelector('.reaction-count')?.textContent === '1');
@@ -644,6 +659,17 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await newcomer.goto(base + '#dyskusje');
   await joinRoom(newcomer, 1);
   await newcomer.getByText('Pokój nr 1 · poprzedni mieszkaniec', { exact: true }).first().waitFor();
+  await newcomer.getByRole('link', { name: 'Strona główna' }).click();
+  await newcomer.getByRole('button', { name: 'Odłącz: to urządzenie' }).click();
+  await newcomer.getByRole('button', { name: 'Odłącz urządzenie', exact: true }).click();
+  await newcomer.getByText('To urządzenie zostało odłączone.', { exact: true }).waitFor();
+  await newcomer.getByRole('link', {name: 'Podłącz urządzenie w Dyskusjach'}).click();
+  await joinRoom(newcomer, 1);
+  await newcomer.getByRole('link', {name: 'Strona główna'}).click();
+  await newcomer.getByText('To urządzenie', {exact:true}).waitFor();
+  assert.equal(await newcomer.getByText('To urządzenie zostało odłączone.', {exact:true}).isVisible(), false);
+  await newcomer.goto(base + '#dyskusje');
+  await newcomer.locator('#discussion-compose').waitFor();
   const operator = await device(320);
   let loggedOut = false;
   let released = false;

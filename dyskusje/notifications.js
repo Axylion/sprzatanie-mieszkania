@@ -7,17 +7,17 @@
   const empty = document.querySelector("#notification-empty");
   const notice = document.querySelector("#notification-status");
   const readAll = document.querySelector("#notification-read-all");
-  const pushStatus = document.querySelector("#push-status");
-  const pushHelp = document.querySelector("#push-help");
-  const permissionButton = document.querySelector("#push-permission");
-  const choices = [...document.querySelectorAll(".notification-settings input")];
+  const switches = [...document.querySelectorAll("[data-push-category]")];
+  const indicator = document.getElementById("announcements-push-indicator");
+  const chatSwitch = switches.find(button => button.dataset.pushCategory === "messages");
+  const inboxCategories = ["duties", "messages", "announcements"];
+  let confirmed = [];
+  let pushQueue = Promise.resolve();
+  let pushContext = 0;
   const format = new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Warsaw" });
   const localReadKey = "goleszan19-public-notifications-read";
   let snapshot = { items: [], unread: 0 };
   let refreshId = 0;
-  let pushBusy = false;
-  let pushSynced = false;
-  let preferenceQueue = Promise.resolve();
   let tab;
   let lastActivity = Date.now();
   let presence = false;
@@ -28,10 +28,7 @@
   let audio;
   const onChat = () => !document.querySelector("#discussion-view").hidden;
   const active = () => !document.hidden && document.hasFocus() && Date.now() - lastActivity < 120000;
-  const preferenceKey = name => "goleszan19-notification-" + name;
-  const selected = () => choices.filter(input => input.checked).map(input => input.name);
   const tabId = () => tab ||= crypto.randomUUID();
-  choices.forEach(input => { input.checked = localStorage.getItem(preferenceKey(input.name)) === "true"; });
   const token = () => localStorage.getItem(tokenKey);
   const ready = /^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(config?.url) &&
     /^sb_publishable_[A-Za-z0-9_-]+$/.test(config?.publishableKey);
@@ -47,42 +44,6 @@
       throw Object.assign(new Error("RPC failed"), { code: error.message });
     }
     return response.json().catch(() => null);
-  }
-
-  function applyPreferences(categories) {
-    for (const input of choices) {
-      input.checked = categories.includes(input.name);
-      localStorage.setItem(preferenceKey(input.name), String(input.checked));
-    }
-  }
-
-  function syncPreferences(categories) {
-    const key = token();
-    if (!ready || !key) return Promise.resolve();
-    const pendingKey = "goleszan19-pending-preferences";
-    if (categories) localStorage.setItem(pendingKey, JSON.stringify({ device: key, categories }));
-    preferenceQueue = preferenceQueue.catch(() => {}).then(async () => {
-      if (key !== token()) return;
-      const pending = localStorage.getItem(pendingKey);
-      let changes;
-      try {
-        const value = JSON.parse(pending);
-        if (value?.device === key && Array.isArray(value.categories)) changes = value.categories;
-      } catch { /* Invalid local settings can be replaced by server settings. */ }
-      const result = await rpc("notification_preferences", {
-        p_token: key, p_categories: changes ?? null, p_initialize: false
-      });
-      if (key !== token() || pending !== localStorage.getItem(pendingKey)) return;
-      if (pending) localStorage.removeItem(pendingKey);
-      if (result === null) {
-        const defaults = selected();
-        const initialized = await rpc("notification_preferences", {
-          p_token: key, p_categories: defaults, p_initialize: true
-        });
-        if (key === token() && localStorage.getItem(pendingKey) === null) applyPreferences(initialized);
-      } else applyPreferences(result);
-    });
-    return preferenceQueue;
   }
 
   function reportActivity(presented = [], leaving = false) {
@@ -169,7 +130,6 @@
   }
 
   function publicAnnouncements() {
-    if (!selected().includes("announcements")) return [];
     const read = localRead();
     return activeAnnouncements.slice(0, 50).map(item => ({
       id: item.id, title: "Ważne ogłoszenie", description: item.title,
@@ -214,7 +174,7 @@
     try {
       const items = !ready || !key ? publicAnnouncements() : null;
       const result = items ? { items, unread: items.filter(item => !item.read).length }
-        : await rpc("notifications", { p_token: key, p_categories: selected() });
+        : await rpc("notifications", { p_token: key, p_categories: inboxCategories });
       if (id !== refreshId || key !== token()) return;
       const presented = present(result.items, key);
       snapshot = result;
@@ -235,7 +195,7 @@
   async function mark(id) {
     try {
       if (ready && token()) {
-        await rpc("notification_read", { p_token: token(), p_id: id, p_categories: selected() });
+        await rpc("notification_read", { p_token: token(), p_id: id, p_categories: inboxCategories });
       } else {
         const ids = id === null ? snapshot.items.map(item => item.id) : [id];
         localStorage.setItem(localReadKey, JSON.stringify({ ...localRead(), ...Object.fromEntries(ids.map(id => [id, true])) }));
@@ -250,7 +210,7 @@
 
   function scrollToTarget() {
     const target = location.hash.slice(1);
-    if (target === "calendar-title" || target === "powiadomienia" || target.startsWith("ogloszenie-")) {
+    if (target === "calendar-title" || target.startsWith("ogloszenie-")) {
       requestAnimationFrame(() => (document.getElementById(target) ||
         (target.startsWith("ogloszenie-") && document.getElementById("announcements-card")))?.scrollIntoView?.());
     }
@@ -261,139 +221,146 @@
     refresh();
   });
   readAll.addEventListener("click", () => mark(null));
-  document.querySelector("#notification-settings-link").addEventListener("click", () => {
-    panel.close();
-    document.querySelector(".notification-settings").open = true;
-    requestAnimationFrame(scrollToTarget);
-  });
-
   const supported = "Notification" in window && "PushManager" in window && "serviceWorker" in navigator;
   async function subscription() {
     const registration = await navigator.serviceWorker?.getRegistration();
     return registration?.pushManager?.getSubscription();
   }
 
-  function syncPush(value, key) {
+  function syncPush(value, key, categories) {
     const data = value?.toJSON();
     return rpc("push_subscription", {
       p_token: key, p_endpoint: data?.endpoint ?? null, p_p256dh: data?.keys?.p256dh ?? null,
-      p_auth: data?.keys?.auth ?? null, p_categories: selected()
+      p_auth: data?.keys?.auth ?? null, p_categories: categories
     });
   }
 
-  function showPush() {
-    permissionButton.hidden = true;
-    pushHelp.textContent = "";
-    if (!supported) {
-      pushStatus.textContent = "Ta przeglądarka nie obsługuje powiadomień w tle.";
-      pushHelp.textContent = "Na iPhonie dodaj aplikację do ekranu początkowego i otwórz ją z tego ekranu.";
-    } else if (!ready || !config.vapidPublicKey) {
-      pushStatus.textContent = "Powiadomienia w tle czekają na konfigurację.";
-    } else if (!token()) {
-      pushStatus.textContent = "Połącz urządzenie, aby otrzymywać powiadomienia w tle.";
-    } else if (Notification.permission === "denied") {
-      pushStatus.textContent = "Powiadomienia są zablokowane w ustawieniach przeglądarki.";
-      pushHelp.textContent = "Otwórz ustawienia witryny przy pasku adresu, zezwól na powiadomienia i wróć do aplikacji.";
-    } else if (pushBusy) {
-      pushStatus.textContent = "Sprawdzanie powiadomień w tle…";
-    } else if (Notification.permission === "default") {
-      permissionButton.hidden = false;
-      permissionButton.textContent = "Włącz powiadomienia";
-      pushStatus.textContent = "Otrzymuj powiadomienia również wtedy, gdy aplikacja jest zamknięta.";
-    } else if (!selected().length) {
-      pushStatus.textContent = "Wybierz co najmniej jedną kategorię, aby otrzymywać powiadomienia.";
-    } else if (pushSynced) {
-      pushStatus.textContent = "Powiadomienia są aktywne";
-    } else {
-      permissionButton.hidden = false;
-      permissionButton.textContent = "Podłącz ponownie";
-      pushStatus.textContent = "Powiadomienia w tle nie są aktywne na tym urządzeniu.";
+  function showPush(message = "", category) {
+    const permitted = supported && Notification.permission === "granted";
+    const blocked = supported && Notification.permission === "denied";
+    for (const button of switches) {
+      const name = button.dataset.pushCategory;
+      const enabled = permitted && confirmed.includes(name);
+      button.setAttribute("aria-checked", String(enabled));
+      const status = document.getElementById("push-" + name + "-status");
+      status.dataset.enabled = String(enabled);
+      const explanation = blocked
+        ? "Powiadomienia są zablokowane. Zezwól na nie w ustawieniach witryny przy pasku adresu."
+        : !supported
+          ? "Ta przeglądarka nie obsługuje push. Na iPhonie dodaj aplikację do ekranu początkowego."
+          : !token() ? "Połącz urządzenie w Dyskusjach, aby włączyć powiadomienia."
+            : !ready || !config.vapidPublicKey ? "Powiadomienia w tle czekają na konfigurację." : "";
+      const state = name === "announcements"
+        ? enabled ? "Powiadomienia włączone" : "Powiadomienia wyłączone — zalecamy włączenie"
+        : "";
+      status.textContent = [state, category === name && message ? message : explanation].filter(Boolean).join(". ");
     }
+    const announcementActive = permitted && confirmed.includes("announcements");
+    indicator.textContent = announcementActive ? "Powiadomienia włączone" : "Powiadomienia wyłączone";
+    indicator.previousElementSibling.dataset.active = String(announcementActive);
   }
 
-  let pushQueue = Promise.resolve();
-  function updatePush(reconnect = false) {
+  async function registrationForPush() {
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing?.active) return existing;
+    return Promise.race([navigator.serviceWorker.ready, new Promise(resolve => setTimeout(resolve, 4000))]);
+  }
+
+  function readPush(key, current) {
+    if (!current || (current.expirationTime != null && current.expirationTime <= Date.now())) return [];
+    return rpc("push_status", { p_token: key, p_endpoint: current.endpoint }).then(categories => categories || []);
+  }
+
+  function updatePush(category) {
     const key = token();
-    if (!supported || !ready || !config.vapidPublicKey || !key) return;
+    const context = pushContext;
+    if (!supported || !ready || !config.vapidPublicKey || !key) return showPush();
+    const currentContext = () => context === pushContext && key === token();
     pushQueue = pushQueue.catch(() => {}).then(async () => {
-      if (key !== token()) return;
-      pushBusy = true;
-      pushSynced = false;
-      showPush();
+      if (!currentContext()) return;
       let created;
       try {
         let current = await subscription();
-        if (current && (reconnect || (current.expirationTime != null && current.expirationTime <= Date.now()))) {
+        if (Notification.permission !== "granted") {
+          confirmed = [];
+          showPush();
+          return;
+        }
+        const settings = await readPush(key, current);
+        if (!currentContext()) return;
+        confirmed = settings;
+        if (!category) return showPush();
+        const categories = confirmed.includes(category)
+          ? confirmed.filter(name => name !== category)
+          : [...confirmed, category];
+        if (current?.expirationTime != null && current.expirationTime <= Date.now()) {
           await current.unsubscribe();
           current = null;
         }
-        if (Notification.permission === "granted" && selected().length) {
-          if (!current) {
-            let registration = await navigator.serviceWorker.getRegistration();
-            if (!registration?.active) {
-              // Bound the wait on a first visit or when service workers are restricted.
-              registration = await Promise.race([
-                navigator.serviceWorker.ready,
-                new Promise(resolve => setTimeout(resolve, 4000))
-              ]);
-            }
-            if (!registration?.pushManager) throw new Error("Push unavailable");
-            if (key !== token()) return;
-            created = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: config.vapidPublicKey });
-          }
-          if (key !== token()) return;
-          await syncPush(current || created, key);
-          pushSynced = key === token();
-          created = null;
-        } else {
-          await syncPush(null, key);
-          await current?.unsubscribe();
+        if (categories.length && !current) {
+          const registration = await registrationForPush();
+          if (!registration?.pushManager || !currentContext()) throw new Error("Push unavailable");
+          created = await registration.pushManager.subscribe({
+            userVisibleOnly: true, applicationServerKey: config.vapidPublicKey
+          });
         }
-      } catch { /* An unsynchronized subscription is shown as inactive. */ }
-      finally {
+        if (!currentContext()) return;
+        await syncPush(categories.length ? current || created : null, key, categories);
+        if (!currentContext()) return;
+        confirmed = categories;
+        created = null;
+        if (!categories.length) await current?.unsubscribe().catch(() => {});
+      } catch (error) {
+        if (!currentContext()) return;
+        if (!category) confirmed = [];
+        if (error.code === "device_invalid") window.dispatchEvent(new Event("g19-device-revoked"));
+        showPush("Nie udało się zapisać lub sprawdzić subskrypcji. Spróbuj ponownie.", category || "announcements");
+        return;
+      } finally {
         await created?.unsubscribe().catch(() => {});
-        pushBusy = false;
-        showPush();
+      }
+      if (currentContext()) showPush();
+    });
+    return pushQueue;
+  }
+
+  let changingPush = false;
+  for (const button of switches) {
+    button.addEventListener("click", async () => {
+      if (changingPush) return;
+      changingPush = true;
+      try {
+        if (supported && ready && config.vapidPublicKey && token() && Notification.permission === "default") {
+          await Notification.requestPermission().catch(() => {});
+        }
+        if (!supported || Notification.permission !== "granted" || !token()) return showPush();
+        await updatePush(button.dataset.pushCategory);
+      } finally {
+        changingPush = false;
       }
     });
   }
 
-  permissionButton.addEventListener("click", async () => {
-    const reconnect = Notification.permission === "granted";
-    if (Notification.permission === "default") await Notification.requestPermission().catch(() => "denied");
-    updatePush(reconnect);
-    showPush();
-  });
-
-  function applyServerSettings() {
-    return syncPreferences().then(() => { showPush(); updatePush(); });
-  }
-
-  for (const input of choices) {
-    input.addEventListener("change", () => {
-      const categories = selected();
-      applyPreferences(categories);
-      syncPreferences(categories).then(() => { refresh(); updatePush(); }).catch(() => {
-        pushStatus.textContent = "Ustawienia zostaną wysłane po odzyskaniu połączenia.";
-      });
-      showPush();
-    });
-  }
   window.addEventListener("g19-announcements", () => { if (!token()) refresh(); scrollToTarget(); });
   function deviceChanged() {
     refreshId++;
     snapshot = { items: [], unread: 0 };
     baseline = undefined;
     chatSeen = null;
-    pushSynced = false;
+    pushContext++;
+    confirmed = [];
+    chatSwitch.parentElement.hidden = true;
     render();
-    if (!token()) subscription().then(s => s?.unsubscribe()).catch(() => {});
     showPush();
-    applyServerSettings().catch(() => {}).finally(refresh);
+    updatePush();
+    refresh();
     reportActivity().catch(() => {});
   }
   window.addEventListener("g19-device-changed", deviceChanged);
   window.addEventListener("storage", event => { if (event.key === tokenKey || event.key === null) deviceChanged(); });
+  window.addEventListener("g19-chat-connected", () => {
+    chatSwitch.parentElement.hidden = false;
+  });
   window.addEventListener("g19-chat-loaded", event => {
     chatSeen = event.detail;
     if (active()) reportActivity().then(refresh).catch(() => {});
@@ -405,7 +372,8 @@
   });
   window.addEventListener("online", () => {
     reportActivity().catch(() => {});
-    applyServerSettings().catch(() => {}).finally(refresh);
+    updatePush();
+    refresh();
   });
   function foregroundChanged() {
     if (!document.hidden && document.hasFocus()) {
@@ -417,7 +385,7 @@
       foregroundSince = Date.now();
     }
     reportActivity().catch(() => {});
-    if (!document.hidden) applyServerSettings().catch(() => {}).finally(refresh);
+    if (!document.hidden) { updatePush(); refresh(); }
   }
   navigator.serviceWorker?.addEventListener("controllerchange", () => updatePush());
   window.addEventListener("focus", foregroundChanged);
@@ -442,7 +410,7 @@
   }
   setInterval(() => {
     if (token() && (active() || presence)) reportActivity().catch(() => {});
-    if (!document.hidden && document.hasFocus() && token()) syncPreferences().catch(() => {}).finally(refresh);
+    if (!document.hidden && document.hasFocus() && token()) refresh();
   }, 15000);
   deviceChanged();
 })();

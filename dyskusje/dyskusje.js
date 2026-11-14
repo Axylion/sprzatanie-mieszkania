@@ -14,6 +14,7 @@
   const pairRenew = document.getElementById("discussion-pair-renew");
   const pairBack = document.getElementById("discussion-pair-back");
   const approvalDetails = document.getElementById("discussion-approve");
+  const connectionStatus = document.getElementById("device-connection-status");
   const deviceConnect = document.getElementById("device-connect");
   const deviceSettings = document.getElementById("device-settings");
   const deviceList = document.getElementById("device-list");
@@ -120,6 +121,8 @@
     clearHistory();
     chat.hidden = join.hidden = pairPanel.hidden = true;
     deviceSettings.hidden = true;
+    connectionStatus.textContent = "To urządzenie zostało odłączone.";
+    connectionStatus.hidden = false;
     deviceList.replaceChildren();
     deviceConfirm.hidden = true;
     deviceConnect.hidden = !configured;
@@ -228,6 +231,7 @@
       if (refreshError || chat.hidden) status.textContent = "";
       refreshError = false;
       chat.hidden = false;
+      window.dispatchEvent(new Event("g19-chat-connected"));
       join.hidden = pairPanel.hidden = true;
       if (data.room) rememberRoom(data.room);
       updateDeviceCount(data.deviceCount);
@@ -338,6 +342,8 @@
     localStorage.removeItem(enrollmentKey);
     finishPairing();
     token = data.token;
+    connectionStatus.textContent = "";
+    connectionStatus.hidden = true;
     window.dispatchEvent(new Event("g19-device-changed"));
     rpc("my_devices", { p_token: token, p_kind: deviceKind(), p_browser: browserProof }).catch(() => {});
     rememberRoom(data.room);
@@ -720,6 +726,10 @@
       const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind(), p_browser: browserProof });
       if (token !== usedToken || document.getElementById("harmonogram").hidden) return;
       updateDeviceCount(devices.length);
+      if (devices.some(device => device.current)) {
+        connectionStatus.textContent = "";
+        connectionStatus.hidden = true;
+      }
       const rows = devices.map(device => {
         const row = deviceRow(device.kind, true, device.current);
         const button = document.createElement("button");
@@ -776,10 +786,6 @@
       if (current && token === usedToken) {
         showRevoked();
         status.textContent = "";
-        const notice = document.createElement("p");
-        notice.setAttribute("role", "status");
-        notice.textContent = "To urządzenie zostało odłączone.";
-        deviceSettings.after(notice);
         document.getElementById("settings-title").focus();
         return;
       }

@@ -11,7 +11,11 @@
   const confirmAction = document.getElementById("admin-confirm-action");
   const configured = /^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(config?.url) &&
     /^sb_publishable_[A-Za-z0-9_-]+$/.test(config?.publishableKey) && Boolean(config.adminEmail);
+  // Keep only the short-lived access token in this tab. The server still
+  // checks the session and administrator role before any data is displayed.
+  const sessionKey = "goleszan19-admin-session:" + config?.url?.replace(/\/$/, "");
   let session;
+  let deadline = 0;
   let expires;
   let busy = false;
   let chosen;
@@ -36,8 +40,30 @@
 
   passwordField.addEventListener("input", updateSubmit);
 
+  function useSession(token, expiresAt) {
+    if (typeof token !== "string" || !token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      throw new Error("Session unavailable");
+    }
+    session = token;
+    deadline = expiresAt;
+    clearTimeout(expires);
+    expires = setTimeout(() => endSession("Sesja wygasła. Zaloguj się ponownie."), expiresAt - Date.now());
+  }
+
+  function restoreSession() {
+    if (!configured) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(sessionKey));
+      if (saved) useSession(saved.token, saved.deadline);
+    } catch {
+      endSession("Zaloguj się ponownie.");
+    }
+  }
+
   function endSession(message = "") {
     session = chosen = pending = null;
+    deadline = 0;
+    try { sessionStorage.removeItem(sessionKey); } catch { /* Storage can be unavailable. */ }
     clearTimeout(expires);
     if (confirm.open) confirm.close();
     list.replaceChildren();
@@ -256,9 +282,15 @@
 
   async function refresh() {
     const expected = session;
+    if (!expected || deadline <= Date.now()) {
+      endSession("Sesja wygasła. Zaloguj się ponownie.");
+      return false;
+    }
     try {
       const rooms = await rpc("rooms");
       if (session !== expected) return false;
+      try { sessionStorage.setItem(sessionKey, JSON.stringify({ token: expected, deadline })); }
+      catch { /* Login still works when the browser disables storage. */ }
       form.hidden = true;
       panel.hidden = false;
       render(rooms);
@@ -266,7 +298,16 @@
     } catch (error) {
       if (session !== expected) return false;
       if ([401, 403].includes(error.status)) endSession("Zaloguj się ponownie.");
-      else status.textContent = "Nie udało się odczytać pokoi. Spróbuj ponownie.";
+      else {
+        status.textContent = "Nie udało się odczytać pokoi. Spróbuj ponownie.";
+        if (panel.hidden) {
+          const retry = action("Spróbuj ponownie", () => {
+            status.textContent = "";
+            refresh();
+          });
+          status.append(" ", retry);
+        }
+      }
       return false;
     }
   }
@@ -280,10 +321,10 @@
     form.reset();
     try {
       const auth = await request("/auth/v1/token?grant_type=password", { email: config.adminEmail, password }, null);
-      session = auth.access_token;
-      const duration = Math.min(Number(auth.expires_in), 3600) * 1000;
-      if (!session || !Number.isFinite(duration) || duration <= 0) throw new Error("Session unavailable");
-      expires = setTimeout(() => endSession("Sesja wygasła. Zaloguj się ponownie."), duration);
+      const now = Date.now();
+      const limits = [now + Math.min(Number(auth.expires_in), 3600) * 1000];
+      if (Number.isFinite(auth.expires_at)) limits.push(auth.expires_at * 1000);
+      useSession(auth.access_token, Math.min(...limits));
       status.textContent = "";
       if (await refresh() && !view.hidden) document.getElementById("admin-title").focus();
     } catch (error) {
@@ -340,6 +381,7 @@
       if (!form.hidden) document.getElementById("admin-login-title").focus({ preventScroll: true });
     }
   }
+  restoreSession();
   window.addEventListener("hashchange", open);
   open();
 })();

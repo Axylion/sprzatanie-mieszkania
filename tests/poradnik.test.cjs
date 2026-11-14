@@ -8,7 +8,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 async function setTheme(page, theme) {
   await page.locator('#theme-toggle').click();
-  await page.locator('#theme-menu input[value="' + theme + '"]').click();
+  await page.locator('#theme-menu label:has(input[value="' + theme + '"])').click();
 }
 
 const prefix = '/sprzatanie-mieszkania/';

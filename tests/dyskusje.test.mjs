@@ -11,7 +11,7 @@ const { PGlite } = await import(process.env.G19_PGLITE || '@electric-sql/pglite'
 const root = fileURLToPath(new URL('../', import.meta.url));
 async function setTheme(page, theme) {
   await page.locator('#theme-toggle').click();
-  await page.locator('#theme-menu input[value="' + theme + '"]').click();
+  await page.locator('#theme-menu label:has(input[value="' + theme + '"])').click();
 }
 
 const migration = await readFile(new URL('../supabase/migrations/202611130001_dyskusje.sql', import.meta.url), 'utf8');
@@ -690,18 +690,22 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await newcomer.locator('#discussion-compose').waitFor();
   const operator = await device(320);
   let loggedOut = false;
+  let signIns = 0;
+  let adminAuthorized = true;
   let released = false;
   await operator.context().route('https://g19test.supabase.co/auth/v1/**', async route => {
     if (route.request().url().includes('logout')) {
       loggedOut = true;
       return route.fulfill({ status: 204 });
     }
+    signIns++;
     const { password } = route.request().postDataJSON();
     if (password !== 'only-a-test-fixture') return route.fulfill({ status: 400, json: {} });
     return route.fulfill({ json: { access_token: 'fixture-session', expires_in: 3600 } });
   });
   await operator.context().route('https://g19test.supabase.co/rest/v1/rpc/g19_web_admin_*', async route => {
     assert.equal(route.request().headers().authorization, 'Bearer fixture-session');
+    if (!adminAuthorized) return route.fulfill({ status: 403, json: {} });
     if (route.request().url().endsWith('_release')) {
       const args = route.request().postDataJSON();
       assert.equal(args.p_room, 1);
@@ -771,6 +775,15 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await operator.getByLabel('Hasło').fill('only-a-test-fixture');
   await operator.getByRole('button', { name: 'Zaloguj się' }).click();
   await operator.getByRole('button', { name: /Pokój nr 4/ }).waitFor();
+  const storageKey = 'goleszan19-admin-session:https://g19test.supabase.co';
+  const savedSession = await operator.evaluate(key => JSON.parse(sessionStorage.getItem(key)), storageKey);
+  assert.deepEqual(Object.keys(savedSession).sort(), ['deadline', 'token']);
+  assert.ok(savedSession.deadline > Date.now());
+  await operator.reload();
+  await operator.getByRole('button', { name: /Pokój nr 4/ }).waitFor();
+  assert.equal(signIns, 2);
+  assert.equal(await login.isVisible(), false);
+  assert.deepEqual(await operator.evaluate(key => JSON.parse(sessionStorage.getItem(key)), storageKey), savedSession);
   assert.equal(await operator.locator('.admin-room').count(), 4);
   assert.ok(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await operator.getByRole('button', { name: /Pokój nr 4/ }).click();
@@ -811,6 +824,21 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await operator.getByRole('button', { name: 'Wyloguj' }).click();
   await operator.getByLabel('Hasło').waitFor();
   await operator.waitForFunction(() => !document.querySelector('#admin-login').hidden);
+  await operator.reload();
+  await operator.getByLabel('Hasło').waitFor();
+  assert.equal(await operator.evaluate(key => sessionStorage.getItem(key), storageKey), null);
+  assert.equal(signIns, 2);
+  await operator.evaluate(({key, saved}) => {
+    sessionStorage.setItem(key, JSON.stringify({ ...saved, deadline: Date.now() - 1 }));
+  }, {key: storageKey, saved: savedSession});
+  await operator.reload();
+  await operator.getByLabel('Hasło').waitFor();
+  assert.equal(await operator.evaluate(key => sessionStorage.getItem(key), storageKey), null);
+  adminAuthorized = false;
+  await operator.evaluate(({key, saved}) => sessionStorage.setItem(key, JSON.stringify(saved)), {key:storageKey, saved:savedSession});
+  await operator.reload();
+  await operator.getByText('Zaloguj się ponownie.', {exact:true}).waitFor();
+  assert.equal(await operator.evaluate(key => sessionStorage.getItem(key), storageKey), null);
   assert.ok(loggedOut);
   // Fill a page with fixtures and check that automatic refresh preserves the reader's place.
   await db.exec(`

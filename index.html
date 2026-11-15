@@ -9,6 +9,7 @@
   <meta name="theme-color" content="#f6f7fb" id="theme-color">
   <title>Goleszan 19</title>
   <script>
+    let appAtRoot = false;
     // Pages serves the same document for unknown paths. Resolve assets from the
     // application root and replace directory URLs with the existing hash routes.
     (() => {
@@ -16,10 +17,8 @@
       const projectRoot = "/sprzatanie-mieszkania";
       const root = url.pathname === projectRoot || url.pathname.startsWith(projectRoot + "/")
         ? projectRoot + "/" : "/";
-      if (url.pathname === root || url.pathname === root + "index.html") return;
-      const base = document.createElement("base");
-      base.href = root;
-      document.head.append(base);
+      appAtRoot = url.pathname === root || url.pathname === root + "index.html";
+      if (appAtRoot) return;
       const route = url.pathname.slice(root.length).replace(/\/$/, "");
       if (!url.hash && ["administracja", "dyskusje", "poradnik", "harmonogram", "calendar-title"].includes(route)) {
         url.hash = route;
@@ -28,9 +27,15 @@
       location.replace(url);
     })();
   </script>
+  <template>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">
+  </template>
+  <script>
+    // Keep URLs out of the speculative preload scanner on redirecting documents.
+    if (appAtRoot) document.write(document.currentScript.previousElementSibling.innerHTML);
+  </script>
 
   <script>
     // Zastosuj motyw przed wyświetleniem strony.
@@ -348,6 +353,7 @@
       main { padding-top: 25px; }
     }
   </style>
+  <template>
   <link rel="stylesheet" href="./poradnik/poradnik.css">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js"></script>
@@ -358,6 +364,11 @@
   <script defer src="./ogloszenia/content.js"></script>
   <script defer src="./administracja/announcements.js"></script>
   <script defer src="./administracja/admin.js"></script>
+  </template>
+  <script>
+    // Keep URLs out of the speculative preload scanner on redirecting documents.
+    if (appAtRoot) document.write(document.currentScript.previousElementSibling.innerHTML);
+  </script>
 </head>
 
 <body>
@@ -1269,7 +1280,7 @@
     if (event.target === shortcutHelp) shortcutHelp.close();
   });
 
-  if ("serviceWorker" in navigator) {
+  if (appAtRoot && "serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {
         // Serwis pozostaje dostępny w przeglądarce bez trybu offline.

@@ -26,7 +26,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-8-2 to v13-8-3 update under the GitHub Pages subpath', async () => {
+test('PWA v13-8-3 to v13-8-4 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -49,7 +49,7 @@ test('PWA v13-8-2 to v13-8-3 update under the GitHub Pages subpath', async () =>
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-8-3', 'shell-v13-8-2')
+      ? contents.toString().replace('shell-v13-8-4', 'shell-v13-8-3')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -91,14 +91,14 @@ test('PWA v13-8-2 to v13-8-3 update under the GitHub Pages subpath', async () =>
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-8-2');
+      const cache = await caches.open('goleszan19-shell-v13-8-3');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-8-3') && !keys.includes('goleszan19-shell-v13-8-2');
+      return keys.includes('goleszan19-shell-v13-8-4') && !keys.includes('goleszan19-shell-v13-8-3');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
@@ -138,6 +138,44 @@ test('PWA v13-8-2 to v13-8-3 update under the GitHub Pages subpath', async () =>
       assert.deepEqual(await page.locator('.dashboard-links svg').evaluateAll(icons=>icons.map(icon=>icon.getBoundingClientRect().width)),[24,24]);
       assert.equal(await page.locator('#calendar-days').evaluate(element=>getComputedStyle(element).display),'grid');
     }
+    const shadow = locator => locator.evaluate(element => getComputedStyle(element).boxShadow);
+    async function checkTextLink(selector) {
+      const link = page.locator(selector).first();
+      await link.hover();
+      assert.equal(await shadow(link), 'none', selector);
+      assert.match(await link.evaluate(element => getComputedStyle(element).textDecorationLine), /underline/);
+      await page.keyboard.press('Tab');
+      await link.focus();
+      assert.equal(await link.evaluate(element => element.matches(':focus-visible')), true, selector);
+      assert.notEqual(await link.evaluate(element => getComputedStyle(element).outlineStyle), 'none', selector);
+    }
+    async function checkControl(selector) {
+      const control = page.locator(selector).first();
+      await page.mouse.move(0,0);
+      const before = await shadow(control);
+      await control.hover();
+      assert.notEqual(await shadow(control), before, selector);
+    }
+    for (const width of [390,1280]) {
+      await page.setViewportSize({width,height:850});
+      for (const theme of ['light','dark']) {
+        await page.goto(appUrl + '#harmonogram');
+        await setTheme(page, theme);
+        await checkControl('.brand-icon');
+        await checkControl('#theme-toggle');
+        await checkControl('.dashboard-links .guide-entry');
+        await checkControl('#calendar-days button:not(:disabled)');
+        await checkTextLink('footer #admin-link');
+        await page.goto(appUrl + '#dyskusje');
+        await checkTextLink('#discussion-view .guide-home-link');
+        await page.goto(appUrl + '#poradnik');
+        await checkTextLink('#poradnik-view .guide-home-link');
+        await checkControl('#poradnik-view .guide-categories a[aria-current]');
+        await page.goto(appUrl + '#administracja');
+        await checkTextLink('#admin-view .guide-home-link');
+      }
+    }
+    await page.goto(appUrl + '#harmonogram');
     assert.deepEqual(mimeErrors, []);
     await page.locator('.announcement-entry').first().waitFor();
     await page.locator('.announcement-dismiss').click();
@@ -372,7 +410,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-8-3');
+      const c = await caches.open('goleszan19-shell-v13-8-4');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

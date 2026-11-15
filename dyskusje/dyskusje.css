@@ -694,8 +694,13 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 :root { --control-hover: rgb(0 117 124 / 43%); }
 :root[data-theme="dark"] { --control-hover: rgb(107 228 236 / 59%); }
 @media (hover: hover) and (pointer: fine) {
-  :is(button:not(:disabled), summary, select:not(:disabled), a[href], #theme-menu label):hover {
+  :is(button:not(:disabled), summary, select:not(:disabled), #theme-menu label):hover,
+  a:where(.brand-icon, .guide-entry, .guide-categories a, #notification-list a):hover {
     box-shadow: inset 0 0 0 1px var(--control-hover), 0 0 8px var(--control-hover);
+  }
+  a[href]:not(:where(.brand-icon, .guide-entry, .guide-categories a, #notification-list a)):hover {
+    text-decoration-line: underline;
+    text-underline-offset: .16em;
   }
 }
 :where(button:not(:disabled), summary, select:not(:disabled), a[href]):focus-visible {

@@ -8,6 +8,26 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7fb" id="theme-color">
   <title>Goleszan 19</title>
+  <script>
+    // Pages serves the same document for unknown paths. Resolve assets from the
+    // application root and replace directory URLs with the existing hash routes.
+    (() => {
+      const url = new URL(location.href);
+      const projectRoot = "/sprzatanie-mieszkania";
+      const root = url.pathname === projectRoot || url.pathname.startsWith(projectRoot + "/")
+        ? projectRoot + "/" : "/";
+      if (url.pathname === root || url.pathname === root + "index.html") return;
+      const base = document.createElement("base");
+      base.href = root;
+      document.head.append(base);
+      const route = url.pathname.slice(root.length).replace(/\/$/, "");
+      if (!url.hash && ["administracja", "dyskusje", "poradnik", "harmonogram", "calendar-title"].includes(route)) {
+        url.hash = route;
+      }
+      url.pathname = root;
+      location.replace(url);
+    })();
+  </script>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="apple-touch-icon" href="./icon-192.png">
   <link rel="manifest" href="./manifest.webmanifest">

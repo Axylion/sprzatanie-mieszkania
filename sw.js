@@ -1,5 +1,5 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v13-6";
+const CACHE_NAME = "goleszan19-shell-v13-7";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
   "./dyskusje/notifications.js", "./administracja/admin.js",
@@ -90,18 +90,28 @@ self.addEventListener("push", event => {
   let data;
   try { data = event.data?.json(); } catch { return; }
   if (!data || !/^[0-9]+$/.test(data.id) || !/^#(dyskusje|calendar-title|ogloszenie-.+)$/.test(data.target)) return;
-  const titles = { messages: "Nowa wiadomość", announcements: "Ważne ogłoszenie", duties: "Twój dyżur sprzątania" };
+  const titles = { messages: "Nowa wiadomość", announcements: "Ważne ogłoszenie", duties: "Przypomnienie o sprzątaniu" };
   if (!Object.hasOwn(titles, data.category)) return;
   const message = data.category === "messages";
   const preview = message && [1, 2, 3, 4].includes(data.room) &&
     typeof data.preview === "string" && data.preview.length <= 401 && data.preview.trim();
-  const title = message ? "Goleszan 19 · Nowa wiadomość" : titles[data.category];
+  const announcementTitle = data.category === "announcements" && notificationText(data.title);
+  const title = message ? "Goleszan 19 · Nowa wiadomość" : announcementTitle || titles[data.category];
+  const body = message
+    ? (preview ? "Pokój nr " + data.room + ": " + preview : "Otwórz Goleszan 19.")
+    : notificationText(data.body) || (data.category === "duties"
+      ? "Sprawdź harmonogram sprzątania."
+      : "Otwórz ogłoszenie w Goleszan 19.");
   event.waitUntil(self.registration.showNotification(title, {
-    body: preview ? "Pokój nr " + data.room + ": " + preview : "Otwórz Goleszan 19.", tag: "g19-" + data.id, renotify: false,
+    body, tag: "g19-" + data.id, renotify: false,
     icon: new URL("icon-192.png", self.registration.scope).href,
     data: { target: data.target }
   }));
 });
+
+function notificationText(value) {
+  return typeof value === "string" && value.length <= 401 ? value.trim() : "";
+}
 
 self.addEventListener("notificationclick", event => {
   event.notification.close();

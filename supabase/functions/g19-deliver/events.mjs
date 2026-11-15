@@ -46,7 +46,8 @@ export function announcementsForInbox(items) {
     if (typeof item?.id !== "string" || !item.id || typeof item.title !== "string" ||
         typeof item.body !== "string" || !Number.isFinite(published) ||
         (expires !== null && !Number.isFinite(expires))) return [];
-    return [{ id: item.id, title: item.title, published: new Date(published).toISOString(),
+    return [{ id: item.id, title: item.title, summary: announcementText(item.body, 160),
+      published: new Date(published).toISOString(),
       expires: expires === null ? null : new Date(expires).toISOString() }];
   });
 }
@@ -58,9 +59,51 @@ export function deliveryOutcome(status) {
 }
 
 const graphemes = new Intl.Segmenter("pl", { granularity: "grapheme" });
+const polishDate = new Intl.DateTimeFormat("pl-PL", {
+  day: "numeric", month: "long", year: "numeric", timeZone: "UTC"
+});
+
+function announcementText(value, limit) {
+  const text = typeof value === "string" ? value.replace(/\s+/gu, " ").trim() : "";
+  let clipped = "";
+  let count = 0;
+  for (const { segment, index } of graphemes.segment(text)) {
+    if (count >= limit || clipped.length + segment.length > 400) {
+      if (!clipped) return "";
+      const boundary = clipped.lastIndexOf(" ");
+      if (text[index] !== " " && !clipped.endsWith(" ") && boundary > 0) {
+        clipped = clipped.slice(0, boundary);
+      }
+      return clipped.trimEnd() + "…";
+    }
+    clipped += segment;
+    count++;
+  }
+  return clipped;
+}
+
+function dutyText(value) {
+  // The persisted key is a Warsaw calendar date. Use UTC for calendar arithmetic.
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const saturday = new Date(value + "T00:00:00Z");
+  if (saturday.getUTCDay() !== 6 || !saturday.toISOString().startsWith(value + "T")) return null;
+  const sunday = new Date(saturday);
+  sunday.setUTCDate(sunday.getUTCDate() + 1);
+  const period = saturday.getUTCMonth() === sunday.getUTCMonth()
+    ? saturday.getUTCDate() + "–" + polishDate.format(sunday)
+    : polishDate.format(saturday) + " – " + polishDate.format(sunday);
+  return "Twój dyżur: " + period + " (sobota–niedziela).";
+}
 
 export function pushPayload(item) {
   const payload = { id: item.id, category: item.category, target: item.target };
+  if (item.category === "duties") {
+    return { ...payload, body: dutyText(item.duty_saturday) || "Sprawdź harmonogram sprzątania." };
+  }
+  if (item.category === "announcements") {
+    return { ...payload, title: announcementText(item.announcement_title, 100),
+      body: announcementText(item.announcement_summary, 160) };
+  }
   if (item.category !== "messages" || ![1, 2, 3, 4].includes(item.room) || typeof item.message !== "string") {
     return payload;
   }

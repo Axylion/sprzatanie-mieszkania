@@ -24,7 +24,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-5 to v13-6 update under the GitHub Pages subpath', async () => {
+test('PWA v13-6 to v13-7 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -37,12 +37,12 @@ test('PWA v13-5 to v13-6 update under the GitHub Pages subpath', async () => {
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-6', 'shell-v13-5')
+      ? contents.toString().replace('shell-v13-7', 'shell-v13-6')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
-  const context = await browser.newContext();
+  const context = await browser.newContext({viewport:{width:390,height:750}});
   const page = await context.newPage();
   await page.clock.install({time:new Date('2026-11-04T12:00:00Z')});
   try {
@@ -50,18 +50,30 @@ test('PWA v13-5 to v13-6 update under the GitHub Pages subpath', async () => {
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-5');
+      const cache = await caches.open('goleszan19-shell-v13-6');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-6') && !keys.includes('goleszan19-shell-v13-5');
+      return keys.includes('goleszan19-shell-v13-7') && !keys.includes('goleszan19-shell-v13-6');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), JSON.parse(fs.readFileSync(path.join(root,'announcements.json'),'utf8')));
+    const appUrl = `http://127.0.0.1:${server.address().port}${prefix}`;
+    await page.goto(appUrl + '#calendar-title');
+    await page.waitForFunction(() => {
+      const target = document.getElementById('calendar-title').getBoundingClientRect();
+      return location.hash === '#calendar-title' && scrollY > 0 && target.top >= 0 && target.bottom <= innerHeight;
+    });
+    const announcementId = await page.locator('.announcement-entry').first().getAttribute('id');
+    await page.goto(appUrl + '#' + announcementId);
+    await page.waitForFunction(id => {
+      const target = document.getElementById(id)?.getBoundingClientRect();
+      return location.hash === '#' + id && target && target.top >= 0 && target.top < innerHeight;
+    }, announcementId);
     await page.locator('.announcement-dismiss').click();
     await page.reload({waitUntil:"domcontentloaded"});
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
@@ -288,7 +300,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-6');
+      const c = await caches.open('goleszan19-shell-v13-7');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), data);

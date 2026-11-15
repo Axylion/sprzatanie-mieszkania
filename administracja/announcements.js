@@ -19,6 +19,16 @@
   const content = window.g19AnnouncementContent;
   const bodyPreview = preview.querySelector(".announcement-body");
   const dateInput = form.elements.endsOn;
+  const dateOpen = document.getElementById("announcement-date-open");
+  const dateClear = document.getElementById("announcement-date-clear");
+  const dateDialog = document.getElementById("announcement-date-dialog");
+  const dateDays = document.getElementById("announcement-date-days");
+  const dateMonth = document.getElementById("announcement-date-month");
+  const dateNavigation = [...dateDialog.querySelectorAll("[data-step]")];
+  const monthFormatter = new Intl.DateTimeFormat("pl-PL", {month:"long", year:"numeric", timeZone:"UTC"});
+  const publishDialog = document.getElementById("announcement-publish-dialog");
+  const publishButton = document.getElementById("announcement-publish");
+  let cursor;
   const titleInput = form.elements.title;
   let items = [];
   let selectedStatus = "all";
@@ -119,6 +129,8 @@
   }
 
   function showList() {
+    if (publishDialog.open) publishDialog.close();
+    if (dateDialog.open) dateDialog.close();
     form.hidden = true;
     listView.hidden = false;
     current = null;
@@ -126,6 +138,8 @@
     savedRange = null;
     initial = "";
     form.reset();
+    dateInput.value = "";
+    dateOpen.textContent = "Wybierz datę";
     editor.replaceChildren();
     bodyPreview.replaceChildren();
     preview.querySelector("h3").textContent = "";
@@ -133,13 +147,90 @@
     expiryPreview.textContent = "";
   }
 
+  function warsawToday(now = new Date()) {
+    const parts = Object.fromEntries(warsawCalendar.formatToParts(now).map(part => [part.type, part.value]));
+    return new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), 12));
+  }
+
+  function moveDays(date, offset) {
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + offset, 12));
+  }
+
+  function moveMonths(date, offset) {
+    const year = date.getUTCFullYear(), month = date.getUTCMonth() + offset;
+    const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    return new Date(Date.UTC(year, month, Math.min(date.getUTCDate(), last), 12));
+  }
+
+  function drawDates(focusDay = false) {
+    const today = warsawToday(), last = moveDays(today, 3650);
+    cursor = new Date(Math.max(+today, Math.min(+last, +cursor)));
+    const year = cursor.getUTCFullYear(), month = cursor.getUTCMonth();
+    const first = new Date(Date.UTC(year, month, 1, 12));
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const padding = (first.getUTCDay() + 6) % 7;
+    dateMonth.textContent = monthFormatter.format(cursor);
+    for (const control of dateNavigation) {
+      const target = moveMonths(first, Number(control.dataset.step));
+      control.disabled = moveMonths(target, 1) <= today || target > last;
+    }
+    dateDays.replaceChildren(...Array.from({length: padding}, () => document.createElement("span")));
+    for (let day = 1; day <= lastDay; day++) {
+      const date = new Date(Date.UTC(year, month, day, 12));
+      const key = date.toISOString().slice(0, 10);
+      const control = button(String(day), () => {
+        if (date < warsawToday()) { drawDates(true); return; }
+        dateInput.value = key;
+        previewContent();
+        dateDialog.close();
+      });
+      control.disabled = date < today || date > last;
+      control.tabIndex = +date === +cursor ? 0 : -1;
+      control.setAttribute("aria-label", dayFormatter.format(date));
+      control.setAttribute("aria-pressed", String(key === dateInput.value));
+      if (+date === +today) control.setAttribute("aria-current", "date");
+      dateDays.append(control);
+    }
+    if (focusDay) dateDays.querySelector('[tabindex="0"]').focus();
+  }
+
+  dateOpen.addEventListener("click", () => {
+    cursor = dateInput.value ? new Date(dateInput.value + "T12:00:00Z") : warsawToday();
+    dateDialog.showModal();
+    drawDates(true);
+  });
+  dateClear.addEventListener("click", () => {
+    dateInput.value = "";
+    previewContent();
+    dateOpen.focus();
+  });
+  dateDialog.addEventListener("close", () => { if (!form.hidden) dateOpen.focus(); });
+  for (const control of dateNavigation) control.addEventListener("click", () => {
+    const step = Number(control.dataset.step);
+    cursor = moveMonths(cursor, step);
+    drawDates();
+    if (control.disabled) dateDays.querySelector('[tabindex="0"]').focus();
+  });
+  dateDays.addEventListener("keydown", event => {
+    const offsets = {ArrowLeft:-1, ArrowRight:1, ArrowUp:-7, ArrowDown:7,
+      Home:-((cursor.getUTCDay() + 6) % 7), End:6 - ((cursor.getUTCDay() + 6) % 7)};
+    if (event.key in offsets) cursor = moveDays(cursor, offsets[event.key]);
+    else if (event.key === "PageUp" || event.key === "PageDown") {
+      cursor = moveMonths(cursor, (event.key === "PageUp" ? -1 : 1) * (event.shiftKey ? 12 : 1));
+    } else return;
+    event.preventDefault();
+    drawDates(true);
+  });
+
   function previewContent() {
     preview.querySelector("h3").textContent = titleInput.value.trim() || "Tytuł ogłoszenia";
     const now = new Date();
-    preview.querySelector(".announcement-date").textContent = "Opublikowano: " +
-      dayFormatter.format(current?.publishedAt ? new Date(current.publishedAt) : now);
-    const parts = Object.fromEntries(warsawCalendar.formatToParts(now).map(part => [part.type, part.value]));
-    const defaultDay = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + 30, 12));
+    preview.querySelector(".announcement-date").textContent = current?.publishedAt
+      ? "Opublikowano: " + dayFormatter.format(new Date(current.publishedAt))
+      : "Podgląd — nieopublikowane";
+    const defaultDay = moveDays(warsawToday(now), 30);
+    dateOpen.textContent = dateInput.value ? dayFormatter.format(new Date(dateInput.value + "T12:00:00Z")) : "Wybierz datę";
+    dateClear.disabled = dateOpen.disabled || Boolean(current?.publishedAt) || !dateInput.value;
     expiryPreview.textContent = dateInput.value ? "Koniec publikacji: " + dayFormatter.format(new Date(dateInput.value + "T12:00:00Z"))
       : current?.expiresAt ? "Koniec publikacji: " + formatter.format(new Date(current.expiresAt))
       : !current?.publishedAt ? "Przy publikacji dziś: " + dayFormatter.format(defaultDay) : "";
@@ -154,7 +245,7 @@
     dateInput.value = item?.endsOn || "";
     content.render(editor, item?.content || []);
     const draft = !item || item.status === "draft";
-    dateInput.disabled = Boolean(item && ["expired", "withdrawn"].includes(item.status));
+    dateOpen.disabled = Boolean(item && ["expired", "withdrawn"].includes(item.status));
     document.getElementById("announcement-save-draft").hidden = !draft;
     document.getElementById("announcement-publish").hidden = !draft;
     document.getElementById("announcement-save-changes").hidden = draft;
@@ -192,7 +283,7 @@
       editor.focus();
       return;
     }
-    if (publish && !window.confirm("Opublikować ogłoszenie i wysłać powiadomienie subskrybentom?")) return;
+
     const value = data();
     save("save_announcement", { p_id: draftId, p_revision: current?.revision || null,
       p_title: value.title, p_content: value.content, p_ends_on: value.endsOn, p_publish: publish },
@@ -205,7 +296,19 @@
   document.getElementById("announcement-cancel").addEventListener("click", () => { if (canLeave()) showList(); });
   document.getElementById("announcement-save-draft").addEventListener("click", () => saveForm(false));
   document.getElementById("announcement-save-changes").addEventListener("click", () => saveForm(false));
-  document.getElementById("announcement-publish").addEventListener("click", () => saveForm(true));
+  publishButton.addEventListener("click", () => {
+    if (busy || publishDialog.open || !form.reportValidity()) return;
+    if (!editor.textContent.trim()) { saveForm(true); return; }
+    publishDialog.showModal();
+  });
+  publishDialog.querySelector("[data-cancel]").addEventListener("click", () => publishDialog.close());
+  publishDialog.querySelector("form").addEventListener("submit", event => {
+    event.preventDefault();
+    if (!publishDialog.open || busy) return;
+    publishDialog.close();
+    saveForm(true);
+  });
+  publishDialog.addEventListener("close", () => { if (!form.hidden && !busy) publishButton.focus(); });
   filter.addEventListener("click", event => {
     const key = event.target.closest("[data-filter]")?.dataset.filter;
     if (!key) return;
@@ -292,14 +395,14 @@
       control.setAttribute("aria-pressed", String((control.dataset.section === "announcements") === announcements));
     }
     if (announcements) refresh();
-    document.getElementById("admin-panel").setAttribute("aria-labelledby", announcements ? "admin-announcements-title" : "admin-title");
+    document.getElementById("admin-title").textContent = announcements ? "Ważne ogłoszenia" : "Zarządzanie pokojami";
   }
   nav.addEventListener("click", event => {
     if (!event.target.dataset.section) return;
     const openAnnouncements = event.target.dataset.section === "announcements";
     activate(openAnnouncements);
     if (openAnnouncements === !section.hidden) {
-      document.getElementById(openAnnouncements ? "admin-announcements-title" : "admin-title").focus();
+      document.getElementById("admin-title").focus();
     }
   });
   window.addEventListener("beforeunload", event => {

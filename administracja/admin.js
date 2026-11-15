@@ -379,7 +379,7 @@
     }
     if (session) {
       refresh().then(loaded => {
-        if (loaded && !view.hidden) document.getElementById(announcements.isOpen() ? "admin-announcements-title" : "admin-title").focus({ preventScroll: true });
+        if (loaded && !view.hidden) document.getElementById("admin-title").focus({ preventScroll: true });
       });
     } else {
       endSession(configured ? "" : "Panel wymaga konfiguracji administratora.");

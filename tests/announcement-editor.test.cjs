@@ -113,9 +113,59 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await list.getByText('Szkic',{exact:true}).waitFor();
   assert.ok(!record.publishedAt);
   await list.getByRole('button',{name:'Edytuj'}).click();
-  page.once('dialog',dialog=>dialog.accept());
-  await page.getByRole('button',{name:'Opublikuj',exact:true}).click();
+  const publish = page.getByRole('button',{name:'Opublikuj',exact:true});
+  const confirmation = page.getByRole('dialog',{name:'Opublikować ogłoszenie?'});
+  for (const theme of ['light', 'dark']) {
+    await page.locator('#theme-toggle').click();
+    await page.locator('#theme-menu label:has(input[value="' + theme + '"])').click();
+    for (const width of [390,1280]) {
+      await page.setViewportSize({width,height:850});
+      assert.equal(await page.locator('#admin-title').textContent(),'Ważne ogłoszenia');
+      assert.equal(await page.locator('#admin-announcement-preview .announcement-date').textContent(),'Podgląd — nieopublikowane');
+      const h = await page.locator('#admin-announcement-preview .announcement-body').evaluate(body=>
+        [body.querySelector('h2'),body.querySelector('h3'),body].map(el=>parseFloat(getComputedStyle(el).fontSize)));
+      assert.ok(h[0]>h[1] && h[1]>h[2]);
+      assert.equal(await editor.locator('h2').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)),h[0]);
+      assert.equal(await editor.locator('h3').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)),h[1]);
+      await page.locator('#announcement-date-open').click();
+      const picker=page.locator('#announcement-date-dialog');
+      await picker.locator('[aria-current="date"]').waitFor();
+      const today = await picker.locator('[aria-current="date"]').textContent();
+      if (Number(today) > 1) assert.equal(await picker.locator('#announcement-date-days button').first().isDisabled(),true);
+      await picker.getByRole('button',{name:'Następny miesiąc'}).click();
+      await picker.getByRole('button',{name:'Poprzedni miesiąc'}).click();
+      const currentMonth=await picker.locator('#announcement-date-month').textContent();
+      await picker.getByRole('button',{name:'Następny rok'}).click();
+      assert.notEqual(await picker.locator('#announcement-date-month').textContent(),currentMonth);
+      await picker.getByRole('button',{name:'Poprzedni rok'}).click();
+      await picker.locator('[aria-current="date"]').focus();
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('Enter');
+      assert.match(await page.locator('#announcement-end-date').inputValue(),/^\d{4}-\d\d-\d\d$/);
+      await page.locator('#announcement-date-clear').click();
+      assert.equal(await page.locator('#announcement-end-date').inputValue(),'');
+      const active = page.locator('#admin-sections [aria-pressed="true"]');
+      await page.mouse.move(0,0);
+      const before=await active.evaluate(e=>getComputedStyle(e).boxShadow);
+      await active.hover();
+      assert.notEqual(await active.evaluate(e=>getComputedStyle(e).boxShadow),before);
+      assert.equal(await active.getAttribute('aria-pressed'),'true');
+      await publish.click();
+      await confirmation.getByRole('button',{name:'Anuluj'}).waitFor();
+      assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Anuluj');
+      await page.keyboard.press('Escape');
+      await confirmation.waitFor({state:'hidden'});
+      assert.equal(await publish.evaluate(e=>e===document.activeElement),true);
+      assert.equal(record.status,'draft');
+    }
+  }
+  await publish.click();
+  await confirmation.getByRole('button',{name:'Opublikuj i wyślij powiadomienia'}).click();
   await list.getByText('Opublikowane',{exact:true}).waitFor();
+  await list.getByRole('button',{name:'Edytuj'}).click();
+  const firstPublication = new Intl.DateTimeFormat('pl-PL',{dateStyle:'medium',timeZone:'Europe/Warsaw'}).format(new Date(record.publishedAt));
+  assert.equal(await page.locator('#admin-announcement-preview .announcement-date').textContent(),'Opublikowano: '+firstPublication);
+  await page.locator('#announcement-cancel').click();
   const resident=await context.newPage();
   await resident.goto(base + '#ogloszenie-' + record.id);
   const card=resident.locator('#announcements-card .announcement-entry');
@@ -137,6 +187,16 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   assert.equal(await list.locator('article').count(),0);
   await page.getByRole('button',{name:'Wycofane (1)',exact:true}).click();
   assert.equal(await list.locator('article').count(),1);
+  const adminHeading = page.locator('#admin-title');
+  const headingStyle = () => adminHeading.evaluate(el=>{
+    const s=getComputedStyle(el);
+    return [s.fontSize,s.lineHeight,el.offsetLeft];
+  });
+  const announcementHeading = await headingStyle();
+  await page.getByRole('button',{name:'Pokoje',exact:true}).click();
+  assert.equal(await adminHeading.textContent(),'Zarządzanie pokojami');
+  assert.deepEqual(await headingStyle(),announcementHeading);
+  await page.locator('#admin-sections [data-section="announcements"]').click();
   await resident.reload();
   assert.deepEqual(await resident.locator('#announcements-card').getAttribute('hidden'),'');
   await list.getByRole('button',{name:'Edytuj'}).click();

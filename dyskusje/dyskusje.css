@@ -523,7 +523,7 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   color: var(--admin-text);
   font: 14px/1.35 Arial, sans-serif;
 }
-#admin-panel :is(h1, h2) { margin: 0; font-size: 28px; line-height: 1.15; }
+#admin-panel :is(h1, h2):not(.announcement-rich *) { margin: 0; font-size: 28px; line-height: 1.15; }
 .admin-toolbar, .admin-room-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .admin-toolbar { margin-bottom: 12px; }
 .admin-toolbar .admin-actions { gap: 8px; }
@@ -628,19 +628,12 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 @media (max-width: 700px) {
   #admin-announcement-form:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
 }
-#admin-panel .announcement-rich h2 { font-size: 1.18em; line-height: 1.4; margin: 0 0 .45em; }
 
 #admin-view:has(#admin-announcements:not([hidden])) { max-width: 1200px; }
-.admin-announcement-heading, .admin-announcement-list-toolbar {
+.admin-announcement-list-toolbar {
   display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  justify-content: space-between; padding: 8px 0;
 }
-.admin-announcement-list-toolbar { justify-content: space-between; padding: 8px 0; }
-.admin-announcement-icon {
-  display: grid; place-items: center; width: 46px; height: 46px;
-  color: #6edce5; background: var(--admin-inset); border: 1px solid var(--admin-edge); border-radius: 12px;
-}
-:root[data-theme="light"] .admin-announcement-icon { color: #664415; background: #ffe5a4; }
-.admin-announcement-icon svg { width: 25px; height: 25px; }
 .admin-announcement-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; border-inline-start-width: 5px; }
 .admin-announcement-row[data-state="published"] { border-inline-start-color: #2f8842; }
 .admin-announcement-row[data-state="draft"] { border-inline-start-color: #d19320; }
@@ -650,9 +643,9 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 #admin-announcement-form aside {
   border: 1px solid var(--admin-edge); background: var(--admin-card); border-radius: 14px; padding: 16px;
 }
-#admin-announcement-form h3 { margin-block-start: 0; }
+#admin-announcement-form :is(.admin-announcement-fields > h3, #announcement-preview-title) { margin-block-start: 0; }
 #admin-announcement-form .announcement-preview-entry > h3 { margin-block-start: 7px; }
-#admin-announcements .announcement-primary { background: #2b793b; border-color: #4ca962; color: white; }
+:is(#admin-announcements, .admin-announcement-dialog) .announcement-primary { background: #2b793b; border-color: #4ca962; color: white; }
 #admin-announcement-filter button[aria-pressed="true"] { background: var(--admin-inset); border-color: var(--admin-edge); font-weight: 700; }
 @media (max-width: 700px) {
   .admin-announcement-row { grid-template-columns: 1fr; gap: 10px; }
@@ -663,11 +656,48 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   border: 1px solid var(--admin-edge); padding: 8px 10px; border-radius: 8px; background: var(--admin-inset);
 }
 
-#admin-panel:has(#admin-announcements:not([hidden])) > .admin-toolbar { justify-content: flex-end; }
-#admin-panel:has(#admin-announcements:not([hidden])) > .admin-toolbar > h1,
 #admin-panel #admin-announcements button[hidden] { display: none; }
 .admin-announcement-fields > h3, #admin-announcement-preview-title { font-size: 20px; }
 .admin-announcement-fields > .admin-actions:last-child {
   border-top: 1px solid var(--admin-divider); padding-top: 14px;
 }
 #admin-announcements .announcement-primary { padding-inline: 16px; font-weight: 700; }
+
+#admin-announcement-form .announcement-rich { font-size: 14px; }
+#admin-panel > .admin-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+#admin-panel > .admin-toolbar h1 { overflow-wrap: anywhere; }
+
+.admin-announcement-dialog {
+  width: min(420px, calc(100% - 24px)); max-height: calc(100% - 24px);
+  overflow: auto; box-sizing: border-box; padding: 20px;
+  border: 1px solid var(--border); border-radius: 16px;
+  background: var(--surface); color: var(--text);
+}
+.admin-announcement-dialog::backdrop { background: rgb(0 12 17 / 62%); }
+.admin-announcement-dialog h2 { font-size: 1.25rem; margin: 0 0 12px; }
+.admin-announcement-dialog .admin-actions { justify-content: flex-end; margin-top: 12px; }
+.expiry-actions { margin-top: 5px; }
+.expiry-navigation { grid-template-columns: auto auto minmax(0,1fr) auto auto; }
+.expiry-navigation strong { text-align: center; }
+.admin-announcement-dialog .calendar-grid button { min-width: 0; padding-inline: 0; }
+.admin-announcement-dialog button[aria-pressed="true"] {
+  background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent);
+}
+.admin-announcement-dialog button[aria-current="date"] { border-bottom: 3px solid var(--accent); }
+.admin-announcement-dialog button:disabled { opacity: .48; cursor: default; }
+@media (max-width: 460px) {
+  #admin-panel > .admin-toolbar h1 { font-size: clamp(1rem, 4.2vw, 1.32rem); }
+  #admin-panel > .admin-toolbar button { padding-inline: 8px; }
+  .admin-announcement-dialog { padding: 14px; }
+}
+
+:root { --control-hover: rgb(0 117 124 / 43%); }
+:root[data-theme="dark"] { --control-hover: rgb(107 228 236 / 59%); }
+@media (hover: hover) and (pointer: fine) {
+  :is(button:not(:disabled), summary, select:not(:disabled), a[href], #theme-menu label):hover {
+    box-shadow: inset 0 0 0 1px var(--control-hover), 0 0 8px var(--control-hover);
+  }
+}
+:where(button:not(:disabled), summary, select:not(:disabled), a[href]):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}

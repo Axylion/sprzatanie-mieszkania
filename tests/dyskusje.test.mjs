@@ -365,6 +365,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     await context.route('https://g19test.supabase.co/rest/v1/rpc/g19_*', async route => {
       const method = route.request().url().split('g19_').at(-1);
       try {
+        if (method === 'public_announcements') {
+          return route.fulfill({ json: JSON.parse(await readFile(resolve(root, 'announcements.json'), 'utf8')),
+            headers: { 'Access-Control-Allow-Origin': '*' } });
+        }
         if (method === 'pair_claim' && losePairResponse) {
           losePairResponse = false;
           return route.abort();

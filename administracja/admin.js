@@ -34,6 +34,9 @@
 
   const rpc = (name, args = {}) => request("/rest/v1/rpc/g19_web_admin_" + name, args);
 
+  const announcements = window.g19AdminAnnouncements;
+  announcements.init(rpc, () => endSession("Zaloguj się ponownie."));
+
   function updateSubmit() {
     submit.disabled = busy || !passwordField.value;
   }
@@ -67,6 +70,7 @@
     clearTimeout(expires);
     if (confirm.open) confirm.close();
     list.replaceChildren();
+    announcements.reset();
     form.reset();
     updateSubmit();
     form.hidden = !configured;
@@ -336,6 +340,7 @@
   });
 
   document.getElementById("admin-logout").addEventListener("click", async () => {
+    if (!announcements.canLeave()) return;
     const token = session;
     endSession();
     if (token) {
@@ -343,7 +348,7 @@
       catch { status.textContent = "Wylogowano z aplikacji. Nie udało się potwierdzić zakończenia sesji na serwerze."; }
     }
   });
-  document.getElementById("admin-refresh").addEventListener("click", () => { status.textContent = ""; refresh(); });
+  document.getElementById("admin-refresh").addEventListener("click", () => { status.textContent = ""; if (announcements.isOpen()) announcements.refresh(); else refresh(); });
   confirmAction.addEventListener("click", async () => {
     if (!session || busy || !pending) return;
     const { room, device } = pending;
@@ -374,7 +379,7 @@
     }
     if (session) {
       refresh().then(loaded => {
-        if (loaded && !view.hidden) document.getElementById("admin-title").focus({ preventScroll: true });
+        if (loaded && !view.hidden) document.getElementById(announcements.isOpen() ? "admin-announcements-title" : "admin-title").focus({ preventScroll: true });
       });
     } else {
       endSession(configured ? "" : "Panel wymaga konfiguracji administratora.");

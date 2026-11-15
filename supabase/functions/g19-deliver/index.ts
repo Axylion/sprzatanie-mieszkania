@@ -1,12 +1,11 @@
 import webpush from "npm:web-push@3.6.7";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { announcementsForInbox, deliveryOutcome, pushPayload } from "./events.mjs";
+import { deliveryOutcome, pushPayload } from "./events.mjs";
 
 const env = (key: string) => Deno.env.get(key) ?? "";
 const api = env("SUPABASE_URL");
 const serviceKey = env("SUPABASE_SERVICE_ROLE_KEY");
 const secret = env("G19_DELIVERY_SECRET");
-const source = env("G19_ANNOUNCEMENTS_URL");
 const hash = (value: string) => createHash("sha256").update(value).digest();
 const allowedHosts = /^(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|([a-z0-9-]+\.)?push\.apple\.com|([a-z0-9-]+\.)?notify\.windows\.com)$/;
 
@@ -26,23 +25,11 @@ Deno.serve(async request => {
     return new Response(null, { status: 401 });
   }
   try {
-    let events: ReturnType<typeof announcementsForInbox> = [];
-    let sourceAvailable = true;
-    if (source) {
-      try {
-        const response = await fetch(source, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(6000) });
-        if (!response.ok) throw new Error("announcement source unavailable");
-        events = announcementsForInbox(await response.json());
-      } catch {
-        sourceAvailable = false;
-        console.warn("g19: announcement source unavailable");
-      }
-    }
-    await rpc("notification_tick", { p_announcements: events, p_duty_enabled: env("G19_DUTY_ENABLED") === "true" });
+    await rpc("db_notification_tick", { p_duty_enabled: env("G19_DUTY_ENABLED") === "true" });
     const publicKey = env("G19_VAPID_PUBLIC_KEY");
     const privateKey = env("G19_VAPID_PRIVATE_KEY");
     const subject = env("G19_VAPID_SUBJECT");
-    if (!publicKey || !privateKey || !subject) return Response.json({ sourceAvailable, pushConfigured: false });
+    if (!publicKey || !privateKey || !subject) return Response.json({ pushConfigured: false });
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const batch = await rpc("push_take");
     const outcomes = await Promise.all(batch.map(async (item: { id: string; lease: string; endpoint: string; p256dh: string; auth: string; category: string; target: string; room?: number; message?: string }) => {
@@ -50,6 +37,11 @@ Deno.serve(async request => {
       const endpoint = new URL(item.endpoint);
       if (endpoint.protocol === "https:" && !endpoint.port && !endpoint.username && !endpoint.password && allowedHosts.test(endpoint.hostname)) {
         try {
+          if (item.category === "announcements" &&
+              !await rpc("announcement_delivery_active", { p_id: item.id })) {
+            await rpc("push_finish", { p_id: item.id, p_lease: item.lease, p_outcome: "failed" });
+            return "skipped";
+          }
           await webpush.sendNotification({
             endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth }
           }, JSON.stringify(pushPayload(item)), {
@@ -63,9 +55,9 @@ Deno.serve(async request => {
       await rpc("push_finish", { p_id: item.id, p_lease: item.lease, p_outcome: outcome });
       return outcome;
     }));
-    const counts = Object.fromEntries(["sent", "retry", "gone", "failed"].map(key => [key, outcomes.filter(x => x === key).length]));
+    const counts = Object.fromEntries(["sent", "retry", "gone", "failed", "skipped"].map(key => [key, outcomes.filter(x => x === key).length]));
     console.info("g19 delivery", counts);
-    return Response.json({ sourceAvailable, ...counts });
+    return Response.json(counts);
   } catch {
     console.error("g19: delivery job failed");
     return new Response(null, { status: 502 });

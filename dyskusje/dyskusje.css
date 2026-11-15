@@ -580,3 +580,94 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 .admin-event .admin-icon { color: var(--admin-green); }
 .admin-event:is([data-kind="blocked"], [data-kind="admin_detached"]) .admin-icon { color: var(--admin-warn); }
 .admin-history > button { margin-top: 12px; }
+
+#admin-sections { margin: 16px 0; }
+#admin-sections button[aria-pressed="true"] {
+  background: var(--admin-card);
+  border-color: var(--admin-edge);
+  font-weight: 700;
+}
+
+#admin-announcements { color: var(--admin-text); }
+#admin-announcement-list { display: grid; gap: 10px; margin-top: 14px; }
+.admin-announcement-row, .admin-announcement-fields {
+  padding: 16px;
+  border: 1px solid var(--admin-edge);
+  border-radius: 14px;
+  background: var(--admin-card);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-announcement-row h3 { display: inline; margin-right: 10px; }
+.admin-announcement-row p, #announcement-expiry-help { color: var(--admin-muted); }
+.admin-announcement-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; background: var(--admin-inset); }
+.admin-announcement-badge[data-state="published"] { color: var(--admin-green); background: var(--admin-green-bg); }
+.admin-announcement-badge[data-state="withdrawn"] { color: var(--admin-warn); }
+#admin-announcement-form:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .9fr); gap: 18px; }
+.admin-announcement-fields { display: grid; gap: 10px; align-content: start; }
+.admin-announcement-fields label { display: grid; gap: 5px; }
+#admin-announcements :is(input, select, #announcement-editor) {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--admin-edge);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--admin-inset);
+  color: var(--admin-text);
+  font: inherit;
+}
+#admin-announcements select { width: auto; max-width: 100%; }
+#announcement-editor { min-height: 150px; white-space: pre-wrap; }
+#admin-announcement-preview { margin-top: 8px; }
+#admin-announcement-preview > h4 { margin: 0 0 10px; font-size: 18px; }
+#admin-announcement-form aside { min-width: 0; }
+#admin-announcements :is(input, select, button, #announcement-editor):focus-visible {
+  outline: 2px solid var(--admin-green);
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  #admin-announcement-form:not([hidden]) { grid-template-columns: minmax(0, 1fr); }
+}
+#admin-panel .announcement-rich h2 { font-size: 1.18em; line-height: 1.4; margin: 0 0 .45em; }
+
+#admin-view:has(#admin-announcements:not([hidden])) { max-width: 1200px; }
+.admin-announcement-heading, .admin-announcement-list-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+}
+.admin-announcement-list-toolbar { justify-content: space-between; padding: 8px 0; }
+.admin-announcement-icon {
+  display: grid; place-items: center; width: 46px; height: 46px;
+  color: #6edce5; background: var(--admin-inset); border: 1px solid var(--admin-edge); border-radius: 12px;
+}
+:root[data-theme="light"] .admin-announcement-icon { color: #664415; background: #ffe5a4; }
+.admin-announcement-icon svg { width: 25px; height: 25px; }
+.admin-announcement-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; border-inline-start-width: 5px; }
+.admin-announcement-row[data-state="published"] { border-inline-start-color: #2f8842; }
+.admin-announcement-row[data-state="draft"] { border-inline-start-color: #d19320; }
+.admin-announcement-row[data-state="withdrawn"] { border-inline-start-color: #c34553; }
+.admin-announcement-row-side { padding-inline-start: 16px; border-inline-start: 1px solid var(--admin-divider); }
+.admin-announcement-row-side p { margin-top: 0; }
+#admin-announcement-form aside {
+  border: 1px solid var(--admin-edge); background: var(--admin-card); border-radius: 14px; padding: 16px;
+}
+#admin-announcement-form h3 { margin-block-start: 0; }
+#admin-announcement-form .announcement-preview-entry > h3 { margin-block-start: 7px; }
+#admin-announcements .announcement-primary { background: #2b793b; border-color: #4ca962; color: white; }
+#admin-announcement-filter button[aria-pressed="true"] { background: var(--admin-inset); border-color: var(--admin-edge); font-weight: 700; }
+@media (max-width: 700px) {
+  .admin-announcement-row { grid-template-columns: 1fr; gap: 10px; }
+  .admin-announcement-row-side { padding: 10px 0 0; border-inline-start: 0; border-top: 1px solid var(--admin-divider); }
+}
+#announcement-expiry-preview:empty { display: none; }
+#announcement-expiry-preview {
+  border: 1px solid var(--admin-edge); padding: 8px 10px; border-radius: 8px; background: var(--admin-inset);
+}
+
+#admin-panel:has(#admin-announcements:not([hidden])) > .admin-toolbar { justify-content: flex-end; }
+#admin-panel:has(#admin-announcements:not([hidden])) > .admin-toolbar > h1,
+#admin-panel #admin-announcements button[hidden] { display: none; }
+.admin-announcement-fields > h3, #admin-announcement-preview-title { font-size: 20px; }
+.admin-announcement-fields > .admin-actions:last-child {
+  border-top: 1px solid var(--admin-divider); padding-top: 14px;
+}
+#admin-announcements .announcement-primary { padding-inline: 16px; font-weight: 700; }

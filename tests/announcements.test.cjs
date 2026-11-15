@@ -20,15 +20,25 @@ const mimeTypes = {
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp'
 };
+const publicRpc = '/rest/v1/rpc/g19_public_announcements';
+const testConfig = 'window.goleszanDiscussionsConfig = {url:location.origin,publishableKey:"sb_publishable_testing"};';
 const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-6 to v13-7 update under the GitHub Pages subpath', async () => {
+test('PWA v13-7 to v13-8 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;
+    if (pathname === publicRpc) {
+      res.setHeader('Content-Type','application/json');
+      return res.end(fs.readFileSync(path.join(root,'announcements.json')));
+    }
+    if (pathname === prefix + 'dyskusje/config.js') {
+      res.setHeader('Content-Type','text/javascript');
+      return res.end(testConfig);
+    }
     if (!pathname.startsWith(prefix)) { res.writeHead(404); return res.end(); }
     const name = pathname.slice(prefix.length) || 'index.html';
     const target = path.join(root, name);
@@ -37,7 +47,7 @@ test('PWA v13-6 to v13-7 update under the GitHub Pages subpath', async () => {
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-7', 'shell-v13-6')
+      ? contents.toString().replace('shell-v13-8', 'shell-v13-7')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -50,14 +60,14 @@ test('PWA v13-6 to v13-7 update under the GitHub Pages subpath', async () => {
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-6');
+      const cache = await caches.open('goleszan19-shell-v13-7');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-7') && !keys.includes('goleszan19-shell-v13-6');
+      return keys.includes('goleszan19-shell-v13-8') && !keys.includes('goleszan19-shell-v13-7');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
@@ -102,7 +112,11 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
   let data = [], requests = [], fail = false;
   const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname;
-    if (file === '/announcements.json') {
+    if (file === '/dyskusje/config.js') {
+      res.setHeader('Content-Type','text/javascript');
+      return res.end(testConfig);
+    }
+    if (file === publicRpc) {
       requests.push(req.headers);
       res.writeHead(fail ? 503 : 200, {'Content-Type':'application/json', 'Cache-Control':'public, max-age=86400'});
       return res.end(JSON.stringify(data));
@@ -264,7 +278,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.match(data[0].body, /TO JEST OGŁOSZENIE TESTOWE/);
     await page.reload();
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
-    assert.ok(await page.locator('.announcement-body').evaluate(e => Math.abs(e.clientHeight - parseFloat(getComputedStyle(e).lineHeight)*3) < 2));
+    assert.ok(await page.locator('#announcements-card .announcement-body').evaluate(e => Math.abs(e.clientHeight - parseFloat(getComputedStyle(e).lineHeight)*3) < 2));
     if (process.env.SCREENSHOT_DIR) {
       for (const width of [360,1280]) {
         await page.setViewportSize({width,height:900});
@@ -300,10 +314,10 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-7');
+      const c = await caches.open('goleszan19-shell-v13-8');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
-    assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), data);
+    assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);
     assert.ok(requests.some(headers => headers['cache-control']?.includes('no-cache')));
     await page.locator('#shortcut-open').click();
     assert.equal(await page.locator('#shortcut-help').isVisible(), true);
@@ -341,7 +355,11 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
   ];
   const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname;
-    if (file === '/announcements.json') {
+    if (file === '/dyskusje/config.js') {
+      res.setHeader('Content-Type','text/javascript');
+      return res.end(testConfig);
+    }
+    if (file === publicRpc) {
       res.setHeader('Content-Type','application/json');
       return res.end(JSON.stringify(data));
     }
@@ -415,7 +433,7 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
     await page.locator('#announcements-open').click();
     await page.locator('#hidden-announcements-list button').first().click();
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
-    assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()),data);
+    assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()),data);
     // Zaplanowana publikacja również uwzględnia Warsaw i działa bez przeładowania.
     for (const p of pages) await p.clock.runFor(1000);
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);

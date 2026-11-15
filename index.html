@@ -257,7 +257,7 @@
       margin-top: 16px;
       padding-top: 16px;
     }
-    .announcement-entry h3 { font-size: 16px; margin: 7px 0; }
+    :is(.announcement-entry, .announcement-preview-entry) > h3 { font-size: 16px; margin: 7px 0; }
     .announcement-body {
       margin: 5px 0;
       color: #302b16;
@@ -270,6 +270,12 @@
       overflow: hidden;
     }
     .announcement-body.expanded { display: block; }
+    .announcement-rich :is(p, h2, h3, ul, ol) { margin: 0 0 .45em; }
+    .announcement-rich :is(ul, ol) { padding-inline-start: 1.6em; }
+    .announcement-rich h2 { font-size: 1.18em; line-height: 1.4; }
+    .announcement-rich h3 { font-size: 1.08em; line-height: 1.4; }
+    .announcement-body.announcement-rich:not(.expanded) { display: block; max-height: 3lh; }
+    .announcement-body a { color: #285239; text-decoration: underline; }
     .announcement-date { font-size: 12px; color: #5f5428; }
     .announcement-toggle {
       display: block;
@@ -329,6 +335,8 @@
   <script defer src="./dyskusje/config.js"></script>
   <script defer src="./dyskusje/dyskusje.js"></script>
   <script defer src="./dyskusje/notifications.js"></script>
+  <script defer src="./ogloszenia/content.js"></script>
+  <script defer src="./administracja/announcements.js"></script>
   <script defer src="./administracja/admin.js"></script>
 </head>
 
@@ -619,7 +627,72 @@
   <section id="admin-panel" aria-labelledby="admin-title" hidden>
     <div class="admin-toolbar"><h1 id="admin-title" tabindex="-1">Zarządzanie pokojami</h1>
     <div class="admin-actions"><button type="button" id="admin-refresh">Odśwież</button><button type="button" id="admin-logout">Wyloguj</button></div></div>
-    <div id="admin-rooms"></div>
+    <nav id="admin-sections" class="admin-actions" aria-label="Sekcje administracji">
+      <button type="button" data-section="rooms" aria-pressed="true">Pokoje</button>
+      <button type="button" data-section="announcements" aria-pressed="false">Ważne ogłoszenia</button>
+    </nav>
+    <div id="admin-room-management"><div id="admin-rooms"></div></div>
+    <section id="admin-announcements" aria-labelledby="admin-announcements-title" hidden>
+      <div class="admin-announcement-heading">
+        <span aria-hidden="true" class="admin-announcement-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 9h5l10-5v15L9 15H4zM6 15l2 5h3l-1-5M22 9v5"/></svg></span>
+        <h2 id="admin-announcements-title" tabindex="-1">Ważne ogłoszenia</h2>
+      </div>
+      <p id="admin-announcement-status" role="status"></p>
+      <div id="admin-announcement-list-view">
+        <div class="admin-announcement-list-toolbar">
+          <div id="admin-announcement-filter" class="admin-actions" role="group" aria-label="Filtruj według statusu">
+            <button type="button" data-filter="all" aria-pressed="true">Wszystkie</button>
+            <button type="button" data-filter="published" aria-pressed="false">Opublikowane</button>
+            <button type="button" data-filter="draft" aria-pressed="false">Szkice</button>
+            <button type="button" data-filter="expired" aria-pressed="false">Wygasłe</button>
+            <button type="button" data-filter="withdrawn" aria-pressed="false">Wycofane</button>
+          </div>
+          <button type="button" id="announcement-new" class="announcement-primary">+ Dodaj ogłoszenie</button>
+        </div>
+        <div id="admin-announcement-list"></div>
+      </div>
+      <form id="admin-announcement-form" hidden>
+        <div class="admin-announcement-fields">
+          <h3 id="admin-announcement-form-title">Nowe ogłoszenie</h3>
+          <label>Tytuł<input name="title" required maxlength="160"></label>
+          <span id="announcement-editor-label">Treść</span>
+          <div id="announcement-tools" role="group" aria-label="Formatowanie treści" class="admin-actions">
+            <select id="announcement-paragraph" aria-label="Styl akapitu">
+              <option value="" disabled selected>Styl akapitu</option>
+              <option value="p">Zwykły tekst</option><option value="h2">Nagłówek H2</option>
+              <option value="h3">Nagłówek H3</option>
+            </select>
+            <button type="button" data-command="bold" aria-label="Pogrubienie" title="Pogrubienie"><b>B</b></button>
+            <button type="button" data-command="italic" aria-label="Kursywa" title="Kursywa"><i>I</i></button>
+            <button type="button" data-command="underline" aria-label="Podkreślenie" title="Podkreślenie"><u>U</u></button>
+            <button type="button" data-command="insertUnorderedList" aria-label="Lista punktowana">•</button>
+            <button type="button" data-command="insertOrderedList" aria-label="Lista numerowana">1.</button>
+            <button type="button" data-command="link" aria-label="Link" title="Link">🔗</button>
+            <button type="button" data-command="clear" aria-label="Wyczyść formatowanie" title="Wyczyść formatowanie">Wyczyść</button>
+          </div>
+          <div id="announcement-editor" class="announcement-rich" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="announcement-editor-label" tabindex="0"></div>
+          <label>Data zakończenia publikacji<input name="endsOn" id="announcement-end-date" type="date" aria-describedby="announcement-expiry-help"></label>
+          <p id="announcement-expiry-help">Domyślnie 30 dni od publikacji. Wybrana data obowiązuje do końca dnia w czasie warszawskim.</p>
+          <output id="announcement-expiry-preview" for="announcement-end-date"></output>
+          <div class="admin-actions">
+            <button type="button" id="announcement-save-draft">Zapisz szkic</button>
+            <button type="button" id="announcement-publish" class="announcement-primary">Opublikuj</button>
+            <button type="button" id="announcement-save-changes">Zapisz zmiany</button>
+            <button type="button" id="announcement-cancel">Anuluj</button>
+          </div>
+        </div>
+        <aside aria-labelledby="announcement-preview-title">
+          <h3 id="announcement-preview-title">Podgląd ogłoszenia</h3>
+          <section class="card announcement-card" id="admin-announcement-preview">
+            <h4>Ważna informacja dla mieszkańców</h4>
+            <article class="announcement-preview-entry">
+              <div class="announcement-date"></div><h3></h3>
+              <div class="announcement-body announcement-rich expanded"></div>
+            </article>
+          </section>
+        </aside>
+      </form>
+    </section>
   </section>
 </main>
 <dialog id="admin-confirm" class="shortcut-help" aria-labelledby="admin-confirm-text">
@@ -883,9 +956,9 @@
     } catch (_) { /* Bez pamięci lokalnej ukrywanie działa do przeładowania strony. */ }
   }
   // Identyfikator i wersja treści: nowe lub zmienione ogłoszenie pojawia się ponownie.
-  const announcementKey = item => JSON.stringify([
-    item.id, item.publishedAt, item.updatedAt, item.title, item.body, item.expiresAt
-  ]);
+  const announcementKey = item => item.legacyHideKey || JSON.stringify(Number.isInteger(item.version)
+    ? [item.id, item.version]
+    : [item.id, item.publishedAt, item.updatedAt, item.title, item.body, item.expiresAt]);
   const warsawDateParts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
@@ -948,6 +1021,9 @@
       // scrollHeight zawiera pełną treść również przy ograniczeniu do trzech wierszy.
       const hasMore = body.scrollHeight > parseFloat(getComputedStyle(body).lineHeight) * 3 + 1;
       button.hidden = !hasMore;
+      for (const link of body.querySelectorAll("a[href]")) {
+        link.tabIndex = hasMore && !body.classList.contains("expanded") ? -1 : 0;
+      }
     });
   }
 
@@ -978,10 +1054,13 @@
       meta.textContent = "Opublikowano: " + fmtAnnouncementDate(item.publishedAt);
       const title = document.createElement("h3");
       title.textContent = item.title;
-      const body = document.createElement("p");
+      const body = document.createElement(Array.isArray(item.content) && item.content.some(node => typeof node !== "string") ? "div" : "p");
       body.className = "announcement-body";
       body.id = "announcement-body-" + index;
-      body.textContent = item.body;
+      if (body.localName === "div") {
+        body.classList.add("announcement-rich");
+        window.g19AnnouncementContent.render(body, item.content);
+      } else body.textContent = item.body;
       const button = document.createElement("button");
       button.type = "button";
       button.className = "announcement-toggle";
@@ -1006,6 +1085,7 @@
         body.classList.toggle("expanded", expanded);
         button.setAttribute("aria-expanded", String(expanded));
         button.textContent = expanded ? "Zwiń ↑" : "Więcej ↓";
+        for (const link of body.querySelectorAll("a[href]")) link.tabIndex = expanded || button.hidden ? 0 : -1;
       }
       button.addEventListener("click", () => {
         if (expandedAnnouncements.has(key)) expandedAnnouncements.delete(key);
@@ -1078,7 +1158,12 @@
   async function loadAnnouncements() {
     const request = ++announcementRequest;
     try {
-      const response = await fetch("./announcements.json", {cache: "no-store"});
+      const config = window.goleszanDiscussionsConfig;
+      if (!config?.url || !config.publishableKey) return renderAnnouncements([]);
+      const response = await fetch(config.url.replace(/\/$/, "") + "/rest/v1/rpc/g19_public_announcements", {
+        method: "POST", cache: "no-store", headers: { apikey: config.publishableKey, "Content-Type": "application/json" },
+        body: "{}", signal: AbortSignal.timeout(8000)
+      });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Invalid announcements data");
@@ -1089,7 +1174,7 @@
       if (request === announcementRequest) renderAnnouncements([]);
     }
   }
-  loadAnnouncements();
+  document.addEventListener("DOMContentLoaded", loadAnnouncements, {once: true});
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       renderAnnouncements(loadedAnnouncements);

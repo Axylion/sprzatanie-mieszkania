@@ -114,6 +114,7 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   await db.query("update g19_private.announcements set expires_at = now() where id = $1", [custom]);
   assert.equal(await active(expiring.id), false);
   assert.equal((await adminList()).find(item => item.id === custom).status, 'expired');
+  assert.ok(!(await publicList()).some(item => item.id === custom));
   const bell = await rpc('notifications', [token, ['announcements']], 'anon');
   assert.deepEqual(bell, { items:[], unread:0 });
   await db.query('update g19_private.push_delivery set next_attempt_at = now() where notification_id = $1', [expiring.id]);

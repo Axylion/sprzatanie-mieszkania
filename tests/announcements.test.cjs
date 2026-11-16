@@ -26,14 +26,21 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-8-3 to v13-8-4 update under the GitHub Pages subpath', async () => {
+test('PWA v13-8-4 to v13-8-5 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;
     if (pathname === publicRpc) {
       res.setHeader('Content-Type','application/json');
-      return res.end(fs.readFileSync(path.join(root,'announcements.json')));
+      return res.end(JSON.stringify([{
+        ...announcement('postgres-microseconds','Dłuższa informacja o pracach. '.repeat(20)),
+        publishedAt:'2026-11-15T23:03:38.627737+00:00',
+        expiresAt:'2026-12-15T23:03:38.627737+00:00',
+        version:1
+      }, announcement('expired','Archiwalny tekst',{
+        publishedAt:'2026-11-13T11:00:00.50001+00:00', expiresAt:'2026-11-16T07:00:00.123456+00:00'
+      })]));
     }
     if ([prefix + 'dyskusje/config.js', '/dyskusje/config.js'].includes(pathname)) {
       res.setHeader('Content-Type','text/javascript');
@@ -49,7 +56,7 @@ test('PWA v13-8-3 to v13-8-4 update under the GitHub Pages subpath', async () =>
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-8-4', 'shell-v13-8-3')
+      ? contents.toString().replace('shell-v13-8-5', 'shell-v13-8-4')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -85,23 +92,27 @@ test('PWA v13-8-3 to v13-8-4 update under the GitHub Pages subpath', async () =>
 
   }
   const page = await context.newPage();
-  await page.clock.install({time:new Date('2026-11-04T12:00:00Z')});
+  await page.clock.install({time:new Date('2026-11-16T08:00:00Z')});
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}${prefix}`);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-8-3');
+      const cache = await caches.open('goleszan19-shell-v13-8-4');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-8-4') && !keys.includes('goleszan19-shell-v13-8-3');
+      return keys.includes('goleszan19-shell-v13-8-5') && !keys.includes('goleszan19-shell-v13-8-4');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
+    assert.equal(await page.locator('#ogloszenie-postgres-microseconds').count(),1);
+    assert.equal(await page.locator('#ogloszenie-expired').count(),0);
+    assert.equal(await page.evaluate(() => parseAnnouncementDate('2026-11-15T23:03:38.627737+00:00')),
+      Date.parse('2026-11-15T23:03:38.627Z'));
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), JSON.parse(fs.readFileSync(path.join(root,'announcements.json'),'utf8')));
     const appUrl = `http://127.0.0.1:${server.address().port}${prefix}`;
     await page.goto(appUrl + '#calendar-title');
@@ -410,7 +421,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-8-4');
+      const c = await caches.open('goleszan19-shell-v13-8-5');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

@@ -5,7 +5,7 @@ begin;
 alter table g19_private.announcements add column if not exists deleted_at timestamptz;
 
 create or replace function g19_private.announcement_default_expiry(p_published_at timestamptz)
-returns timestamptz language sql immutable set search_path = '' as $$
+returns timestamptz language sql stable set search_path = '' as $$
   select (((p_published_at at time zone 'Europe/Warsaw')::date + 31)::timestamp) at time zone 'Europe/Warsaw';
 $$;
 revoke all on function g19_private.announcement_default_expiry(timestamptz) from public, anon, authenticated, service_role;

@@ -20,6 +20,9 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   }
   const migration = await readFile(new URL('202611170018_announcement_archive_expiry.sql', directory), 'utf8');
   await db.exec(migration);
+  const {rows: [expiryFunction]} = await db.query(`select provolatile as volatility from pg_proc
+    where oid = 'g19_private.announcement_default_expiry(timestamptz)'::regprocedure`);
+  assert.equal(expiryFunction.volatility, 's');
   const admin = randomUUID(), session = randomUUID(), expired = randomUUID();
   await db.query('insert into auth.users values ($1)', [admin]);
   await db.query("insert into auth.sessions values ($1,$2,now()),($3,$2,now() - interval '2 hours')", [session, admin, expired]);

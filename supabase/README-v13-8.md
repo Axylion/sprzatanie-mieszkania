@@ -45,3 +45,15 @@ i Cloudflare Pages **goleszan-19-preview**. Wdrożenie wymaga osobnego potwierdz
    poprzedni Edge, uwzględniając filtr ogłoszeń w migracji 017. Po zapisaniu
    danych przez administratora popraw frontend z zachowaniem odczytu z
    Supabase, ponieważ v13-7 nie pokaże nowych rekordów.
+
+## Aktualizacja v13-9-0
+
+Po osobnym zatwierdzeniu zastosuj migrację **018** w projekcie testowym przed
+opublikowaniem ZIP v13-9-0. Migracja nie aktualizuje istniejących terminów.
+Nowa publikacja bez wybranej daty wygasa o północy po 30. dniu liczonym od
+warszawskiej daty publikacji. Zapis bez zmiany daty zachowuje bieżący termin.
+
+Usunięcie wygasłego lub wycofanego ogłoszenia ustawia `deleted_at`. Wpis znika
+z list administratora, a jego identyfikator i historia dostaw zostają zachowane.
+Migracja nie wymaga zmiany funkcji Edge, Cron ani subskrypcji. Przy wycofaniu
+frontendu można pozostawić migrację 018 i wrócić do poprzedniego deploymentu Pages.

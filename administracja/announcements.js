@@ -28,6 +28,18 @@
   const monthFormatter = new Intl.DateTimeFormat("pl-PL", {month:"long", year:"numeric", timeZone:"UTC"});
   const publishDialog = document.getElementById("announcement-publish-dialog");
   const publishButton = document.getElementById("announcement-publish");
+  const deleteDialog = document.getElementById("announcement-delete-dialog");
+  const deleteName = document.getElementById("announcement-delete-name");
+  let pendingDeletion;
+  deleteDialog.querySelector("[data-cancel]").addEventListener("click", () => deleteDialog.close());
+  deleteDialog.querySelector("form").addEventListener("submit", event => {
+    event.preventDefault();
+    if (busy || !deleteDialog.open || !pendingDeletion) return;
+    const {id, revision} = pendingDeletion;
+    deleteDialog.close();
+    save("delete_announcement", {p_id: id, p_revision: revision}, "Ogłoszenie usunięte.");
+  });
+  deleteDialog.addEventListener("close", () => { pendingDeletion = undefined; });
   let cursor;
   const titleInput = form.elements.title;
   let items = [];
@@ -65,15 +77,47 @@
     return element;
   }
 
+  const matchesFilter = (item, key) => key === "all"
+    ? ["draft", "published"].includes(item.status) : item.status === key;
+  const formatDay = day => dayFormatter.format(new Date(day + "T12:00:00Z"));
+  function expiryLabel(item) {
+    if (item.displayEndsOn) return formatDay(item.displayEndsOn);
+    if (!item.expiresAt) return item.endsOn ? formatDay(item.endsOn) : "—";
+    return dayFormatter.format(new Date(Date.parse(item.expiresAt) - 1));
+  }
+  let statusTimer;
+  function scheduleStatusRefresh() {
+    clearTimeout(statusTimer);
+    const expiries = items.filter(item => item.status === "published" && item.expiresAt)
+      .map(item => Date.parse(item.expiresAt)).filter(Number.isFinite);
+    if (expiries.length) statusTimer = setTimeout(updateExpiredStatuses,
+      Math.min(2147483647, Math.max(1, Math.min(...expiries) - Date.now())));
+  }
+  function updateExpiredStatuses() {
+    const expired = items.filter(item => item.status === "published" && Date.parse(item.expiresAt) <= Date.now());
+    expired.forEach(item => { item.status = "expired"; });
+    if (expired.length) {
+      articles();
+      if (!form.hidden && current?.status === "expired") {
+        dateOpen.disabled = true;
+        previewContent();
+      }
+    }
+    scheduleStatusRefresh();
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") updateExpiredStatuses();
+  });
+
   function articles() {
     const filterLabels = { all: "Wszystkie", ...labels, draft: "Szkice" };
     for (const tab of filter.querySelectorAll("[data-filter]")) {
       const key = tab.dataset.filter;
-      const count = key === "all" ? items.length : items.filter(item => item.status === key).length;
+      const count = items.filter(item => matchesFilter(item, key)).length;
       tab.textContent = filterLabels[key] + " (" + count + ")";
       tab.setAttribute("aria-pressed", String(key === selectedStatus));
     }
-    const selected = items.filter(item => selectedStatus === "all" || item.status === selectedStatus);
+    const selected = items.filter(item => matchesFilter(item, selectedStatus));
     list.replaceChildren(...selected.map(item => {
       const row = document.createElement("article");
       row.className = "admin-announcement-row";
@@ -87,8 +131,7 @@
       badge.dataset.state = item.status;
       const dates = [
         item.publishedAt && "Opublikowano: " + formatter.format(new Date(item.publishedAt)),
-        "Koniec publikacji: " + (item.expiresAt ? formatter.format(new Date(item.expiresAt))
-          : item.endsOn ? dayFormatter.format(new Date(item.endsOn + "T12:00:00Z")) : "—"),
+        "Koniec publikacji: " + expiryLabel(item),
         item.withdrawnAt && "Wycofano: " + formatter.format(new Date(item.withdrawnAt))
       ].filter(Boolean);
       main.append(headline, badge, text("p", item.summary));
@@ -100,6 +143,12 @@
         if (window.confirm("Wycofać z publikacji ogłoszenie „" + item.title + "”?")) {
           save("withdraw_announcement", { p_id: item.id, p_revision: item.revision }, "Ogłoszenie wycofane.");
         }
+      }));
+      if (["withdrawn", "expired"].includes(item.status)) actions.append(button("Usuń", () => {
+        if (busy || deleteDialog.open) return;
+        pendingDeletion = item;
+        deleteName.textContent = item.title;
+        deleteDialog.showModal();
       }));
       side.append(actions);
       row.append(main, side);
@@ -123,6 +172,7 @@
       if (generation !== sessionGeneration) return;
       items = rows;
       articles();
+      updateExpiredStatuses();
     } catch (error) {
       if (generation === sessionGeneration) handleError(error);
     }
@@ -131,6 +181,7 @@
   function showList() {
     if (publishDialog.open) publishDialog.close();
     if (dateDialog.open) dateDialog.close();
+    if (deleteDialog.open) deleteDialog.close();
     form.hidden = true;
     listView.hidden = false;
     current = null;
@@ -225,14 +276,17 @@
   function previewContent() {
     preview.querySelector("h3").textContent = titleInput.value.trim() || "Tytuł ogłoszenia";
     const now = new Date();
-    preview.querySelector(".announcement-date").textContent = current?.publishedAt
+    const publication = current?.publishedAt
       ? "Opublikowano: " + dayFormatter.format(new Date(current.publishedAt))
       : "Podgląd — nieopublikowane";
+    const archived = {withdrawn: "Wycofane", expired: "Wygasłe"}[current?.status];
+    preview.querySelector(".announcement-date").textContent = archived ? archived + " · " + publication : publication;
     const defaultDay = moveDays(warsawToday(now), 30);
     dateOpen.textContent = dateInput.value ? dayFormatter.format(new Date(dateInput.value + "T12:00:00Z")) : "Wybierz datę";
     dateClear.disabled = dateOpen.disabled || Boolean(current?.publishedAt) || !dateInput.value;
-    expiryPreview.textContent = dateInput.value ? "Koniec publikacji: " + dayFormatter.format(new Date(dateInput.value + "T12:00:00Z"))
-      : current?.expiresAt ? "Koniec publikacji: " + formatter.format(new Date(current.expiresAt))
+    expiryPreview.textContent = current?.expiresAt && (dateInput.value || null) === current.endsOn
+      ? "Koniec publikacji: " + expiryLabel(current)
+      : dateInput.value ? "Koniec publikacji: " + formatDay(dateInput.value)
       : !current?.publishedAt ? "Przy publikacji dziś: " + dayFormatter.format(defaultDay) : "";
     content.render(bodyPreview, content.read(editor));
   }
@@ -426,6 +480,7 @@
       busy = false;
       form.inert = false;
       items = [];
+      clearTimeout(statusTimer);
       selectedStatus = "all";
       list.replaceChildren();
       message.textContent = "";

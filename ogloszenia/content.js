@@ -1,5 +1,6 @@
 (() => {
   const allowed = new Set(["p", "h2", "h3", "strong", "em", "u", "ul", "ol", "li", "br", "a"]);
+  const blocks = new Set(["p", "h2", "h3", "ul", "ol", "li"]);
   const tags = { div: "p", b: "strong", i: "em" };
 
   function safeLink(value) {
@@ -18,6 +19,21 @@
       const tag = tags[node.localName] || node.localName;
       const children = [...node.childNodes].flatMap(readNode);
       if (!allowed.has(tag)) return children;
+      if (tag === "p" && children.some(child => blocks.has(child?.tag))) {
+        // Chromium may put several lines or list blocks inside one editor div.
+        // Keep blocks as siblings; a paragraph can contain only inline content.
+        const result = [];
+        let inline = [];
+        for (const child of children) {
+          if (blocks.has(child?.tag)) {
+            if (inline.length) result.push({ tag, children: inline });
+            inline = [];
+            result.push(child);
+          } else inline.push(child);
+        }
+        if (inline.length) result.push({ tag, children: inline });
+        return result;
+      }
       if (tag === "a") {
         const href = safeLink(node.getAttribute("href"));
         return href ? [{ tag, href, children }] : children;

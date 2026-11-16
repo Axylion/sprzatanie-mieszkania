@@ -26,7 +26,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-8-4 to v13-8-5 update under the GitHub Pages subpath', async () => {
+test('PWA v13-8-5 to v13-9-0 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -56,7 +56,7 @@ test('PWA v13-8-4 to v13-8-5 update under the GitHub Pages subpath', async () =>
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-8-5', 'shell-v13-8-4')
+      ? contents.toString().replace('shell-v13-9-0', 'shell-v13-8-5')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -98,18 +98,21 @@ test('PWA v13-8-4 to v13-8-5 update under the GitHub Pages subpath', async () =>
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-8-4');
+      const cache = await caches.open('goleszan19-shell-v13-8-5');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
+      localStorage.setItem('goleszan19-hidden-announcements-v1', JSON.stringify([JSON.stringify(['old-hidden', 1])]));
+      localStorage.removeItem('goleszan19-hidden-announcements-v2');
     });
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-8-5') && !keys.includes('goleszan19-shell-v13-8-4');
+      return keys.includes('goleszan19-shell-v13-9-0') && !keys.includes('goleszan19-shell-v13-8-5');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
     assert.equal(await page.locator('#ogloszenie-postgres-microseconds').count(),1);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('goleszan19-hidden-announcements-v2'))?.includes('old-hidden'));
     assert.equal(await page.locator('#ogloszenie-expired').count(),0);
     assert.equal(await page.evaluate(() => parseAnnouncementDate('2026-11-15T23:03:38.627737+00:00')),
       Date.parse('2026-11-15T23:03:38.627Z'));
@@ -275,10 +278,35 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.clock.setFixedTime(new Date('2026-11-04T12:00:00Z'));
     await page.reload();
 
-    data = [announcement('a', long), announcement('b', long), announcement('short','Krótki tekst.'),
+    data = [announcement('b', long, {legacyHideKey:'shared'}), announcement('short','Krótki tekst.'),
+      announcement('a', long, {publishedAt:'2026-01-02T12:00:00Z',legacyHideKey:'shared'}),
       announcement('future',long,{publishedAt:'2099-01-01'}), announcement('expired',long,{expiresAt:'2026-01-02'}), {id:'invalid'}];
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+    const slide = page.locator('.announcement-entry');
+    const position = page.locator('#announcement-position');
+    const nextSlide = page.getByRole('button', {name:'Następne ogłoszenie'});
+    const previousSlide = page.getByRole('button', {name:'Poprzednie ogłoszenie'});
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.equal(await slide.count(),1);
+    assert.equal(await position.textContent(),'1 / 3');
+    assert.equal(await previousSlide.isDisabled(),true);
+    await nextSlide.click();
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
+    await nextSlide.press('ArrowRight');
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-short');
+    assert.equal(await slide.locator('.announcement-toggle').isVisible(),false);
+    assert.equal(await nextSlide.isDisabled(),true);
+    await previousSlide.click();
+    await previousSlide.click();
+    const swipe = dx => slide.locator('.announcement-body').evaluate((element, dx) => {
+      const init = {pointerId:4, pointerType:'touch', isPrimary:true, bubbles:true, clientY:100};
+      element.dispatchEvent(new PointerEvent('pointerdown', {...init,clientX:120}));
+      element.dispatchEvent(new PointerEvent('pointerup', {...init,clientX:120+dx}));
+    }, dx);
+    await swipe(-90);
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
+    await swipe(90);
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-a');
     for (const width of [320, 360, 390, 430, 768, 1280]) {
       await page.setViewportSize({width,height:844});
       for (const theme of ['light','dark']) {
@@ -289,20 +317,22 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
         assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).color), 'rgb(255, 255, 255)');
         assert.equal(await page.locator('#announcements-card').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(255, 246, 175)');
         assert.equal(await page.locator('#announcements-heading').evaluate(e => getComputedStyle(e).fontWeight), '700');
-        assert.equal(await page.locator('.announcement-entry').nth(2).locator('.announcement-toggle').isVisible(), false);
         const first = page.locator('.announcement-entry').nth(0);
         assert.equal(await first.locator('.announcement-toggle').isVisible(), true);
         assert.ok(await first.locator('p').evaluate(e => Math.abs(e.clientHeight - parseFloat(getComputedStyle(e).lineHeight)*3) < 2));
         await first.locator('.announcement-toggle').click();
         assert.equal(await first.locator('.announcement-toggle').textContent(), 'Zwiń ↑');
-        assert.equal(await page.locator('.announcement-entry').nth(1).locator('.announcement-toggle').getAttribute('aria-expanded'), 'false');
+        await nextSlide.click();
+        assert.equal(await slide.locator('.announcement-toggle').getAttribute('aria-expanded'), 'false');
+        await previousSlide.click();
+        assert.equal(await slide.locator('.announcement-toggle').getAttribute('aria-expanded'), 'true');
         await first.locator('.announcement-toggle').click();
         assert.equal(await first.locator('.announcement-toggle').textContent(), 'Więcej ↓');
         if (process.env.SCREENSHOT_DIR) await page.screenshot({path:path.join(process.env.SCREENSHOT_DIR,`mobile-${width}-${theme}.png`),fullPage:true});
       }
     }
     assert.ok(await page.locator('#announcements-card').evaluate(e => e.compareDocumentPosition(document.querySelector('.intro')) & Node.DOCUMENT_POSITION_FOLLOWING));
-    assert.equal(await page.locator('.announcement-date').first().textContent(), 'Opublikowano: 1 sty 2026');
+    assert.equal(await page.locator('.announcement-date').first().textContent(), 'Opublikowano: 2 sty 2026');
     // Icon, 26px transparent circle, 44px hit target and keyboard operation.
     assert.equal(await page.locator('#shortcut-open svg').count(), 1);
     assert.equal(await page.locator('#shortcut-open svg').evaluate(e => getComputedStyle(e).stroke), 'rgb(255, 255, 255)');
@@ -310,19 +340,25 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.match(await dismiss.getAttribute('aria-label'), /na tym urządzeniu/);
     assert.deepEqual(await dismiss.evaluate(e => ({width:e.offsetWidth,height:e.offsetHeight,bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,svg:e.querySelector('svg').getBoundingClientRect().width})), {width:44,height:44,bg:'rgba(0, 0, 0, 0)',color:'rgb(51, 51, 51)',svg:26});
     await page.locator('#announcements-open').click();
-    assert.ok(await page.getByText('Brak ukrytych ogłoszeń.', { exact:true }).isVisible());
+    assert.equal(await page.locator('#hidden-announcements-list button').count(),3);
     await page.getByRole('button', { name: 'Zamknij ogłoszenia' }).click();
     await dismiss.focus();
     await page.keyboard.press('Enter');
-    assert.equal(await page.locator('.announcement-entry').count(), 2);
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
+    assert.equal(await position.textContent(),'1 / 2');
     assert.equal(await page.locator('.announcement-dismiss').first().evaluate(e => e === document.activeElement), true);
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 2);
+    await page.locator('#ogloszenie-b').waitFor();
+    await page.goto(url + '#ogloszenie-a');
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('goleszan19-hidden-announcements-v2'))),['a']);
+    await nextSlide.click();
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
     // Separate device/browser context still sees all announcements; JSON is unchanged.
     const other = await browser.newContext();
     const otherPage = await other.newPage();
     await otherPage.goto(url);
-    await otherPage.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+    await otherPage.locator('#ogloszenie-a').waitFor();
     await other.close();
     assert.equal(data.length, 6);
     await page.locator('.announcement-dismiss').first().click();
@@ -351,24 +387,26 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
       await restore.click();
       await hidden.filter({hasText:title}).click();
     }
-    // Reused IDs with new publication dates/title/body/version must not inherit hiding.
-    await page.locator('.announcement-dismiss').first().click();
-    const original = {...data[0]};
-    for (const change of [{title:'Zmieniony tytuł'}, {body:'Zmieniona treść'}, {publishedAt:'2026-02-01T12:00:00Z'}, {updatedAt:'2026-02-01T12:00:00Z'}, {id:'new-id'}]) {
-      data[0] = {...original, ...change};
-      await page.reload();
-      await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
-    }
-    // Corrupt storage and storage quota/permission errors do not break announcements.
-    await page.evaluate(() => localStorage.setItem('goleszan19-hidden-announcements-v1', '{bad json'));
+    // Editing keeps the same ID hidden; a different ID does not inherit its state.
+    await dismiss.click();
+    data[1] = {...data[1], title:'Zmieniony tytuł', version:2};
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.equal(await position.textContent(),'1 / 2');
+    data[1] = {...data[1], id:'new-id', publishedAt:'2026-02-01T12:00:00Z'};
+    await page.reload();
+    await page.locator('#ogloszenie-new-id').waitFor();
+    assert.equal(await position.textContent(),'1 / 3');
+    await page.evaluate(() => localStorage.setItem('goleszan19-hidden-announcements-v2', '{bad json'));
+    await page.reload();
+    await page.locator('#ogloszenie-new-id').waitFor();
     await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); }; });
-    await page.locator('.announcement-dismiss').first().click();
-    assert.equal(await page.locator('.announcement-entry').count(), 2);
+    await dismiss.click();
+    assert.equal(await position.textContent(),'1 / 2');
     await restore.click();
-    await hidden.first().click();
-    assert.equal(await page.locator('.announcement-entry').count(), 3);
+    await hidden.filter({hasText:'Zmieniony tytuł'}).click();
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-new-id');
+    assert.equal(await position.textContent(),'1 / 3');
     // System theme follows OS changes.
     await page.reload();
     await setTheme(page, 'system');
@@ -421,7 +459,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-8-5');
+      const c = await caches.open('goleszan19-shell-v13-9-0');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);
@@ -487,7 +525,7 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
       await page.clock.install({time:new Date('2026-11-04T22:59:58Z')});
       await page.clock.pauseAt(new Date('2026-11-04T22:59:59Z'));
       await page.goto(`http://127.0.0.1:${server.address().port}/`);
-      await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+      await page.locator('#ogloszenie-permanent').waitFor();
       pages.push(page);
       const parsed = await page.evaluate(() => [
         parseAnnouncementDate('2026-11-04T12:30:00'),
@@ -516,23 +554,24 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
     const [page, other] = pages;
     const hide = id => page.getByRole('button',{name:'Ukryj ogłoszenie na tym urządzeniu: Informacja '+id,exact:true}).click();
     await hide('permanent');
+    await page.getByRole('button',{name:'Następne ogłoszenie'}).click();
     await hide('instant');
     assert.equal(await page.locator('.announcement-entry').count(),1);
-    assert.equal(await other.locator('.announcement-entry').count(),3);
+    assert.equal(await other.locator('#announcement-position').textContent(),'1 / 3');
     // Dokładnie o północy w Warszawie ogłoszenie z samą datą znika na obu urządzeniach.
     for (const p of pages) await p.clock.runFor(1000);
     assert.equal(await page.locator('#announcements-card').isVisible(),false);
     assert.equal(await page.locator('#announcements-card').evaluate(e => e.getBoundingClientRect().height),0);
-    assert.equal(await other.locator('.announcement-entry').count(),2);
+    assert.equal(await other.locator('#announcement-position').textContent(),'1 / 2');
     for (const id of ['permanent','instant']) {
       await page.locator('#announcements-open').click();
       await page.locator('#hidden-announcements-list button').filter({hasText:'Informacja '+id}).click();
     }
-    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent','Informacja instant']);
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja instant']);
     await hide('instant');
     for (const p of pages) await p.clock.runFor(2000);
     await page.locator('#announcements-open').click();
-    assert.ok(await page.getByText('Brak ukrytych ogłoszeń.', {exact:true}).isVisible());
+    assert.equal(await page.locator('#hidden-announcements-list button').count(),1);
     await page.getByRole('button', {name:'Zamknij ogłoszenia'}).click();
     assert.deepEqual(await other.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
     // Termin nie usuwa wpisu z JSON i nie można go przywrócić lokalną funkcją.
@@ -543,21 +582,22 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()),data);
     // Zaplanowana publikacja również uwzględnia Warsaw i działa bez przeładowania.
     for (const p of pages) await p.clock.runFor(1000);
-    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
     await page.locator('#announcements-open').click();
-    assert.ok(await page.getByText('Brak ukrytych ogłoszeń.', {exact:true}).isVisible());
+    assert.equal(await page.locator('#hidden-announcements-list button').count(),2);
     await page.getByRole('button', {name:'Zamknij ogłoszenia'}).click();
     // Wpisy bez expiresAt pozostają aktywne także po miesiącu.
     for (const p of pages) {
       await p.clock.fastForward(16 * 86400000);
       await p.clock.fastForward(16 * 86400000);
     }
-    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
-    // Przedłużony termin jest nową wersją, nie dziedziczy wcześniejszego ukrycia.
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
+    // Zmiana terminu nie zmienia trwałego ID ani lokalnego ukrycia.
     data[2].expiresAt = '2099-12-31';
+    await page.goto(new URL(page.url()).origin + '/');
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
-    assert.equal(await page.locator('.announcement-entry h3').allTextContents().then(t => t.includes('Informacja instant')),true);
+    await page.locator('#ogloszenie-future').waitFor();
+    assert.equal(await page.locator('#announcement-position').textContent(),'1 / 2');
     assert.deepEqual(errors,[]);
   } finally {
     await browser.close();

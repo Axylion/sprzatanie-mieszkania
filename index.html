@@ -251,7 +251,7 @@
     #announcements-card[hidden], .announcement-toggle[hidden] { display: none; }
     .announcement-heading { font-size: 20px; font-weight: 700; }
     .announcement-entry { position: relative; }
-    .announcement-entry h3, .announcement-date { padding-right: 40px; }
+    .announcement-entry > h3, .announcement-date { padding-right: 40px; }
     .announcement-dismiss {
       position: absolute;
       top: -9px;
@@ -266,7 +266,6 @@
       place-items: center;
     }
     .announcement-dismiss svg { width: 26px; height: 26px; }
-    .announcement-entry + .announcement-entry .announcement-dismiss { top: 7px; }
     .announcement-dismiss:focus-visible {
       outline: 2px solid #2f8842;
       outline-offset: 2px;
@@ -277,11 +276,13 @@
       margin: -1px; overflow: hidden; clip-path: inset(50%);
       white-space: nowrap; border: 0;
     }
-    .announcement-entry + .announcement-entry {
-      border-top: 1px solid #e4ca49;
-      margin-top: 16px;
-      padding-top: 16px;
-    }
+    .announcement-slider { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+    .announcement-slider.single { display: block; }
+    .announcement-slider button[data-slide] { min-width: 40px; min-height: 44px; font-size: 22px; }
+    .announcement-slider button[data-slide]:disabled { opacity: .48; }
+    .announcement-slider button[data-slide][hidden], #announcement-position[hidden] { display: none; }
+    #announcements-list { touch-action: pan-y pinch-zoom; }
+    #announcement-position { text-align: center; margin: 8px 0 0; }
     :is(.announcement-entry, .announcement-preview-entry) > h3 { font-size: 16px; margin: 7px 0; }
     .announcement-body {
       margin: 5px 0;
@@ -294,7 +295,9 @@
       -webkit-line-clamp: 3;
       overflow: hidden;
     }
-    .announcement-body.expanded { display: block; }
+    .announcement-body.expanded { display: block; overflow: visible; }
+    .announcement-rich { line-height: 1.65; white-space: pre-wrap; }
+    .announcement-rich p:empty { min-height: 1lh; }
     .announcement-rich :is(p, h2, h3, ul, ol) { margin: 0 0 .45em; }
     .announcement-rich :is(ul, ol) { padding-inline-start: 1.6em; }
     .announcement-rich h2 { font-size: 1.45em; line-height: 1.22; margin-block: .55em .3em; }
@@ -412,7 +415,7 @@
 
 <dialog id="announcements-panel" class="shortcut-help" aria-labelledby="announcements-title">
   <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" aria-label="Zamknij ogłoszenia">×</button></form></div>
-  <p id="hidden-announcements-empty">Brak ukrytych ogłoszeń.</p>
+  <p id="hidden-announcements-empty">Brak aktywnych ogłoszeń.</p>
   <ul id="hidden-announcements-list"></ul>
   <div class="push-control">
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-announcements-status" data-push-category="announcements">Powiadomienia o ogłoszeniach</button>
@@ -448,7 +451,12 @@
 <main class="container" id="harmonogram">
   <section class="card announcement-card" id="announcements-card" aria-labelledby="announcements-heading" hidden>
     <h2 class="announcement-heading" id="announcements-heading">Ważna informacja dla mieszkańców</h2>
-    <div id="announcements-list"></div>
+    <div class="announcement-slider single" role="group" aria-label="Przeglądanie ogłoszeń">
+      <button type="button" data-slide="-1" aria-label="Poprzednie ogłoszenie" aria-controls="announcements-list" hidden>‹</button>
+      <div id="announcements-list"></div>
+      <button type="button" data-slide="1" aria-label="Następne ogłoszenie" aria-controls="announcements-list" hidden>›</button>
+    </div>
+    <p id="announcement-position" aria-live="polite" aria-atomic="true" hidden></p>
   </section>
 
   <div class="intro">
@@ -749,6 +757,15 @@
     <button type="submit" class="announcement-primary">Opublikuj i wyślij powiadomienia</button>
   </form>
 </dialog>
+<dialog id="announcement-delete-dialog" class="admin-announcement-dialog" aria-labelledby="announcement-delete-title" aria-describedby="announcement-delete-description">
+  <h2 id="announcement-delete-title">Usunąć ogłoszenie?</h2>
+  <p id="announcement-delete-description">Ogłoszenie zniknie z archiwum. Tej operacji nie można cofnąć.</p>
+  <p id="announcement-delete-name"></p>
+  <form class="admin-actions">
+    <button type="button" data-cancel autofocus>Anuluj</button>
+    <button type="submit">Usuń</button>
+  </form>
+</dialog>
 <dialog id="announcement-date-dialog" class="admin-announcement-dialog" aria-labelledby="announcement-date-title">
   <h2 id="announcement-date-title">Data zakończenia publikacji</h2>
   <div class="calendar-month expiry-navigation">
@@ -995,13 +1012,30 @@
   const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");
   const expandedAnnouncements = new Set();
+  const slider = announcementList.parentElement;
+  const [previousSlide, nextSlide] = slider.querySelectorAll("[data-slide]");
+  const position = document.getElementById("announcement-position");
+  const announcementPrefix = "#ogloszenie-";
+  let currentAnnouncementId;
+  let linkedAnnouncementId;
+  let visibleItems = [];
+  let slideIndex = 0;
+  let swipe;
+  let pendingScroll = false;
+  function requestLinkedAnnouncement() {
+    linkedAnnouncementId = location.hash.startsWith(announcementPrefix)
+      ? location.hash.slice(announcementPrefix.length) : undefined;
+    if (linkedAnnouncementId) { currentAnnouncementId = linkedAnnouncementId; pendingScroll = true; }
+  }
+  requestLinkedAnnouncement();
   const announcementsOpen = document.getElementById("announcements-open");
   const announcementsPanel = document.getElementById("announcements-panel");
   const hiddenList = document.getElementById("hidden-announcements-list");
   const hiddenEmpty = document.getElementById("hidden-announcements-empty");
   const excerpt = new Intl.Segmenter("pl", { granularity: "grapheme" });
   const announcementStatus = document.getElementById("announcements-status");
-  const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
+  const OLD_HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v1";
+  const HIDDEN_ANNOUNCEMENTS_KEY = "goleszan19-hidden-announcements-v2";
   let activeAnnouncements = [];
   let loadedAnnouncements = [];
   let announcementTimer;
@@ -1017,10 +1051,23 @@
       localStorage.setItem(HIDDEN_ANNOUNCEMENTS_KEY, JSON.stringify([...hiddenAnnouncements]));
     } catch (_) { /* Bez pamięci lokalnej ukrywanie działa do przeładowania strony. */ }
   }
-  // Identyfikator i wersja treści: nowe lub zmienione ogłoszenie pojawia się ponownie.
-  const announcementKey = item => item.legacyHideKey || JSON.stringify(Number.isInteger(item.version)
-    ? [item.id, item.version]
-    : [item.id, item.publishedAt, item.updatedAt, item.title, item.body, item.expiresAt]);
+  function migrateHiddenAnnouncements(items) {
+    try {
+      if (localStorage.getItem(HIDDEN_ANNOUNCEMENTS_KEY) !== null) return;
+      const previous = JSON.parse(localStorage.getItem(OLD_HIDDEN_ANNOUNCEMENTS_KEY) || "[]");
+      if (!Array.isArray(previous)) return;
+      for (const key of previous) {
+        if (typeof key !== "string") continue;
+        try {
+          const tuple = JSON.parse(key);
+          if (Array.isArray(tuple) && typeof tuple[0] === "string") hiddenAnnouncements.add(tuple[0]);
+        } catch (_) { /* Starszy klucz importu nie jest tablicą JSON. */ }
+        const matches = items.filter(item => item.legacyHideKey === key);
+        if (matches.length === 1) hiddenAnnouncements.add(matches[0].id);
+      }
+      saveHiddenAnnouncements();
+    } catch (_) { /* Pamięć lokalna jest opcjonalna. */ }
+  }
   const warsawDateParts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Warsaw", year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
@@ -1091,6 +1138,45 @@
     });
   }
 
+  function clearLinkedAnnouncement() {
+    if (location.hash.startsWith(announcementPrefix)) history.replaceState(history.state, "", location.pathname + location.search);
+    linkedAnnouncementId = undefined;
+  }
+
+  function moveSlide(step) {
+    const item = visibleItems[slideIndex + step];
+    if (!item) return;
+    clearLinkedAnnouncement();
+    currentAnnouncementId = item.id;
+    renderSlides();
+    if (document.activeElement === document.body ||
+        (document.activeElement === previousSlide && previousSlide.disabled) ||
+        (document.activeElement === nextSlide && nextSlide.disabled)) {
+      (step < 0 ? nextSlide : previousSlide).focus();
+    }
+  }
+
+  previousSlide.addEventListener("click", () => moveSlide(-1));
+  nextSlide.addEventListener("click", () => moveSlide(1));
+  slider.addEventListener("keydown", event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || !["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    if (visibleItems.length < 2) return;
+    event.preventDefault();
+    moveSlide(event.key === "ArrowLeft" ? -1 : 1);
+  });
+  announcementList.addEventListener("pointerdown", event => {
+    if (event.isPrimary && event.pointerType === "touch" && !event.target.closest("button, a")) {
+      swipe = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    }
+  });
+  announcementList.addEventListener("pointercancel", () => { swipe = undefined; });
+  announcementList.addEventListener("pointerup", event => {
+    if (swipe?.id !== event.pointerId) return;
+    const dx = event.clientX - swipe.x, dy = event.clientY - swipe.y;
+    swipe = undefined;
+    if (Math.abs(dx) >= 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) moveSlide(dx < 0 ? 1 : -1);
+  });
+
   function renderAnnouncements(items) {
     loadedAnnouncements = items;
     const now = Date.now();
@@ -1104,73 +1190,114 @@
       announcementTimer = setTimeout(() => renderAnnouncements(loadedAnnouncements),
         Math.min(Math.min(...boundaries) - now, 2147483647));
     }
-    const visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(announcementKey(item)));
     window.dispatchEvent(new Event("g19-announcements"));
     if (announcementsPanel.open) renderHiddenAnnouncements();
-    announcementList.replaceChildren();
-    announcementCard.hidden = visibleItems.length === 0;
-    visibleItems.forEach((item, index) => {
-      const article = document.createElement("article");
-      article.className = "announcement-entry";
-      article.id = "ogloszenie-" + item.id;
-      const meta = document.createElement("div");
-      meta.className = "announcement-date";
-      meta.textContent = "Opublikowano: " + fmtAnnouncementDate(item.publishedAt);
-      const title = document.createElement("h3");
-      title.textContent = item.title;
-      const body = document.createElement(Array.isArray(item.content) && item.content.some(node => typeof node !== "string") ? "div" : "p");
-      body.className = "announcement-body";
-      body.id = "announcement-body-" + index;
-      if (body.localName === "div") {
-        body.classList.add("announcement-rich");
-        window.g19AnnouncementContent.render(body, item.content);
-      } else body.textContent = item.body;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "announcement-toggle";
-      button.setAttribute("aria-controls", body.id);
-      button.hidden = true;
-      const key = announcementKey(item);
-      const dismiss = document.createElement("button");
-      dismiss.type = "button";
-      dismiss.className = "announcement-dismiss";
-      dismiss.setAttribute("aria-label", "Ukryj ogłoszenie na tym urządzeniu: " + item.title);
-      dismiss.innerHTML = '<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true" focusable="false"><circle cx="13" cy="13" r="12.5"/><path d="m9 9 8 8m0-8-8 8" stroke-width="1.5" stroke-linecap="round"/></svg>';
-      dismiss.addEventListener("click", () => {
-        hiddenAnnouncements.add(key);
-        saveHiddenAnnouncements();
-        renderAnnouncements(loadedAnnouncements);
-        announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić w oknie Ważne ogłoszenia.";
-        const remaining = announcementList.querySelectorAll(".announcement-dismiss");
-        (remaining[Math.min(index, remaining.length - 1)] || announcementsOpen).focus();
-      });
-      function updateExpanded() {
-        const expanded = expandedAnnouncements.has(key);
-        body.classList.toggle("expanded", expanded);
-        button.setAttribute("aria-expanded", String(expanded));
-        button.textContent = expanded ? "Zwiń ↑" : "Więcej ↓";
-        for (const link of body.querySelectorAll("a[href]")) link.tabIndex = expanded || button.hidden ? 0 : -1;
-      }
-      button.addEventListener("click", () => {
-        if (expandedAnnouncements.has(key)) expandedAnnouncements.delete(key);
-        else expandedAnnouncements.add(key);
-        updateExpanded();
-      });
-      updateExpanded();
-      article.append(dismiss, meta, title, body, button);
-      announcementList.append(article);
-    });
-    updateAnnouncementToggles();
+    renderSlides();
   }
+
+  function renderSlides() {
+    visibleItems = activeAnnouncements.filter(item => !hiddenAnnouncements.has(item.id) || item.id === linkedAnnouncementId);
+    const retained = visibleItems.findIndex(item => item.id === currentAnnouncementId);
+    slideIndex = retained >= 0 ? retained : Math.max(0, Math.min(slideIndex, visibleItems.length - 1));
+    const item = visibleItems[slideIndex];
+    const navigable = visibleItems.length > 1;
+    const focused = document.activeElement;
+    const focusClass = announcementList.contains(focused) ? focused.className : null;
+    const navigationFocused = focused === previousSlide || focused === nextSlide;
+    announcementCard.hidden = !item;
+    slider.classList.toggle("single", !navigable);
+    previousSlide.hidden = nextSlide.hidden = position.hidden = !navigable;
+    previousSlide.disabled = slideIndex === 0;
+    nextSlide.disabled = slideIndex >= visibleItems.length - 1;
+    const count = (slideIndex + 1) + " / " + visibleItems.length;
+    if (position.textContent !== count && navigable) position.textContent = count;
+    announcementList.replaceChildren();
+    if (!item) {
+      if (slider.contains(focused) || focusClass) announcementsOpen.focus();
+      return;
+    }
+    currentAnnouncementId = item.id;
+    const article = document.createElement("article");
+    article.className = "announcement-entry";
+    article.id = "ogloszenie-" + item.id;
+    const meta = document.createElement("div");
+    meta.className = "announcement-date";
+    meta.textContent = "Opublikowano: " + fmtAnnouncementDate(item.publishedAt);
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+    const body = document.createElement(Array.isArray(item.content) && item.content.some(node => typeof node !== "string") ? "div" : "p");
+    body.className = "announcement-body";
+    body.id = "announcement-body-" + item.id;
+    if (body.localName === "div") {
+      body.classList.add("announcement-rich");
+      window.g19AnnouncementContent.render(body, item.content);
+    } else body.textContent = item.body;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "announcement-toggle";
+    button.setAttribute("aria-controls", body.id);
+    button.hidden = true;
+    const key = item.id;
+    const dismiss = document.createElement("button");
+    dismiss.type = "button";
+    dismiss.className = "announcement-dismiss";
+    dismiss.setAttribute("aria-label", "Ukryj ogłoszenie na tym urządzeniu: " + item.title);
+    dismiss.innerHTML = '<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1" aria-hidden="true" focusable="false"><circle cx="13" cy="13" r="12.5"/><path d="m9 9 8 8m0-8-8 8" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    dismiss.addEventListener("click", () => {
+      clearLinkedAnnouncement();
+      hiddenAnnouncements.add(key);
+      saveHiddenAnnouncements();
+      renderAnnouncements(loadedAnnouncements);
+      announcementStatus.textContent = "Ogłoszenie ukryte na tym urządzeniu. Możesz je przywrócić w oknie Ważne ogłoszenia.";
+      (announcementList.querySelector(".announcement-dismiss") || announcementsOpen).focus();
+    });
+    function updateExpanded() {
+      const expanded = expandedAnnouncements.has(key);
+      body.classList.toggle("expanded", expanded);
+      button.setAttribute("aria-expanded", String(expanded));
+      button.textContent = expanded ? "Zwiń ↑" : "Więcej ↓";
+      for (const link of body.querySelectorAll("a[href]")) link.tabIndex = expanded || button.hidden ? 0 : -1;
+    }
+    button.addEventListener("click", () => {
+      if (expandedAnnouncements.has(key)) expandedAnnouncements.delete(key);
+      else expandedAnnouncements.add(key);
+      updateExpanded();
+    });
+    updateExpanded();
+    article.append(dismiss, meta, title, body, button);
+    announcementList.append(article);
+    updateAnnouncementToggles();
+    if (focusClass === "announcement-dismiss" || (navigationFocused && !navigable)) dismiss.focus();
+    if (focusClass === "announcement-toggle") {
+      (announcementList.querySelector(".announcement-toggle:not([hidden])") || announcementList.querySelector(".announcement-dismiss")).focus();
+    }
+    if (pendingScroll && linkedAnnouncementId === item.id) { pendingScroll = false; scrollToAnnouncement(); }
+  }
+
+  function scrollToAnnouncement(focus = false) {
+    const targetId = currentAnnouncementId;
+    requestAnimationFrame(() => {
+      const target = document.getElementById("ogloszenie-" + targetId);
+      if (!target || !announcementCard.getClientRects().length) return;
+      if (focus) { target.tabIndex = -1; target.focus({preventScroll: true}); }
+      target.scrollIntoView({block: "start"});
+    });
+  }
+
+  window.addEventListener("hashchange", () => {
+    const wasLinked = linkedAnnouncementId;
+    requestLinkedAnnouncement();
+    if (wasLinked || linkedAnnouncementId) renderSlides();
+  });
+
   function renderHiddenAnnouncements() {
-    const items = activeAnnouncements.filter(item =>
-      isActiveAnnouncement(item, Date.now()) && hiddenAnnouncements.has(announcementKey(item)));
+    const items = activeAnnouncements.filter(item => isActiveAnnouncement(item, Date.now()));
     const focusedKey = document.activeElement?.dataset.announcementKey;
     const buttons = items.map(item => {
       const li = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
-      button.dataset.announcementKey = announcementKey(item);
+      button.dataset.announcementKey = item.id;
       const title = document.createElement("strong");
       title.textContent = item.title;
       const sample = document.createElement("span");
@@ -1179,20 +1306,16 @@
       button.append(title, sample);
       button.addEventListener("click", () => {
         if (!isActiveAnnouncement(item, Date.now())) return renderAnnouncements(loadedAnnouncements);
-        hiddenAnnouncements.delete(announcementKey(item));
+        const wasHidden = hiddenAnnouncements.delete(item.id);
         saveHiddenAnnouncements();
         announcementsPanel.close();
-        renderAnnouncements(loadedAnnouncements);
-        announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
-        const targetId = "ogloszenie-" + item.id;
-        location.hash = targetId;
-        requestAnimationFrame(() => {
-          const target = document.getElementById(targetId);
-          if (!target) return;
-          target.tabIndex = -1;
-          target.focus({ preventScroll: true });
-          target.scrollIntoView({ block: "start" });
-        });
+        clearLinkedAnnouncement();
+        currentAnnouncementId = item.id;
+        if (wasHidden) announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
+        history.pushState(history.state, "", announcementPrefix + item.id);
+        requestLinkedAnnouncement();
+        renderSlides();
+        scrollToAnnouncement(true);
       });
       li.append(button);
       return li;
@@ -1232,6 +1355,7 @@
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Invalid announcements data");
       if (request !== announcementRequest) return;
+      migrateHiddenAnnouncements(data);
       renderAnnouncements(data);
     } catch (_) {
       // Offline nadal działa harmonogram; nie pokazuj nieaktualnych ogłoszeń.

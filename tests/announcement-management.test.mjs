@@ -18,6 +18,8 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   for (const name of (await readdir(directory)).filter(name => name.endsWith('.sql')).sort()) {
     await db.exec(await readFile(new URL(name, directory), 'utf8'));
   }
+  const migration = await readFile(new URL('202611170018_announcement_archive_expiry.sql', directory), 'utf8');
+  await db.exec(migration);
   const admin = randomUUID(), session = randomUUID(), expired = randomUUID();
   await db.query('insert into auth.users values ($1)', [admin]);
   await db.query("insert into auth.sessions values ($1,$2,now()),($3,$2,now() - interval '2 hours')", [session, admin, expired]);
@@ -83,8 +85,8 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.deepEqual(published.content, rich);
   assert.ok(!('changedBy' in published));
   const dateResult = await db.query(`select
-    g19_private.announcement_default_expiry('2026-03-01 12:00+01') = '2026-03-31 12:00+02'::timestamptz as spring,
-    g19_private.announcement_default_expiry('2026-10-01 12:00+02') = '2026-10-31 12:00+01'::timestamptz as autumn`);
+    g19_private.announcement_default_expiry('2026-03-01 12:00+01') = '2026-04-01 00:00+02'::timestamptz as spring,
+    g19_private.announcement_default_expiry('2026-10-01 12:00+02') = '2026-11-01 00:00+01'::timestamptz as autumn`);
   assert.deepEqual(dateResult.rows[0], { spring:true, autumn:true });
   await tick();
   await tick();
@@ -100,6 +102,7 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.equal(edited.version, published.version + 1);
   await tick();
   assert.deepEqual(await take(), []);
+  await assert.rejects(rpc('web_admin_delete_announcement', [id, 4]), {code:'PT409'});
   await rpc('web_admin_withdraw_announcement', [id, 4]);
   assert.equal(await active(push.id), false);
   assert.ok(!(await publicList()).some(item => item.id === id));
@@ -119,4 +122,20 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.deepEqual(bell, { items:[], unread:0 });
   await db.query('update g19_private.push_delivery set next_attempt_at = now() where notification_id = $1', [expiring.id]);
   assert.deepEqual(await take(), []);
+  const before = await db.query(`select
+    (select count(*) from g19_private.notification_inbox) as inbox,
+    (select count(*) from g19_private.push_delivery) as delivery`);
+  await assert.rejects(rpc('web_admin_delete_announcement', [id, 5], 'anon'), {code:'42501'});
+  await assert.rejects(rpc('web_admin_delete_announcement', [id, 5], 'authenticated', {}), {code:'PT403'});
+  await assert.rejects(rpc('web_admin_delete_announcement', [id, 4]), {code:'PT409'});
+  await rpc('web_admin_delete_announcement', [id, 5]);
+  await rpc('web_admin_delete_announcement', [custom, 1]);
+  await assert.rejects(save(id, 6, 'Archiwum', rich), {code:'PT409'});
+  assert.ok(!(await adminList()).some(item => [id, custom].includes(item.id)));
+  assert.ok(!(await publicList()).some(item => [id, custom].includes(item.id)));
+  await tick();
+  assert.deepEqual(await take(), []);
+  assert.deepEqual(await db.query(`select
+    (select count(*) from g19_private.notification_inbox) as inbox,
+    (select count(*) from g19_private.push_delivery) as delivery`), before);
 });

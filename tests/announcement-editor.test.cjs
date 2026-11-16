@@ -42,6 +42,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
       json = [{...record, version:record.revision, body:'Treść ogłoszenia'}];
     }
     if (method === 'g19_web_admin_withdraw_announcement') record.status = 'withdrawn';
+    if (method === 'g19_web_admin_delete_announcement') record = undefined;
     return route.fulfill({json, headers:{'Access-Control-Allow-Origin':'*'}});
   });
   const page = await context.newPage();
@@ -89,6 +90,14 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await selectLine('Przygotuj zapas wody');
   await page.getByRole('button',{name:'Lista punktowana'}).click();
   assert.equal(await page.locator('#admin-announcement-preview ul li').textContent(),'Przygotuj zapas wody');
+  const paragraphs = '<div>Pierwszy akapit<div><br></div><div>Drugi akapit</div></div>';
+  await editor.evaluate((element, html) => {
+    element.insertAdjacentHTML('beforeend', html);
+    element.dispatchEvent(new InputEvent('input', {bubbles:true}));
+  }, paragraphs);
+  const paragraphsIn = locator => locator.evaluate(element => [...element.querySelectorAll(':scope > p')].slice(-3).map(p => p.textContent));
+  const previewBody = page.locator('#admin-announcement-preview .announcement-body');
+  assert.deepEqual(await paragraphsIn(previewBody), ['Pierwszy akapit','','Drugi akapit']);
   assert.equal(await page.getByRole('button',{name:'Zapisz zmiany'}).count(),0);
   const positions = () => page.locator('#admin-announcement-form').evaluate(form=>[...form.children].map(item=>{
     const {x,y}=item.getBoundingClientRect();
@@ -113,6 +122,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await list.getByText('Szkic',{exact:true}).waitFor();
   assert.ok(!record.publishedAt);
   await list.getByRole('button',{name:'Edytuj'}).click();
+  assert.deepEqual(await paragraphsIn(editor), ['Pierwszy akapit','','Drugi akapit']);
   const publish = page.getByRole('button',{name:'Opublikuj',exact:true});
   const confirmation = page.getByRole('dialog',{name:'Opublikować ogłoszenie?'});
   for (const theme of ['light', 'dark']) {
@@ -170,6 +180,9 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await resident.goto(base + '#ogloszenie-' + record.id);
   const card=resident.locator('#announcements-card .announcement-entry');
   await card.waitFor();
+  assert.deepEqual(await paragraphsIn(card.locator('.announcement-body')), ['Pierwszy akapit','','Drugi akapit']);
+  await card.locator('.announcement-toggle').click();
+  assert.equal(await card.locator('.announcement-body').evaluate(el => el.scrollHeight <= el.clientHeight + 1),true);
   assert.equal(await card.locator('.announcement-body h2').textContent(),'Nagłówek');
   assert.equal(await card.locator('.announcement-body a').getAttribute('href'),'https://example.org/harmonogram');
   await card.locator('.announcement-dismiss').click();
@@ -179,10 +192,14 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await page.getByRole('button',{name:'Zapisz zmiany'}).click();
   await list.getByRole('heading',{name:/aktualizacja/}).waitFor();
   await resident.reload();
+  await card.waitFor({state:'hidden'});
+  await resident.locator('#announcements-open').click();
+  await resident.getByRole('button',{name:/aktualizacja/}).click();
   await card.getByRole('heading',{name:/aktualizacja/}).waitFor();
   page.once('dialog',dialog=>dialog.accept());
   await list.getByRole('button',{name:'Wycofaj z publikacji'}).click();
-  await list.getByText('Wycofane',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Wycofane (1)',exact:true}).waitFor();
+  assert.equal(await list.locator('article').count(),0);
   await page.getByRole('button',{name:'Szkice (0)',exact:true}).click();
   assert.equal(await list.locator('article').count(),0);
   await page.getByRole('button',{name:'Wycofane (1)',exact:true}).click();
@@ -200,6 +217,16 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await resident.reload();
   assert.deepEqual(await resident.locator('#announcements-card').getAttribute('hidden'),'');
   await list.getByRole('button',{name:'Edytuj'}).click();
+  assert.match(await page.locator('#admin-announcement-preview .announcement-date').textContent(), /^Wycofane · Opublikowano:/);
+  await page.locator('#announcement-cancel').click();
+  const deletion = page.locator('#announcement-delete-dialog');
+  await list.getByRole('button',{name:'Usuń',exact:true}).click();
+  await deletion.getByRole('button',{name:'Anuluj'}).click();
+  assert.equal(await list.locator('article').count(),1);
+  await list.getByRole('button',{name:'Usuń',exact:true}).click();
+  await deletion.getByRole('button',{name:'Usuń',exact:true}).click();
+  await page.getByRole('button',{name:'Wycofane (0)',exact:true}).waitFor();
+  assert.equal(await list.locator('article').count(),0);
   await page.getByRole('button',{name:'Wyloguj'}).click();
   await page.getByRole('button',{name:'Zaloguj się'}).waitFor();
   assert.equal(await editor.textContent(),'');

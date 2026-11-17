@@ -22,13 +22,14 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   t.after(() => browser.close());
   const context = await browser.newContext({ serviceWorkers:'block', viewport:{width:1280,height:900} });
   let record;
+  let filterFixtures = [];
   await context.route('https://g19test.supabase.co/**', async route => {
     const url = new URL(route.request().url());
     const method = url.pathname.split('/').at(-1);
     const args = route.request().postDataJSON() || {};
     let json = [];
     if (url.pathname === '/auth/v1/token') json = {access_token:'test-admin',expires_in:3600};
-    if (method === 'g19_web_admin_announcements') json = record ? [record] : [];
+    if (method === 'g19_web_admin_announcements') json = record ? [record, ...filterFixtures] : filterFixtures;
     if (method === 'g19_web_admin_save_announcement') {
       record = {
         id:args.p_id, title:args.p_title, summary:'Treść ogłoszenia', content:args.p_content, endsOn:args.p_ends_on,
@@ -53,6 +54,10 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await page.getByLabel('Hasło').fill('password');
   await page.getByRole('button',{name:'Zaloguj się'}).click();
   await page.locator('#admin-sections [data-section="announcements"]').click();
+  const filters = page.locator('#admin-announcement-filter');
+  assert.deepEqual(await filters.locator('button').evaluateAll(buttons => buttons.map(b => b.dataset.filter)),
+    ['published','draft','expired','withdrawn','all']);
+  assert.equal(await filters.locator('[aria-pressed=true]').getAttribute('data-filter'),'published');
   await page.locator('#announcement-new').click();
   await page.locator('#admin-announcement-form input[name="title"]').fill('Przerwa w dostawie wody');
   const editor=page.locator('#announcement-editor');
@@ -119,6 +124,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
 
   await page.getByRole('button',{name:'Zapisz szkic'}).click();
   const list=page.locator('#admin-announcement-list');
+  await filters.getByRole('button',{name:'Szkice (1)',exact:true}).click();
   await list.getByText('Szkic',{exact:true}).waitFor();
   assert.ok(!record.publishedAt);
   await list.getByRole('button',{name:'Edytuj'}).click();
@@ -171,6 +177,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   }
   await publish.click();
   await confirmation.getByRole('button',{name:'Opublikuj i wyślij powiadomienia'}).click();
+  await filters.getByRole('button',{name:'Opublikowane (1)',exact:true}).click();
   await list.getByText('Opublikowane',{exact:true}).waitFor();
   await list.getByRole('button',{name:'Edytuj'}).click();
   const firstPublication = new Intl.DateTimeFormat('pl-PL',{dateStyle:'medium',timeZone:'Europe/Warsaw'}).format(new Date(record.publishedAt));
@@ -227,6 +234,17 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await deletion.getByRole('button',{name:'Usuń',exact:true}).click();
   await page.getByRole('button',{name:'Wycofane (0)',exact:true}).waitFor();
   assert.equal(await list.locator('article').count(),0);
+  filterFixtures = ['published','draft','expired','withdrawn'].map(status => ({
+    id:status, status, title:'Ogłoszenie ' + status, summary:'Tekst', revision:1
+  }));
+  await page.getByRole('button',{name:'Odśwież',exact:true}).click();
+  await filters.getByRole('button',{name:'Wszystkie (4)',exact:true}).click();
+  assert.deepEqual(await list.locator('article').evaluateAll(rows => rows.map(row => row.dataset.state)),
+    ['published','draft','expired','withdrawn']);
+  for (const [label,status] of [['Opublikowane','published'],['Szkice','draft'],['Wygasłe','expired'],['Wycofane','withdrawn']]) {
+    await filters.getByRole('button',{name:label+' (1)',exact:true}).click();
+    assert.deepEqual(await list.locator('article').evaluateAll(rows => rows.map(row => row.dataset.state)), [status]);
+  }
   await page.getByRole('button',{name:'Wyloguj'}).click();
   await page.getByRole('button',{name:'Zaloguj się'}).waitFor();
   assert.equal(await editor.textContent(),'');

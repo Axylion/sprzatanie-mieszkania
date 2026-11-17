@@ -89,8 +89,9 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.ok(!('changedBy' in published));
   const dateResult = await db.query(`select
     g19_private.announcement_default_expiry('2026-03-01 12:00+01') = '2026-04-01 00:00+02'::timestamptz as spring,
-    g19_private.announcement_default_expiry('2026-10-01 12:00+02') = '2026-11-01 00:00+01'::timestamptz as autumn`);
-  assert.deepEqual(dateResult.rows[0], { spring:true, autumn:true });
+    g19_private.announcement_default_expiry('2026-10-01 12:00+02') = '2026-11-01 00:00+01'::timestamptz as autumn,
+    g19_private.announcement_default_expiry('2026-11-16 23:59+01') = '2026-12-17 00:00+01'::timestamptz as month_end`);
+  assert.deepEqual(dateResult.rows[0], { spring:true, autumn:true, month_end:true });
   await tick();
   await tick();
   const [push] = await take();
@@ -98,6 +99,8 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.equal(pushPayload(push).title, 'Informacja dla mieszkańców');
   assert.equal(pushPayload(push).body, 'Przerwa w dostawie wody W środę od 9:00. Szczegóły Pamiętaj o zapasie.');
   assert.equal(await active(push.id), true);
+  const inboxCount = async () => (await db.query('select count(*) as total from g19_private.notification_inbox')).rows[0].total;
+  const originalInboxCount = await inboxCount();
   await save(id, 3, 'Poprawiona informacja', ['Poprawiony tekst']);
   const edited = (await publicList()).find(item => item.id === id);
   assert.equal(edited.expiresAt, published.expiresAt);
@@ -105,6 +108,7 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.equal(edited.version, published.version + 1);
   await tick();
   assert.deepEqual(await take(), []);
+  assert.equal(await inboxCount(), originalInboxCount);
   await assert.rejects(rpc('web_admin_delete_announcement', [id, 4]), {code:'PT409'});
   await rpc('web_admin_withdraw_announcement', [id, 4]);
   assert.equal(await active(push.id), false);
@@ -112,7 +116,7 @@ test('Announcement permissions, immutable push identity, Warsaw expiry and legac
   assert.equal((await adminList()).find(item => item.id === id).status, 'withdrawn');
   const endDate = (await db.query("select ((now() at time zone 'Europe/Warsaw')::date + 5)::text as v")).rows[0].v;
   const custom = await save(null, null, 'Termin własny', ['Treść'], endDate, true);
-  const date = (await db.query("select (expires_at at time zone 'Europe/Warsaw')::date = ends_on + 1 as correct from g19_private.announcements where id = $1", [custom])).rows[0];
+  const date = (await db.query("select (expires_at at time zone 'Europe/Warsaw') = (ends_on + 1)::timestamp as correct from g19_private.announcements where id = $1", [custom])).rows[0];
   assert.equal(date.correct, true);
   await tick();
   const [expiring] = await take();

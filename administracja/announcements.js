@@ -43,7 +43,7 @@
   let cursor;
   const titleInput = form.elements.title;
   let items = [];
-  let selectedStatus = "all";
+  let selectedStatus = "published";
   let draftId;
   let current = null;
   let initial = "";
@@ -77,8 +77,7 @@
     return element;
   }
 
-  const matchesFilter = (item, key) => key === "all"
-    ? ["draft", "published"].includes(item.status) : item.status === key;
+  const matchesFilter = (item, key) => key === "all" || item.status === key;
   const formatDay = day => dayFormatter.format(new Date(day + "T12:00:00Z"));
   function expiryLabel(item) {
     if (item.displayEndsOn) return formatDay(item.displayEndsOn);
@@ -481,7 +480,7 @@
       form.inert = false;
       items = [];
       clearTimeout(statusTimer);
-      selectedStatus = "all";
+      selectedStatus = "published";
       list.replaceChildren();
       message.textContent = "";
       showList();

@@ -115,6 +115,7 @@
       const count = items.filter(item => matchesFilter(item, key)).length;
       tab.textContent = filterLabels[key] + " (" + count + ")";
       tab.setAttribute("aria-pressed", String(key === selectedStatus));
+      tab.disabled = key === selectedStatus;
     }
     const selected = items.filter(item => matchesFilter(item, selectedStatus));
     list.replaceChildren(...selected.map(item => {
@@ -364,7 +365,7 @@
   publishDialog.addEventListener("close", () => { if (!form.hidden && !busy) publishButton.focus(); });
   filter.addEventListener("click", event => {
     const key = event.target.closest("[data-filter]")?.dataset.filter;
-    if (!key) return;
+    if (!key || key === selectedStatus) return;
     selectedStatus = key;
     articles();
   });
@@ -445,7 +446,9 @@
     rooms.hidden = announcements;
     section.hidden = !announcements;
     for (const control of nav.querySelectorAll("button")) {
-      control.setAttribute("aria-pressed", String((control.dataset.section === "announcements") === announcements));
+      const selected = (control.dataset.section === "announcements") === announcements;
+      control.setAttribute("aria-pressed", String(selected));
+      control.disabled = selected && (announcements || !document.querySelector("#admin-rooms.admin-room-selected"));
     }
     if (announcements) refresh();
     document.getElementById("admin-title").textContent = announcements ? "Ważne ogłoszenia" : "Zarządzanie pokojami";

@@ -15,7 +15,7 @@
   const homeEntry = home.querySelector('a[href="#poradnik"]');
   const guide = document.querySelector("#poradnik-view");
   const discussion = document.querySelector("#discussion-view");
-  const discussionEntry = document.querySelector(".discussion-entry");
+  const discussionEntry = document.querySelector("#chat-open");
   const footer = document.querySelector("footer");
   const gallery = document.querySelector("#poradnik-gallery");
   const galleryImage = gallery.querySelector("img");

@@ -26,7 +26,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async () => {
+test('PWA v13-9-0-r2 to v13-10-0 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -56,7 +56,7 @@ test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async ()
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-9-0-r2', 'shell-v13-9-0')
+      ? contents.toString().replace('shell-v13-10-0', 'shell-v13-9-0-r2')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -98,7 +98,7 @@ test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async ()
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-9-0');
+      const cache = await caches.open('goleszan19-shell-v13-9-0-r2');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
       localStorage.setItem('goleszan19-hidden-announcements-v1', JSON.stringify([JSON.stringify(['old-hidden', 1])]));
       localStorage.removeItem('goleszan19-hidden-announcements-v2');
@@ -107,7 +107,7 @@ test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async ()
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-9-0-r2') && !keys.includes('goleszan19-shell-v13-9-0');
+      return keys.includes('goleszan19-shell-v13-10-0') && !keys.includes('goleszan19-shell-v13-9-0-r2');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
@@ -149,7 +149,7 @@ test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async ()
         assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
         assert.equal(await page.evaluate(()=>[...document.querySelectorAll('link[rel=stylesheet]')].every(link=>link.sheet?.cssRules.length > 0)),true);
       }
-      assert.deepEqual(await page.locator('.dashboard-links svg').evaluateAll(icons=>icons.map(icon=>icon.getBoundingClientRect().width)),[24,24]);
+      assert.deepEqual(await page.locator('.dashboard-links svg').evaluateAll(icons=>icons.map(icon=>icon.getBoundingClientRect().width)),[24]);
       assert.equal(await page.locator('#calendar-days').evaluate(element=>getComputedStyle(element).display),'grid');
     }
     const shadow = locator => locator.evaluate(element => getComputedStyle(element).boxShadow);
@@ -178,7 +178,7 @@ test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async ()
         await checkControl('.brand-icon');
         await checkControl('#theme-toggle');
         await checkControl('.dashboard-links .guide-entry');
-        await checkControl('#calendar-days button:not(:disabled)');
+        assert.equal(await page.locator('#calendar-days button, #calendar-days [aria-pressed]').count(),0);
         await checkTextLink('footer #admin-link');
         await page.goto(appUrl + '#dyskusje');
         await checkTextLink('#discussion-view .guide-home-link');
@@ -199,7 +199,7 @@ test('PWA v13-9-0 to v13-9-0-r2 update under the GitHub Pages subpath', async ()
     await page.goto(appUrl + 'administracja/#harmonogram');
     await page.waitForURL(appUrl + '#harmonogram');
     await page.reload({waitUntil:"domcontentloaded"});
-    await page.waitForFunction(() => document.querySelectorAll('#calendar-days button').length >= 28);
+    await page.waitForFunction(() => document.querySelectorAll('#calendar-days .calendar-day').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     assert.equal(await page.locator('#announcements-restore').count(), 0);
     await page.getByRole('button', {name:'Pokój nr 3',exact:true}).click();
@@ -246,11 +246,11 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
   const url = `http://127.0.0.1:${server.address().port}/`;
   try {
     await page.goto(url);
-    await page.waitForFunction(() => document.querySelectorAll('#calendar-days button').length >= 28);
+    await page.waitForFunction(() => document.querySelectorAll('#calendar-days .calendar-day').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     assert.deepEqual(await page.evaluate(() => [roomFor(BASE),roomFor(BASE + WEEK),roomFor(BASE + 2*WEEK),roomFor(BASE - WEEK),roomFor(Date.UTC(2027,0,2))]), [3,4,1,2,4]);
     const month = page.locator('#calendar-month');
-    const days = page.locator('#calendar-days button');
+    const days = page.locator('#calendar-days .calendar-day');
     const next = page.getByRole('button', { name: 'Następny miesiąc' });
     const prev = page.getByRole('button', { name: 'Poprzedni miesiąc' });
     assert.equal(await month.textContent(), 'listopad 2026');
@@ -259,14 +259,12 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.match(await page.locator('#calendar-next').textContent(), /7–8 listopada 2026 · Pokój 4/);
     await next.click();
     assert.equal(await month.textContent(), 'grudzień 2026');
-    await days.getByText('26', { exact: true }).click();
-    assert.equal(await page.locator('#calendar-duty').textContent(), 'Pokój 3 · Dyżur sprzątania');
+    assert.ok(await days.getByText('26', { exact: true }).evaluate(el => el.classList.contains('calendar-weekend')));
     await next.click();
     assert.equal(await month.textContent(), 'styczeń 2027');
-    await days.getByText('2', { exact: true }).click();
-    assert.equal(await page.locator('#calendar-duty').textContent(), 'Pokój 4 · Dyżur sprzątania');
+    assert.ok(await days.getByText('2', { exact: true }).evaluate(el => el.classList.contains('calendar-weekend')));
     await days.getByText('4', { exact: true }).click();
-    assert.equal(await page.locator('#calendar-duty').textContent(), 'Brak zaplanowanego dyżuru');
+    assert.equal(await page.locator('#calendar-days [aria-pressed]').count(),0);
     await next.click();
     assert.equal(await days.count(), 28);
     await page.clock.setFixedTime(new Date('2028-02-10T12:00:00Z'));
@@ -459,7 +457,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-9-0-r2');
+      const c = await caches.open('goleszan19-shell-v13-10-0');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);
@@ -469,7 +467,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.locator('#shortcut-close').click();
     await context.setOffline(true);
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('#calendar-days button').length >= 28);
+    await page.waitForFunction(() => document.querySelectorAll('#calendar-days .calendar-day').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     await page.getByRole('button',{name:'Pokój nr 2',exact:true}).click();
     await page.getByRole('button', {name:'Potwierdź pokój'}).click();
@@ -477,7 +475,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.equal(await page.locator('#room-setup').isVisible(), false);
     assert.ok(await page.locator('#calendar-days .calendar-own').count() >= 2);
     await page.locator('#calendar-next-month').click();
-    assert.ok(await page.locator('#calendar-days button').count() >= 28);
+    assert.ok(await page.locator('#calendar-days .calendar-day').count() >= 28);
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(() => !document.querySelector('#announcements-card').hidden);

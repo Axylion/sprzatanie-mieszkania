@@ -21,6 +21,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, args:['--no-sandbox'] });
   t.after(() => browser.close());
   const context = await browser.newContext({ serviceWorkers:'block', viewport:{width:1280,height:900} });
+  let adminListReads=0;
   let record;
   let filterFixtures = [];
   await context.route('https://g19test.supabase.co/**', async route => {
@@ -29,7 +30,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
     const args = route.request().postDataJSON() || {};
     let json = [];
     if (url.pathname === '/auth/v1/token') json = {access_token:'test-admin',expires_in:3600};
-    if (method === 'g19_web_admin_announcements') json = record ? [record, ...filterFixtures] : filterFixtures;
+    if (method === 'g19_web_admin_announcements') { adminListReads++; json = record ? [record, ...filterFixtures] : filterFixtures; }
     if (method === 'g19_web_admin_save_announcement') {
       record = {
         id:args.p_id, title:args.p_title, summary:'Treść ogłoszenia', content:args.p_content, endsOn:args.p_ends_on,
@@ -58,6 +59,12 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   assert.deepEqual(await filters.locator('button').evaluateAll(buttons => buttons.map(b => b.dataset.filter)),
     ['published','draft','expired','withdrawn','all']);
   assert.equal(await filters.locator('[aria-pressed=true]').getAttribute('data-filter'),'published');
+  const readsBefore=adminListReads;
+  await page.locator('#admin-sections [data-section=announcements]').evaluate(el=>el.click());
+  await filters.locator('[aria-pressed=true]').evaluate(el=>el.click());
+  assert.equal(adminListReads,readsBefore);
+  assert.equal(await filters.locator('[aria-pressed=true]').isDisabled(),true);
+  assert.equal(await filters.locator('[aria-pressed=true]').evaluate(el=>getComputedStyle(el).cursor),'default');
   await page.locator('#announcement-new').click();
   await page.locator('#admin-announcement-form input[name="title"]').fill('Przerwa w dostawie wody');
   const editor=page.locator('#announcement-editor');
@@ -162,9 +169,14 @@ test('Announcement editor formats the current block, previews, publishes, hides 
       assert.equal(await page.locator('#announcement-end-date').inputValue(),'');
       const active = page.locator('#admin-sections [aria-pressed="true"]');
       await page.mouse.move(0,0);
-      const before=await active.evaluate(e=>getComputedStyle(e).boxShadow);
+      const appearance = e => {
+        const style=getComputedStyle(e);
+        return [style.boxShadow,style.backgroundColor,style.borderColor,style.cursor];
+      };
+      const before=await active.evaluate(appearance);
       await active.hover();
-      assert.notEqual(await active.evaluate(e=>getComputedStyle(e).boxShadow),before);
+      assert.deepEqual(await active.evaluate(appearance),before);
+      assert.equal(await active.isDisabled(),true);
       assert.equal(await active.getAttribute('aria-pressed'),'true');
       await publish.click();
       await confirmation.getByRole('button',{name:'Anuluj'}).waitFor();

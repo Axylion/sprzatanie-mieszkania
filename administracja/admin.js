@@ -19,6 +19,8 @@
   let expires;
   let busy = false;
   let chosen;
+  let currentRooms = [];
+  const roomTab = document.querySelector('#admin-sections [data-section="rooms"]');
   let pending;
 
   async function request(path, body, token = session) {
@@ -257,7 +259,7 @@
     const count = node("p", "admin-count");
     count.append(roomStatus(room), devicesLabel(room.devices.length));
     info.append(title, count);
-    row.append(info, action("Wszystkie pokoje", () => selectedRoom(null, rooms)));
+    row.append(info);
     card.append(row);
     if (room.devices.length) {
       const devices = node("ul", "admin-devices");
@@ -278,11 +280,18 @@
   }
 
   function render(rooms) {
+    currentRooms = rooms;
     const active = rooms.find(room => room.room === chosen);
     const historyOpen = Boolean(list.querySelector(".admin-history[open]"));
     list.classList.toggle("admin-room-selected", Boolean(active));
+    roomTab.disabled = roomTab.getAttribute("aria-pressed") === "true" && !active;
     list.replaceChildren(...(active ? [detail(active, rooms, historyOpen)] : rooms.map(room => overview(room, rooms))));
   }
+
+  roomTab.addEventListener("click", () => {
+    if (chosen == null && roomTab.getAttribute("aria-pressed") === "true") return;
+    selectedRoom(null, currentRooms);
+  });
 
   async function refresh() {
     const expected = session;

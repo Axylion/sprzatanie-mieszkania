@@ -34,6 +34,7 @@ const signatures = {
   push_subscription: ['p_token', 'p_endpoint', 'p_p256dh', 'p_auth', 'p_categories'],
   notification_activity: ['p_token', 'p_tab', 'p_active', 'p_seen', 'p_presented'],
   notification_read: ['p_token', 'p_id', 'p_categories'],
+  chat_navigation_count: ['p_token', 'p_seen'],
   my_devices: ['p_token', 'p_kind', 'p_browser'],
   revoke_device: ['p_token', 'p_device']
 };
@@ -61,6 +62,7 @@ async function database(t, legacy = false, beforeAccess = null) {
       await db.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'));
     }
   }
+  if (!legacy) await db.exec(await readFile(new URL('../supabase/migrations/202611190019_chat_navigation_count.sql', import.meta.url), 'utf8'));
   const rpc = (method, args) => db.transaction(async tx => {
     await tx.exec('set local role anon');
     const signature = legacy ? signatures[method].filter(key => key !== 'p_browser') : signatures[method];
@@ -491,7 +493,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
         return {
           aligned: Math.abs(rect('.header-inner').left - rect('#harmonogram').left) < 1,
           mobileOrder: rect('.hero').top < rect('.dashboard-calendar').top && rect('.dashboard-calendar').top < rect('.dashboard-links').top,
-          stacked: rect('.dashboard-links a:first-child').top < rect('.dashboard-links a:last-child').top
+          stacked: document.querySelectorAll('.dashboard-links a').length === 1
         };
       });
       assert.ok(layout.aligned && layout.stacked);
@@ -602,6 +604,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await a.getByText('Nie udało się wysłać wiadomości.', { exact: false }).waitFor();
   await a.locator('#discussion-send').click();
   await a.waitForFunction(() => document.querySelector('#discussion-body').value === '');
+  await b.evaluate(() => window.dispatchEvent(new Event('online')));
+  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && !document.querySelector('#chat-count').hidden);
+  await b.reload();
+  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && !document.querySelector('#chat-count').hidden);
   await b.locator('#notification-open').click();
   const bell = b.locator('#notification-panel');
   await bell.getByRole('link', { name: /Nowa wiadomość/ }).waitFor();
@@ -609,6 +615,9 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await bell.getByRole('link', { name: /Nowa wiadomość/ }).click();
   await b.waitForFunction(() => ![...document.querySelectorAll('#notification-list a[data-unread]')].some(a => a.getAttribute('href') === '#dyskusje'));
   await b.locator('.discussion-message').waitFor();
+  assert.equal(await b.locator('#chat-count').isVisible(),false);
+  assert.equal(await a.locator('#chat-count').isVisible(),false);
+  assert.equal(await c.locator('#chat-count').isVisible(),false);
 
   assert.equal(await b.locator('.discussion-message p').innerText(), messageText);
   assert.equal(await b.locator('.discussion-message img').count(), 0);
@@ -625,6 +634,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await db.exec("update g19_private.devices set next_message_at = null where room = 1");
   await rpc('send', { p_token: aKey, p_request: randomUUID(), p_body: 'Sygnał na stronie głównej' });
   await b.locator('#notification-open').click();
+  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && !document.querySelector('#chat-count').hidden);
   await b.waitForFunction(() => window.notificationTones === 1);
   await b.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
   await b.locator('#notification-open').click();
@@ -634,6 +644,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await db.exec("update g19_private.devices set next_message_at = null where room = 1");
   await rpc('send', { p_token: aKey, p_request: randomUUID(), p_body: 'Cicha wiadomość' });
   await b.getByText('Cicha wiadomość', { exact: true }).waitFor();
+  assert.equal(await b.locator('#chat-count').isVisible(),false);
   await b.waitForFunction(() => ![...document.querySelectorAll('#notification-list a[data-unread]')].some(a => a.getAttribute('href') === '#dyskusje'));
   assert.equal(await b.evaluate(() => window.notificationTones), 1);
 
@@ -716,6 +727,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
       released = true;
       return route.fulfill({ json: 1 });
     }
+    if (route.request().url().endsWith('_announcements')) return route.fulfill({json:[]});
     if (route.request().url().endsWith('_history')) {
       return route.fulfill({ json: {more: false, events: [
         { key:'connected:fixture', kind:'connected', at:'2026-11-14T09:20:00.000Z' },
@@ -790,10 +802,20 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   assert.deepEqual(await operator.evaluate(key => JSON.parse(sessionStorage.getItem(key)), storageKey), savedSession);
   assert.equal(await operator.locator('.admin-room').count(), 4);
   assert.ok(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  const roomsTab = operator.getByRole('button',{name:'Pokoje',exact:true});
+  assert.equal(await roomsTab.isDisabled(),true);
+  await operator.getByRole('button', { name: /Pokój nr 4/ }).click();
+  assert.equal(await roomsTab.isDisabled(),false);
+  assert.equal(await operator.getByRole('button',{name:'Wszystkie pokoje'}).count(),0);
+  await operator.locator('#admin-sections [data-section=announcements]').click();
+  assert.equal(await operator.locator('#admin-sections [data-section=announcements]').isDisabled(),true);
+  await roomsTab.click();
+  assert.equal(await operator.locator('.admin-room').count(),4);
+  assert.equal(await roomsTab.isDisabled(),true);
   await operator.getByRole('button', { name: /Pokój nr 4/ }).click();
   await operator.getByText('Historia pokoju', {exact:true}).click();
   await operator.getByText('Nowe urządzenie podłączone', {exact:true}).waitFor();
-  await operator.getByRole('button', {name:'Wszystkie pokoje'}).click();
+  await operator.getByRole('button', {name:'Pokoje',exact:true}).click();
   await setTheme(operator, 'light');
   const panel = operator.locator('#admin-panel');
   assert.equal(await panel.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(246, 247, 251)');
@@ -815,7 +837,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
       ['2026-11-14T09:19:00.000Z', '2026-11-14T09:20:00.000Z']);
     if (width === 770 && process.env.G19_LOGIN_SCREENSHOTS) await panel.screenshot({path:resolve(process.env.G19_LOGIN_SCREENSHOTS, 'goleszan-v13-5-history.png')});
     assert.ok(await operator.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    if (width !== 360) await operator.getByRole('button', {name:'Wszystkie pokoje'}).click();
+    if (width !== 360) await operator.getByRole('button', {name:'Pokoje',exact:true}).click();
   }
   await operator.getByRole('button', { name: 'Zwolnij pokój', exact: true }).click();
   const confirm = operator.locator('#admin-confirm');
@@ -875,4 +897,46 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await b.getByRole('button', { name: 'Najnowsze wiadomości' }).click();
   await b.getByText('Najnowsza wiadomość', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
+});
+
+test('Chat navigation count spans the inbox limit and respects room identity, visits and device access', async t => {
+  const {db,rpc} = await database(t);
+  const bind = room => rpc('bind', {p_room:room,p_proof:randomBytes(32).toString('hex')});
+  const a=await bind(1), b=await bind(2);
+  const pair=await rpc('pair_start',{p_room:1});
+  await rpc('pair_decide',{p_token:a.token,p_code:pair.code,p_approve:true});
+  const second=await rpc('pair_claim',{p_secret:pair.secret});
+  const count=(key,seen=null)=>rpc('chat_navigation_count',{p_token:key,p_seen:seen});
+  assert.deepEqual(await count(a.token),{latest:'0',unread:0});
+  await db.exec(`insert into g19_private.messages (device_id,body,request_id)
+    select id, 'Tekst ' || i, gen_random_uuid() from g19_private.devices
+    cross join generate_series(1,65) i where room=1`);
+  const reader=await count(b.token,'0');
+  assert.equal(reader.unread,130);
+  assert.equal((await count(a.token,'0')).unread,0);
+  assert.equal((await count(second.token,'0')).unread,0);
+  assert.equal((await count(b.token)).unread,0);
+  assert.equal((await count(b.token,reader.latest)).unread,0);
+  await rpc('notification_preferences',{p_token:b.token,p_categories:[],p_initialize:false});
+  assert.equal((await count(b.token,'0')).unread,130);
+  await db.exec(`insert into g19_private.notification_inbox
+    (device_id,category,event_key,title,description,target,created_at)
+    select id, category, 'fixture', 'Test', 'Test', '#calendar-title', now()
+    from g19_private.devices cross join unnest(array['duties','announcements']) category
+    where room=2`);
+  await rpc('notification_read',{p_token:b.token,p_id:null,p_categories:['messages']});
+  const categories = (await db.query(`select category,count(*)::integer total,
+    count(*) filter(where read_at is null)::integer unread
+    from g19_private.notification_inbox where device_id=(select id from g19_private.devices where room=2)
+    group by category order by category`)).rows;
+  assert.deepEqual(categories,[{category:'announcements',total:1,unread:1},{category:'duties',total:1,unread:1},{category:'messages',total:130,unread:0}]);
+  await assert.rejects(count('invalid','0'),{code:'PT401'});
+  await assert.rejects(count(b.token,'-1'),{code:'PT400'});
+  await assert.rejects(db.transaction(async tx=>{
+    await tx.exec('set local role authenticated');
+    await tx.query('select public.g19_chat_navigation_count($1,0)',[b.token]);
+  }),{code:'42501'});
+  assert.ok(!JSON.stringify(reader).includes('Tekst'));
+  await db.exec("update g19_private.devices set revoked_at=now() where room=2");
+  await assert.rejects(count(b.token,'0'),{code:'PT401'});
 });

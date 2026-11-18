@@ -387,6 +387,7 @@
     </div>
     <div class="header-actions">
       <button type="button" class="settings-entry notification-bell" id="notification-open" aria-label="Powiadomienia" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg><span id="notification-count" hidden></span></button>
+      <a class="settings-entry notification-bell chat-entry" id="chat-open" href="#dyskusje" aria-label="Dyskusje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg><span id="chat-count" hidden></span></a>
       <button type="button" class="settings-entry notification-bell" id="announcements-open" aria-label="Ważne ogłoszenia" aria-describedby="announcements-push-indicator" aria-haspopup="dialog">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v5h5l9 4V6l-9 4H4Zm4 5 2 5m10-10 2-2m-2 6 2 2"/></svg>
         <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span>
@@ -483,11 +484,7 @@
     <span class="guide-entry-arrow" aria-hidden="true">→</span>
   </a>
 
-  <a class="card guide-entry discussion-entry" href="#dyskusje">
-    <span class="guide-entry-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg></span>
-    <span><strong>Dyskusje</strong><small>Wspólne sprawy mieszkańców</small></span>
-    <span class="guide-entry-arrow" aria-hidden="true">→</span>
-  </a>
+
 
   </nav>
       <section class="card cleaning-rules">
@@ -548,7 +545,7 @@
       <button type="button" id="calendar-next-month" aria-label="Następny miesiąc">›</button>
     </div>
     <div class="calendar-grid" aria-label="Dni tygodnia"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span></div>
-    <div class="calendar-grid" id="calendar-days" role="group" aria-label="Wybierz datę"></div>
+    <div class="calendar-grid" id="calendar-days" role="group" aria-label="Kalendarz dyżurów"></div>
     <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
     <div class="calendar-date-info"><span id="calendar-duty" class="sr-only" aria-live="polite"></span><div class="push-control">
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status" data-push-category="duties">Powiadomienia o dyżurach</button>
@@ -847,24 +844,12 @@
   const calendarDays = document.getElementById("calendar-days");
   let calendarMonth = new Date(initialDay);
   calendarMonth.setUTCDate(1);
-  let calendarDate = initialDay;
 
   function dutyOn(timestamp) {
     const weekday = new Date(timestamp).getUTCDay();
     if (weekday === 6) return roomFor(timestamp);
     if (weekday === 0) return roomFor(timestamp - dayMs);
     return null;
-  }
-
-  function selectCalendarDate(timestamp) {
-    calendarDate = timestamp;
-    for (const button of calendarDays.querySelectorAll("button")) {
-      button.setAttribute("aria-pressed", String(Number(button.dataset.date) === timestamp));
-    }
-    const room = dutyOn(timestamp);
-    document.getElementById("calendar-duty").textContent = room
-      ? "Pokój " + room + " · Dyżur sprzątania"
-      : "Brak zaplanowanego dyżuru";
   }
 
   function renderCalendar() {
@@ -886,28 +871,25 @@
     };
     for (let i = 0; i < (calendarMonth.getUTCDay() + 6) % 7; i++) blank();
     for (let timestamp = +calendarMonth; timestamp < +end; timestamp += dayMs) {
-      const button = document.createElement("button");
+      const cell = document.createElement("span");
       const duty = dutyOn(timestamp);
-      button.type = "button";
-      button.dataset.date = String(timestamp);
-      button.textContent = new Date(timestamp).getUTCDate();
-      button.setAttribute("aria-label", dateText(timestamp) + (duty ? ", dyżur: pokój " + duty : ""));
-      if (timestamp === today) button.setAttribute("aria-current", "date");
-      if (duty) button.classList.add("calendar-weekend");
-      if (duty === Number(selectedRoom)) button.classList.add("calendar-own");
-      button.addEventListener("click", () => selectCalendarDate(timestamp));
-      cells.push(button);
+      cell.className = "calendar-day";
+      cell.dataset.date = String(timestamp);
+      cell.textContent = new Date(timestamp).getUTCDate();
+      cell.setAttribute("aria-label", dateText(timestamp) + (duty ? ", dyżur: pokój " + duty : ""));
+      if (timestamp === today) cell.setAttribute("aria-current", "date");
+      if (duty) cell.classList.add("calendar-weekend");
+      if (duty === Number(selectedRoom)) cell.classList.add("calendar-own");
+      cells.push(cell);
     }
     while (cells.length % 7) blank();
     calendarDays.replaceChildren(...cells);
-    selectCalendarDate(calendarDate);
+
   }
 
   for (const [selector, offset] of [["calendar-prev", -1], ["calendar-next-month", 1]]) {
     document.getElementById(selector).addEventListener("click", () => {
       calendarMonth.setUTCMonth(calendarMonth.getUTCMonth() + offset);
-      const today = todayInPoland();
-      calendarDate = monthFormat.format(today) === monthFormat.format(calendarMonth) ? today : +calendarMonth;
       renderCalendar();
     });
   }

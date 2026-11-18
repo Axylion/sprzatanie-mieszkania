@@ -200,7 +200,7 @@
 }
 .notification-bell { position: relative; }
 .notification-bell svg { width: 21px; height: 21px; }
-#notification-count { position: absolute; top: -5px; right: -5px; padding: 2px 5px; border-radius: 12px; background: #ffe273; color: #09242e; font-size: .7rem; }
+#notification-count, #chat-count { position: absolute; top: -5px; right: -5px; padding: 2px 5px; border-radius: 12px; background: #ffe273; color: #09242e; font-size: .7rem; }
 .notification-heading { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
 #notification-list { list-style: none; margin: 12px 0; padding: 0; max-height: 55vh; overflow-y: auto; }
 #notification-list li + li { border-top: 1px solid var(--border); }
@@ -245,7 +245,7 @@
 }
 .calendar-grid + .calendar-grid, .dashboard-calendar .calendar-legend { margin-block: 6px 10px; }
 .calendar-grid span { color: var(--muted); font-size: .83rem; }
-.calendar-grid button, .calendar-month button {
+.calendar-grid button, .calendar-month button, .calendar-grid .calendar-day {
   min-width: 0;
   min-height: 38px;
   padding: 0;
@@ -254,6 +254,7 @@
   background: transparent;
   color: var(--text);
 }
+.calendar-grid .calendar-day { display: grid; place-items: center; font-size: inherit; }
 .calendar-month button { min-height: 44px; background: var(--surface-alt); font-size: 1.35rem; }
 .calendar-grid .calendar-weekend { background: var(--accent-bg); color: var(--accent-text); }
 .dashboard-calendar .calendar-own { background: var(--accent); color: #fff; }
@@ -273,7 +274,7 @@
   color: var(--text);
   background: var(--surface-alt);
 }
-#admin-view button:hover, #admin-confirm button:hover { background: var(--accent-bg); }
+#admin-view button:not(:disabled):hover, #admin-confirm button:not(:disabled):hover { background: var(--accent-bg); }
 #admin-view :focus-visible, #admin-confirm :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) { background: #061c23; transition: none; }
 #admin-login {
@@ -530,7 +531,7 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 .admin-icon { display: inline-flex; flex: none; width: 16px; height: 16px; vertical-align: middle; }
 .admin-icon svg { width: 100%; height: 100%; }
 #admin-panel button { background: var(--admin-inset); border-color: var(--admin-edge); color: var(--admin-text); font-size: 14px; }
-#admin-panel button:hover { border-color: var(--accent); }
+#admin-panel button:not(:disabled):hover { border-color: var(--accent); }
 #admin-panel .admin-actions button,
 #admin-panel .admin-room-actions button { display: inline-flex; align-items: center; gap: 4px; }
 #admin-panel .admin-actions .admin-icon, .admin-room-actions .admin-icon { width: 12px; height: 12px; }
@@ -695,14 +696,20 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 :root[data-theme="dark"] { --control-hover: rgb(107 228 236 / 59%); }
 @media (hover: hover) and (pointer: fine) {
   :is(button:not(:disabled), summary, select:not(:disabled), #theme-menu label):hover,
-  a:where(.brand-icon, .guide-entry, .guide-categories a, #notification-list a):hover {
+  a:where(.brand-icon, .guide-entry, .guide-categories a, #notification-list a, .chat-entry):hover {
     box-shadow: inset 0 0 0 1px var(--control-hover), 0 0 8px var(--control-hover);
   }
-  a[href]:not(:where(.brand-icon, .guide-entry, .guide-categories a, #notification-list a)):hover {
+  a[href]:not(:where(.brand-icon, .guide-entry, .guide-categories a, #notification-list a, .chat-entry)):hover {
     text-decoration-line: underline;
     text-underline-offset: .16em;
   }
 }
 :where(button:not(:disabled), summary, select:not(:disabled), a[href]):focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+#admin-sections button:disabled, #admin-announcement-filter button:disabled {
+  cursor: default;
+  opacity: 1;
+  box-shadow: none;
 }

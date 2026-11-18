@@ -3,6 +3,45 @@
   const tokenKey = "goleszan19-discussion-device";
   const panel = document.querySelector("#notification-panel");
   const badge = document.querySelector("#notification-count");
+  const chatBadge = document.querySelector("#chat-count");
+  const chatLink = document.querySelector("#chat-open");
+  let chatCount = 0;
+  let chatVisitPending = true;
+  let chatNavigationRequest = 0;
+  const chatCursorKey = key => "goleszan19-chat-visited:" + config?.url + ":" + key;
+  function readChatCursor(key) {
+    try {
+      const value = localStorage.getItem(chatCursorKey(key));
+      return /^[0-9]+$/.test(value || "") ? value : null;
+    } catch { return null; }
+  }
+  function saveChatCursor(key, latest) {
+    const previous = readChatCursor(key);
+    const value = previous && BigInt(previous) > BigInt(latest) ? previous : latest;
+    try { localStorage.setItem(chatCursorKey(key), value); } catch { /* Storage can be unavailable. */ }
+  }
+  function renderChatCount() {
+    chatBadge.hidden = chatCount === 0;
+    chatBadge.textContent = chatCount > 99 ? "99+" : String(chatCount);
+    chatLink.setAttribute("aria-label", chatCount ? "Dyskusje, nowe wiadomości: " + chatCount : "Dyskusje");
+  }
+  async function refreshChatCount() {
+    const request = ++chatNavigationRequest;
+    const key = token();
+    if (!ready || !key) { chatCount = 0; renderChatCount(); return; }
+    const seen = readChatCursor(key);
+    try {
+      const count = await rpc("chat_navigation_count", {p_token:key, p_seen:seen});
+      if (request !== chatNavigationRequest || key !== token()) return;
+      if (!/^[0-9]+$/.test(count?.latest) || !Number.isSafeInteger(count.unread) || count.unread < 0) return;
+      const viewing = onChat() && !document.hidden;
+      if (seen === null || viewing) saveChatCursor(key, count.latest);
+      chatCount = viewing || seen === null ? 0 : count.unread;
+      renderChatCount();
+    } catch {
+      // Keep the last confirmed count during a transient network failure.
+    }
+  }
   const list = document.querySelector("#notification-list");
   const empty = document.querySelector("#notification-empty");
   const notice = document.querySelector("#notification-status");
@@ -169,6 +208,7 @@
   }
 
   async function refresh() {
+    refreshChatCount();
     const id = ++refreshId;
     const key = token();
     try {
@@ -176,6 +216,12 @@
       const result = items ? { items, unread: items.filter(item => !item.read).length }
         : await rpc("notifications", { p_token: key, p_categories: inboxCategories });
       if (id !== refreshId || key !== token()) return;
+      if (ready && key && onChat() && !document.hidden && (chatVisitPending || result.items.some(item => item.category === "messages" && !item.read))) {
+        await rpc("notification_read", {p_token:key, p_id:null, p_categories:["messages"]});
+        if (id !== refreshId || key !== token()) return;
+        chatVisitPending = false;
+        return refresh();
+      }
       const presented = present(result.items, key);
       snapshot = result;
       if (presented.length && key) reportActivity(presented).catch(() => {});
@@ -347,6 +393,10 @@
     snapshot = { items: [], unread: 0 };
     baseline = undefined;
     chatSeen = null;
+    chatCount = 0;
+    chatVisitPending = true;
+    ++chatNavigationRequest;
+    renderChatCount();
     pushContext++;
     confirmed = [];
     chatSwitch.parentElement.hidden = true;
@@ -357,7 +407,10 @@
     reportActivity().catch(() => {});
   }
   window.addEventListener("g19-device-changed", deviceChanged);
-  window.addEventListener("storage", event => { if (event.key === tokenKey || event.key === null) deviceChanged(); });
+  window.addEventListener("storage", event => {
+    if (event.key === tokenKey || event.key === null) deviceChanged();
+    else if (token() && event.key === chatCursorKey(token())) refreshChatCount();
+  });
   window.addEventListener("g19-chat-connected", () => {
     chatSwitch.parentElement.hidden = false;
   });
@@ -367,6 +420,8 @@
   });
   window.addEventListener("hashchange", () => {
     if (!onChat()) chatSeen = null;
+    else { chatVisitPending = true; chatCount = 0; renderChatCount(); }
+    refresh();
     reportActivity().catch(() => {});
     scrollToTarget();
   });

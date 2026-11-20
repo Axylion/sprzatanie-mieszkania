@@ -716,11 +716,44 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 
 /* Extra presentation elements stay absent outside the dark desktop view. */
 .calendar-desktop-detail, .calendar-upcoming-icon, .notification-category-icon,
-.notification-unread-dot, .discussion-avatar, .discussion-send-icon { display: none; }
+.notification-unread-dot, .discussion-avatar, .discussion-send-icon, .discussion-compose-icon, .discussion-heading-icon { display: none; }
 .notification-content, .notification-item-heading { display: contents; }
 #discussion-body::placeholder { color: transparent; }
 
 @media (min-width: 760px) {
+  [data-theme="dark"] .dashboard-calendar { padding: 14px 16px; font-family: Arial, sans-serif; background: #0b282f; border-color: #39626a; border-radius: 16px; }
+  [data-theme="dark"] #calendar-title { font-size: 28px; margin-bottom: 10px; }
+  [data-theme="dark"] .dashboard-calendar .calendar-month { grid-template-columns: 32px minmax(0, 1fr) 32px; }
+  [data-theme="dark"] .dashboard-calendar .calendar-month button { width: 32px; min-height: 32px; height: 32px; background: #123a43; }
+  [data-theme="dark"] .dashboard-calendar #calendar-month { font-size: 16px; font-weight: 400; }
+  [data-theme="dark"] #notification-panel {
+    width: min(736px, calc(100vw - 48px)); max-height: calc(100dvh - 48px);
+    padding: 12px; font-family: Arial, sans-serif; background: #0b282f; border-color: #39626a; border-radius: 16px;
+  }
+  [data-theme="dark"] #notification-title { font-size: 28px; margin: 0; }
+  [data-theme="dark"] #notification-panel .notification-heading button { min-height: 32px; width: 32px; height: 32px; padding: 0; }
+  [data-theme="dark"] #notification-list { margin: 0; border-top: 1px solid #39626a; max-height: 60dvh; }
+  [data-theme="dark"] #notification-list li + li { border-color: #39626a; }
+  [data-theme="dark"] #notification-list strong { font-size: 16px; font-weight: 400; line-height: 1.5; }
+  [data-theme="dark"] #notification-list a { color: #cde2e5; font-size: 14px; line-height: 1.5; }
+  [data-theme="dark"] #notification-list a[data-unread] strong { color: #ffffff; }
+  [data-theme="dark"] #notification-list time { color: #8fb7bf; font-size: 14px; }
+  [data-theme="dark"] #discussion-view { max-width: 736px; }
+  [data-theme="dark"] .discussion-panel { padding: 12px; font-family: Arial, sans-serif; background: #082025; border-color: #335e65; border-radius: 16px; }
+  [data-theme="dark"] .discussion-heading { position: relative; padding-right: 44px; }
+  [data-theme="dark"] .discussion-heading > .push-control { position: absolute; top: 0; right: 44px; max-width: 330px; }
+  [data-theme="dark"] .discussion-heading .push-switch { min-height: 28px; padding: 0; }
+  [data-theme="dark"] .discussion-heading .push-feedback { font-size: 11px; line-height: 1.35; }
+  [data-theme="dark"] .discussion-heading-icon {
+    display: grid; place-items: center; position: absolute; top: 8px; right: 0;
+    width: 32px; height: 32px; border-radius: 50%; background: #14373f; color: #78dce3;
+  }
+  [data-theme="dark"] .discussion-heading-icon svg { width: 16px; height: 16px; }
+  [data-theme="dark"] #discussion-title { font-size: 28px; margin: 0; }
+  [data-theme="dark"] .discussion-subtitle { margin: 4px 0 20px; color: #97bec5; font-size: 14px; }
+  [data-theme="dark"] .discussion-history { height: auto; min-height: 180px; max-height: min(55dvh, 520px); margin: 0; padding: 0; border-top: 1px solid #335e65; }
+  [data-theme="dark"] .discussion-history-controls:not(:has(button:not([hidden]))) { margin: 0; }
+  [data-theme="dark"] .discussion-message:last-child { border-bottom: 0; }
   [data-theme="dark"] #admin-view:has(#admin-announcement-form:not([hidden])) #admin-refresh { display: none; }
   [data-theme="dark"] {
     --field-focus: #63e5ef;
@@ -729,19 +762,19 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
     --field-error: #f08089;
   }
   [data-theme="dark"] .calendar-upcoming {
-    gap: 7px; padding: 16px 18px; margin-bottom: 14px;
+    gap: 8px; padding: 12px; margin-bottom: 20px; border-radius: 12px;
   }
-  [data-theme="dark"] .calendar-upcoming:not(.calendar-own) { background: #103442; }
+  [data-theme="dark"] .calendar-upcoming:not(.calendar-own) { background: #123a43; }
   [data-theme="dark"] .calendar-upcoming.calendar-own :is(.calendar-upcoming-label, #calendar-next-date, #calendar-next-room) { color: inherit; }
   [data-theme="dark"] .calendar-upcoming-label {
     display: flex; align-items: center; gap: 8px;
-    color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .9px; text-transform: uppercase;
+    color: #a4c9cd; font-size: 14px; font-weight: 400; letter-spacing: 0; text-transform: uppercase;
   }
-  [data-theme="dark"] .calendar-upcoming-icon { display: inline-flex; width: 17px; height: 17px; }
+  [data-theme="dark"] .calendar-upcoming-icon { display: inline-flex; width: 14px; height: 14px; }
   [data-theme="dark"] #calendar-next { display: none; }
   [data-theme="dark"] .calendar-desktop-detail { display: block; }
-  [data-theme="dark"] #calendar-next-date { color: #f1fbff; font-size: 23px; font-weight: 750; line-height: 1.3; }
-  [data-theme="dark"] #calendar-next-room { color: var(--muted); font-size: 14px; }
+  [data-theme="dark"] #calendar-next-date { color: #ffffff; font-size: 28px; font-weight: 750; line-height: 1.3; }
+  [data-theme="dark"] #calendar-next-room { color: #a4c9cd; font-size: 15px; }
 
   [data-theme="dark"] .cleaning-rules summary { transition: color 150ms ease; }
   [data-theme="dark"] .cleaning-rules summary::before { transition: color 150ms ease, transform 150ms ease; }
@@ -772,59 +805,77 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
     box-shadow: 0 0 0 3px rgb(240 128 137 / 15%);
   }
 
-  [data-theme="dark"] #announcement-tools { display: flex; flex-wrap: wrap; gap: 7px; }
+  [data-theme="dark"] #announcement-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+  [data-theme="dark"] #announcement-tools :is(button, select),
+  [data-theme="dark"] #admin-announcements #announcement-editor { background: #163a43; border-color: #39626a; }
   [data-theme="dark"] #announcement-tools #announcement-paragraph { width: 142px; min-height: 44px; flex: 0 0 142px; }
 
   [data-theme="dark"] #notification-read-all {
-    min-height: 32px; padding: 3px 0; border: 0; border-radius: 0;
-    color: var(--field-focus); background: transparent; font-size: 12px;
+    min-height: 24px; padding: 0; margin: 11px 0 18px auto; border: 0; border-radius: 0;
+    color: var(--field-focus); background: transparent; font-size: 14px;
   }
+  [data-theme="dark"] #notification-read-all:not([hidden]) { display: block; }
   [data-theme="dark"] #notification-read-all:hover { text-decoration: underline; box-shadow: none; }
   [data-theme="dark"] #notification-list a {
     grid-template-columns: 32px minmax(0, 1fr); align-items: start;
-    gap: 12px; padding: 15px 4px;
+    gap: 12px; padding: 28px 0;
   }
-  [data-theme="dark"] #notification-list a[data-unread] { border-inline-start: 0; padding-inline-start: 4px; }
+  [data-theme="dark"] #notification-list a[data-unread] { border-inline-start: 0; padding-inline-start: 0; }
+  [data-theme="dark"] #notification-list li:last-child a { padding-bottom: 8px; }
   [data-theme="dark"] .notification-category-icon {
     display: grid; place-items: center; width: 32px; height: 32px;
-    background: var(--surface-alt); color: var(--field-focus); border-radius: 8px;
+    background: #194750; color: #78dce3; border-radius: 12px;
   }
-  [data-theme="dark"] .notification-category-icon svg { width: 20px; height: 20px; }
-  [data-theme="dark"] .notification-content { display: grid; gap: 5px; min-width: 0; }
+  [data-theme="dark"] .notification-category-icon svg { width: 16px; height: 16px; }
+  [data-theme="dark"] .notification-content { display: grid; gap: 4px; min-width: 0; }
   [data-theme="dark"] .notification-item-heading { display: flex; align-items: center; gap: 9px; }
   [data-theme="dark"] #notification-list a[data-unread] .notification-unread-dot {
-    display: block; flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--field-focus);
+    display: block; margin-left: auto; flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--field-focus);
   }
 
   [data-theme="dark"] .discussion-message,
   [data-theme="dark"] .discussion-message[data-mine="true"] {
-    display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 11px;
-    margin: 0; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--border);
+    display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 11px; font-size: 14px;
+    margin: 0; padding: 20px 0; border: 0; border-bottom: 1px solid var(--border);
     border-radius: 0; background: transparent;
   }
   [data-theme="dark"] .discussion-avatar {
-    display: grid; place-items: center; grid-row: 1 / 4; width: 34px; height: 34px;
-    color: var(--chat-text); background: var(--surface-alt); border-radius: 8px; font-weight: 700;
+    display: grid; place-items: center; grid-row: 1 / 4; width: 38px; height: 38px;
+    color: #a4dbe2; background: #1b4852; border-radius: 10px; font-weight: 400; font-size: 16px;
   }
   [data-theme="dark"] .discussion-message > :is(.discussion-meta, p, .discussion-reactions) { grid-column: 2; min-width: 0; }
   [data-theme="dark"] .discussion-meta { gap: 4px 10px; }
-  [data-theme="dark"] .discussion-meta time { font-size: 11px; }
+  [data-theme="dark"] .discussion-meta time { font-size: 10px; color: #8fb7bf; }
+  [data-theme="dark"] .discussion-meta strong { font-weight: 400; }
   [data-theme="dark"] .discussion-message p { margin: 5px 0; }
   [data-theme="dark"] .discussion-reactions button,
   [data-theme="dark"] .discussion-reactions .reaction-count {
-    min-height: 30px; padding: 3px 5px; border: 0; border-radius: 5px; background: transparent; font-size: 12px;
+    min-height: 24px; padding: 2px 0; border: 0; border-radius: 5px; background: transparent; font-size: 12px;
   }
   [data-theme="dark"] .discussion-reactions button[aria-pressed="true"],
   [data-theme="dark"] .discussion-reactions button[aria-pressed="true"] svg { color: var(--field-focus); }
   [data-theme="dark"] .discussion-compose label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  [data-theme="dark"] .discussion-compose textarea { min-height: 44px; height: 44px; }
+  [data-theme="dark"] .discussion-compose {
+    grid-template-columns: 14px minmax(0, 1fr) 32px; align-items: center;
+    padding: 12px; gap: 10px; border: 1px solid #39626a; border-radius: 12px; background: #14373f;
+  }
+  [data-theme="dark"] .discussion-compose:focus-within { border-color: var(--field-focus); box-shadow: 0 0 0 3px var(--field-glow); }
+  [data-theme="dark"] .discussion-compose:has(textarea:user-invalid),
+  [data-theme="dark"] .discussion-compose:has(textarea[aria-invalid="true"]) { border-color: var(--field-error); box-shadow: 0 0 0 3px rgb(240 128 137 / 15%); }
+  [data-theme="dark"] .discussion-compose textarea {
+    min-height: 32px; height: 32px; border: 0; padding: 5px 0; background: transparent; border-radius: 0;
+  }
+  [data-theme="dark"] .discussion-panel .discussion-compose textarea:focus {
+    outline: none; box-shadow: none; border-color: var(--field-focus);
+  }
+  [data-theme="dark"] .discussion-compose-icon { display: flex; width: 14px; height: 14px; color: #8fb7bf; }
   [data-theme="dark"] #discussion-body::placeholder { color: var(--muted); }
   [data-theme="dark"] .discussion-compose #discussion-send {
-    display: grid; place-items: center; width: 44px; padding: 8px;
-    background: var(--surface-alt); color: var(--field-focus);
+    display: grid; place-items: center; width: 32px; min-height: 32px; height: 32px; padding: 7px;
+    border: 0; border-radius: 8px; background: #2f8842; color: #ffffff;
   }
   [data-theme="dark"] .discussion-send-label { display: none; }
-  [data-theme="dark"] .discussion-send-icon { display: block; width: 22px; height: 22px; }
+  [data-theme="dark"] .discussion-send-icon { display: block; width: 18px; height: 18px; }
 }
 @media (min-width: 760px) and (prefers-reduced-motion: reduce) {
   [data-theme="dark"] .cleaning-rules summary,

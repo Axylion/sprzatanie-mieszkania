@@ -179,9 +179,9 @@
 
   function categoryIcon(category) {
     const paths = {
-      messages: '<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/>',
+      messages: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/>',
       announcements: '<path d="m8 8 12-4v16L8 16H4V8h4Zm0 0v8m-3 0 2 5h4l-2-5M2 9v6"/>',
-      duties: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/>'
+      duties: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-10 4 2 2 4-4"/>'
     };
     const icon = document.createElement("span");
     icon.className = "notification-category-icon";

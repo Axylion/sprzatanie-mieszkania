@@ -23,8 +23,8 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   const context = await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block'});
   const events = ['messages','announcements','duties'].map((category,index) => ({
     id:String(index+1),category,title:['Nowa wiadomość','Ważne ogłoszenie','Przypomnienie o sprzątaniu'][index],
-    description:'Informacja dla mieszkańców',target:category === 'messages' ? '#dyskusje' : '#calendar-title',
-    createdAt:'2026-11-21T12:00:00Z',read:index===1
+    description:['Pokój nr 3 · Dyskusje','Test powiadomienia Android','Pokój nr 2 · 21–22 listopada'][index],target:category === 'messages' ? '#dyskusje' : '#calendar-title',
+    createdAt:['2026-11-19T06:51:00Z','2026-11-16T07:41:00Z','2026-11-16T07:00:00Z'][index],read:index===2
   }));
   const reads = [];
   await context.addInitScript(() => localStorage.setItem('goleszan19-discussion-device','fixture-device'));
@@ -86,6 +86,15 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   const panel = page.locator('#notification-panel');
   await panel.locator('#notification-list li').nth(2).waitFor();
   assert.equal(await panel.locator('.notification-category-icon').count(),3);
+  assert.equal(await panel.evaluate(el=>Math.round(el.getBoundingClientRect().width)),736);
+  assert.equal(await panel.locator('#notification-read-all').evaluate(el=>{
+    const a=el.getBoundingClientRect(),p=el.closest('dialog').getBoundingClientRect();
+    return Math.round(p.right-a.right);
+  }),13);
+  assert.ok(await panel.locator('a[data-unread] .notification-unread-dot').first().evaluate(el=>{
+    const dot=el.getBoundingClientRect(),row=el.closest('a').getBoundingClientRect();
+    return row.right-dot.right<2;
+  }));
   assert.equal(await panel.locator('a[data-unread]').count(),2);
   assert.equal(await panel.locator('.notification-unread-dot').evaluateAll(dots=>dots.filter(e=>getComputedStyle(e).display!=='none').length),2);
   assert.equal(await panel.locator('a[data-unread]').first().evaluate(el=>getComputedStyle(el).borderInlineStartWidth),'0px');
@@ -97,6 +106,7 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   await panel.getByRole('button',{name:'Zamknij powiadomienia'}).click();
   await page.locator('#chat-open').click();
   await page.locator('.discussion-message').first().waitFor();
+  assert.equal(await page.locator('#discussion-view').evaluate(el=>Math.round(el.getBoundingClientRect().width)),736);
   assert.equal(await page.locator('.discussion-avatar').first().innerText(),'1');
   assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'0px');
   assert.equal(await page.locator('[data-reaction="1"]').first().evaluate(el=>getComputedStyle(el).color),'rgb(99, 229, 239)');
@@ -104,6 +114,10 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   await page.waitForFunction(()=>getComputedStyle(document.querySelector('#discussion-body')).borderColor==='rgb(99, 229, 239)');
   assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderColor),'rgb(99, 229, 239)');
   assert.equal(await page.locator('.discussion-send-icon').isVisible(),true);
+  assert.equal(await page.locator('#discussion-send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(47, 136, 66)');
+  assert.equal(await page.locator('#discussion-compose').evaluate(el=>getComputedStyle(el).borderRadius),'12px');
+  assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderTopWidth),'0px');
+  await page.locator('.discussion-subtitle').click();
   if (output) await page.locator('#discussion-view').screenshot({path:join(output,'discussion-dark-desktop.png')});
   for (const [width,mode] of [[1280,'light'],[390,'dark']]) {
     await page.setViewportSize({width,height:900});

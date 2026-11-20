@@ -1,0 +1,10 @@
+begin;
+
+-- Frozen snapshot of announcements.json in v13-7. Legacy rows have no push snapshot.
+insert into g19_private.announcements
+  (id, title, content, state, created_at, updated_at, published_at, expires_at, legacy_hide_key)
+values
+  ('test-wazna-informacja-2026-11-04', 'Ogłoszenie testowe — sprawdzenie wyświetlania', '["TO JEST OGŁOSZENIE TESTOWE. Nie informuje o rzeczywistych pracach, awarii ani zmianie harmonogramu. Ten przykładowy komunikat służy wyłącznie do sprawdzenia, czy dłuższa treść jest początkowo ograniczona do trzech wierszy na telefonie i komputerze. Wybierz „Więcej ↓”, aby przeczytać cały tekst, a następnie „Zwiń ↑”, aby wrócić do krótkiego podglądu. Każde ogłoszenie rozwija się niezależnie od pozostałych. Krzyżyk w prawym górnym rogu ukrywa komunikat tylko na tym urządzeniu i nie usuwa go dla innych mieszkańców. Aby go przywrócić, użyj odnośnika „Pokaż ukryte ogłoszenia” w stopce strony. To tylko próba działania interfejsu; obowiązujący harmonogram sprzątania pozostaje bez zmian."]'::jsonb, 'published', '2026-11-04T12:00:00+01:00', '2026-11-04T12:00:00+01:00', '2026-11-04T12:00:00+01:00', '2026-11-16T00:00:00+01:00', '["test-wazna-informacja-2026-11-04","2026-11-04T12:00:00+01:00",null,"Ogłoszenie testowe — sprawdzenie wyświetlania","TO JEST OGŁOSZENIE TESTOWE. Nie informuje o rzeczywistych pracach, awarii ani zmianie harmonogramu. Ten przykładowy komunikat służy wyłącznie do sprawdzenia, czy dłuższa treść jest początkowo ograniczona do trzech wierszy na telefonie i komputerze. Wybierz „Więcej ↓”, aby przeczytać cały tekst, a następnie „Zwiń ↑”, aby wrócić do krótkiego podglądu. Każde ogłoszenie rozwija się niezależnie od pozostałych. Krzyżyk w prawym górnym rogu ukrywa komunikat tylko na tym urządzeniu i nie usuwa go dla innych mieszkańców. Aby go przywrócić, użyj odnośnika „Pokaż ukryte ogłoszenia” w stopce strony. To tylko próba działania interfejsu; obowiązujący harmonogram sprzątania pozostaje bez zmian.","2026-11-16T00:00:00+01:00"]')
+on conflict (id) do nothing;
+
+commit;

@@ -538,7 +538,7 @@
     <div class="dashboard-secondary">
       <section class="card dashboard-calendar" aria-labelledby="calendar-title">
     <h2 id="calendar-title">Kalendarz sprzątania</h2>
-    <div class="calendar-upcoming" id="calendar-upcoming"><strong>Najbliższy dyżur</strong><span id="calendar-next"></span></div>
+    <div class="calendar-upcoming" id="calendar-upcoming"><strong class="calendar-upcoming-label"><span class="calendar-upcoming-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg></span><span>Najbliższy dyżur</span></strong><span id="calendar-next"></span><span id="calendar-next-date" class="calendar-desktop-detail"></span><span id="calendar-next-room" class="calendar-desktop-detail"></span></div>
     <div class="calendar-month">
       <button type="button" id="calendar-prev" aria-label="Poprzedni miesiąc">‹</button>
       <strong id="calendar-month" aria-live="polite"></strong>
@@ -630,8 +630,8 @@
       <button type="button" id="discussion-latest" hidden>Najnowsze wiadomości</button>
       <form class="discussion-compose" id="discussion-compose">
         <label for="discussion-body">Wiadomość</label>
-        <textarea id="discussion-body" rows="2" maxlength="1500" required></textarea>
-        <button type="submit" id="discussion-send" disabled>Wyślij</button>
+        <textarea id="discussion-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
+        <button type="submit" id="discussion-send" aria-label="Wyślij" disabled><span class="discussion-send-label">Wyślij</span><svg class="discussion-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
       </form>
     </div>
   </section>
@@ -858,6 +858,8 @@
     document.getElementById("next-room").textContent = "Pokój nr " + room;
     document.getElementById("next-date").textContent = weekendText(start);
     document.getElementById("calendar-next").textContent = weekendText(start) + " · Pokój " + room;
+    document.getElementById("calendar-next-date").textContent = weekendText(start);
+    document.getElementById("calendar-next-room").textContent = "Pokój nr " + room;
     document.getElementById("calendar-upcoming").classList.toggle("calendar-own", room === Number(selectedRoom));
     document.getElementById("calendar-month").textContent = monthFormat.format(calendarMonth);
     const end = new Date(calendarMonth);

@@ -177,6 +177,20 @@
     }));
   }
 
+  function categoryIcon(category) {
+    const paths = {
+      messages: '<path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/>',
+      announcements: '<path d="m8 8 12-4v16L8 16H4V8h4Zm0 0v8m-3 0 2 5h4l-2-5M2 9v6"/>',
+      duties: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/>'
+    };
+    const icon = document.createElement("span");
+    icon.className = "notification-category-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+      (paths[category] || paths.announcements) + '</svg>';
+    return icon;
+  }
+
   function render() {
     badge.hidden = readAll.hidden = snapshot.unread === 0;
     badge.textContent = snapshot.unread > 99 ? "99+" : String(snapshot.unread);
@@ -194,7 +208,16 @@
       const time = document.createElement("time");
       time.dateTime = new Date(item.createdAt).toISOString();
       time.textContent = format.format(new Date(item.createdAt));
-      link.append(title, detail, time);
+      const content = document.createElement("span");
+      content.className = "notification-content";
+      const heading = document.createElement("span");
+      heading.className = "notification-item-heading";
+      const unreadDot = document.createElement("span");
+      unreadDot.className = "notification-unread-dot";
+      unreadDot.setAttribute("aria-hidden", "true");
+      heading.append(title, unreadDot);
+      content.append(heading, detail, time);
+      link.append(categoryIcon(item.category), content);
       link.addEventListener("click", async event => {
         event.preventDefault();
         if (!item.read && !await mark(item.id)) return;

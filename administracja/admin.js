@@ -357,7 +357,21 @@
       catch { status.textContent = "Wylogowano z aplikacji. Nie udało się potwierdzić zakończenia sesji na serwerze."; }
     }
   });
-  document.getElementById("admin-refresh").addEventListener("click", () => { status.textContent = ""; if (announcements.isOpen()) announcements.refresh(); else refresh(); });
+  const refreshButton = document.getElementById("admin-refresh");
+  refreshButton.addEventListener("click", async () => {
+    if (refreshButton.disabled || refreshButton.hidden) return;
+    const expected = session;
+    refreshButton.disabled = true;
+    refreshButton.setAttribute("aria-busy", "true");
+    status.textContent = "Odświeżanie…";
+    try {
+      const success = await (announcements.isOpen() ? announcements.refresh() : refresh());
+      if (expected === session) status.textContent = success ? "Dane odświeżone." : "Nie udało się odświeżyć danych. Spróbuj ponownie.";
+    } finally {
+      refreshButton.disabled = false;
+      refreshButton.removeAttribute("aria-busy");
+    }
+  });
   confirmAction.addEventListener("click", async () => {
     if (!session || busy || !pending) return;
     const { room, device } = pending;

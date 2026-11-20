@@ -21,6 +21,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH, args:['--no-sandbox'] });
   t.after(() => browser.close());
   const context = await browser.newContext({ serviceWorkers:'block', viewport:{width:1280,height:900} });
+  let failRefresh=false;
   let adminListReads=0;
   let record;
   let filterFixtures = [];
@@ -30,6 +31,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
     const args = route.request().postDataJSON() || {};
     let json = [];
     if (url.pathname === '/auth/v1/token') json = {access_token:'test-admin',expires_in:3600};
+    if (method === 'g19_web_admin_announcements' && failRefresh) return route.fulfill({status:500,json:{}});
     if (method === 'g19_web_admin_announcements') { adminListReads++; json = record ? [record, ...filterFixtures] : filterFixtures; }
     if (method === 'g19_web_admin_save_announcement') {
       record = {
@@ -65,6 +67,12 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   assert.equal(adminListReads,readsBefore);
   assert.equal(await filters.locator('[aria-pressed=true]').isDisabled(),true);
   assert.equal(await filters.locator('[aria-pressed=true]').evaluate(el=>getComputedStyle(el).cursor),'default');
+  await page.getByRole('button',{name:'Odśwież',exact:true}).click();
+  await page.getByText('Dane odświeżone.',{exact:true}).waitFor();
+  failRefresh=true;
+  await page.getByRole('button',{name:'Odśwież',exact:true}).click();
+  await page.getByText('Nie udało się odświeżyć danych. Spróbuj ponownie.',{exact:true}).waitFor();
+  failRefresh=false;
   await page.locator('#announcement-new').click();
   await page.locator('#admin-announcement-form input[name="title"]').fill('Przerwa w dostawie wody');
   const editor=page.locator('#announcement-editor');
@@ -143,6 +151,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
     await page.locator('#theme-menu label:has(input[value="' + theme + '"])').click();
     for (const width of [390,1280]) {
       await page.setViewportSize({width,height:850});
+      assert.equal(await page.locator('#admin-refresh').isVisible(),!(theme === 'dark' && width >= 760));
       assert.equal(await page.locator('#admin-title').textContent(),'Ważne ogłoszenia');
       assert.equal(await page.locator('#admin-announcement-preview .announcement-date').textContent(),'Podgląd — nieopublikowane');
       const h = await page.locator('#admin-announcement-preview .announcement-body').evaluate(body=>
@@ -150,6 +159,19 @@ test('Announcement editor formats the current block, previews, publishes, hides 
       assert.ok(h[0]>h[1] && h[1]>h[2]);
       assert.equal(await editor.locator('h2').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)),h[0]);
       assert.equal(await editor.locator('h3').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)),h[1]);
+      if (theme === 'dark' && width === 1280) {
+        const paragraph=page.locator('#announcement-paragraph');
+        assert.deepEqual(await paragraph.evaluate(el => {
+          const r=el.getBoundingClientRect(), next=el.nextElementSibling.getBoundingClientRect();
+          return [Math.round(r.width),Math.round(r.top-next.top)];
+        }),[142,0]);
+        for (const field of [page.locator('#admin-announcement-form input[name=title]'),paragraph,editor]) {
+          await field.focus();
+          await page.waitForTimeout(170);
+          assert.equal(await field.evaluate(el=>getComputedStyle(el).borderColor),'rgb(99, 229, 239)');
+          assert.notEqual(await field.evaluate(el=>getComputedStyle(el).boxShadow),'none');
+        }
+      }
       await page.locator('#announcement-date-open').click();
       const picker=page.locator('#announcement-date-dialog');
       await picker.locator('[aria-current="date"]').waitFor();

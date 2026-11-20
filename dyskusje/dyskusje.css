@@ -713,3 +713,121 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   opacity: 1;
   box-shadow: none;
 }
+
+/* Extra presentation elements stay absent outside the dark desktop view. */
+.calendar-desktop-detail, .calendar-upcoming-icon, .notification-category-icon,
+.notification-unread-dot, .discussion-avatar, .discussion-send-icon { display: none; }
+.notification-content, .notification-item-heading { display: contents; }
+#discussion-body::placeholder { color: transparent; }
+
+@media (min-width: 760px) {
+  [data-theme="dark"] #admin-view:has(#admin-announcement-form:not([hidden])) #admin-refresh { display: none; }
+  [data-theme="dark"] {
+    --field-focus: #63e5ef;
+    --field-hover: #479aa5;
+    --field-glow: rgb(99 229 239 / 20%);
+    --field-error: #f08089;
+  }
+  [data-theme="dark"] .calendar-upcoming {
+    gap: 7px; padding: 16px 18px; margin-bottom: 14px;
+  }
+  [data-theme="dark"] .calendar-upcoming:not(.calendar-own) { background: #103442; }
+  [data-theme="dark"] .calendar-upcoming.calendar-own :is(.calendar-upcoming-label, #calendar-next-date, #calendar-next-room) { color: inherit; }
+  [data-theme="dark"] .calendar-upcoming-label {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .9px; text-transform: uppercase;
+  }
+  [data-theme="dark"] .calendar-upcoming-icon { display: inline-flex; width: 17px; height: 17px; }
+  [data-theme="dark"] #calendar-next { display: none; }
+  [data-theme="dark"] .calendar-desktop-detail { display: block; }
+  [data-theme="dark"] #calendar-next-date { color: #f1fbff; font-size: 23px; font-weight: 750; line-height: 1.3; }
+  [data-theme="dark"] #calendar-next-room { color: var(--muted); font-size: 14px; }
+
+  [data-theme="dark"] .cleaning-rules summary { transition: color 150ms ease; }
+  [data-theme="dark"] .cleaning-rules summary::before { transition: color 150ms ease, transform 150ms ease; }
+  [data-theme="dark"] #harmonogram .cleaning-rules summary:hover {
+    color: var(--field-focus); box-shadow: none; background: transparent;
+  }
+  [data-theme="dark"] #harmonogram .cleaning-rules summary:hover::before { color: var(--field-focus); }
+
+  [data-theme="dark"] :is(input:not([type="hidden"], [type="radio"], [type="checkbox"]), textarea, select, [contenteditable="true"]) {
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"]):not(:disabled):hover {
+    border-color: var(--field-hover);
+  }
+  [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"]):not(:disabled):focus {
+    border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 1px;
+    box-shadow: 0 0 0 3px var(--field-glow);
+  }
+  [data-theme="dark"] #admin-announcements :is(input, select, #announcement-editor):focus,
+  [data-theme="dark"] #admin-login #admin-password:focus,
+  [data-theme="dark"] #admin-view :is(input, textarea, select, [contenteditable="true"]):focus-visible,
+  [data-theme="dark"] .discussion-panel :is(input, textarea, select):focus-visible {
+    outline: 2px solid var(--field-focus); outline-offset: 1px; border-color: var(--field-focus); box-shadow: 0 0 0 3px var(--field-glow);
+  }
+  [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"])[aria-invalid="true"],
+  [data-theme="dark"] :is(input, textarea, select):user-invalid {
+    border-color: var(--field-error); outline-color: var(--field-error);
+    box-shadow: 0 0 0 3px rgb(240 128 137 / 15%);
+  }
+
+  [data-theme="dark"] #announcement-tools { display: flex; flex-wrap: wrap; gap: 7px; }
+  [data-theme="dark"] #announcement-tools #announcement-paragraph { width: 142px; min-height: 44px; flex: 0 0 142px; }
+
+  [data-theme="dark"] #notification-read-all {
+    min-height: 32px; padding: 3px 0; border: 0; border-radius: 0;
+    color: var(--field-focus); background: transparent; font-size: 12px;
+  }
+  [data-theme="dark"] #notification-read-all:hover { text-decoration: underline; box-shadow: none; }
+  [data-theme="dark"] #notification-list a {
+    grid-template-columns: 32px minmax(0, 1fr); align-items: start;
+    gap: 12px; padding: 15px 4px;
+  }
+  [data-theme="dark"] #notification-list a[data-unread] { border-inline-start: 0; padding-inline-start: 4px; }
+  [data-theme="dark"] .notification-category-icon {
+    display: grid; place-items: center; width: 32px; height: 32px;
+    background: var(--surface-alt); color: var(--field-focus); border-radius: 8px;
+  }
+  [data-theme="dark"] .notification-category-icon svg { width: 20px; height: 20px; }
+  [data-theme="dark"] .notification-content { display: grid; gap: 5px; min-width: 0; }
+  [data-theme="dark"] .notification-item-heading { display: flex; align-items: center; gap: 9px; }
+  [data-theme="dark"] #notification-list a[data-unread] .notification-unread-dot {
+    display: block; flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--field-focus);
+  }
+
+  [data-theme="dark"] .discussion-message,
+  [data-theme="dark"] .discussion-message[data-mine="true"] {
+    display: grid; grid-template-columns: 34px minmax(0, 1fr); column-gap: 11px;
+    margin: 0; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--border);
+    border-radius: 0; background: transparent;
+  }
+  [data-theme="dark"] .discussion-avatar {
+    display: grid; place-items: center; grid-row: 1 / 4; width: 34px; height: 34px;
+    color: var(--chat-text); background: var(--surface-alt); border-radius: 8px; font-weight: 700;
+  }
+  [data-theme="dark"] .discussion-message > :is(.discussion-meta, p, .discussion-reactions) { grid-column: 2; min-width: 0; }
+  [data-theme="dark"] .discussion-meta { gap: 4px 10px; }
+  [data-theme="dark"] .discussion-meta time { font-size: 11px; }
+  [data-theme="dark"] .discussion-message p { margin: 5px 0; }
+  [data-theme="dark"] .discussion-reactions button,
+  [data-theme="dark"] .discussion-reactions .reaction-count {
+    min-height: 30px; padding: 3px 5px; border: 0; border-radius: 5px; background: transparent; font-size: 12px;
+  }
+  [data-theme="dark"] .discussion-reactions button[aria-pressed="true"],
+  [data-theme="dark"] .discussion-reactions button[aria-pressed="true"] svg { color: var(--field-focus); }
+  [data-theme="dark"] .discussion-compose label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  [data-theme="dark"] .discussion-compose textarea { min-height: 44px; height: 44px; }
+  [data-theme="dark"] #discussion-body::placeholder { color: var(--muted); }
+  [data-theme="dark"] .discussion-compose #discussion-send {
+    display: grid; place-items: center; width: 44px; padding: 8px;
+    background: var(--surface-alt); color: var(--field-focus);
+  }
+  [data-theme="dark"] .discussion-send-label { display: none; }
+  [data-theme="dark"] .discussion-send-icon { display: block; width: 22px; height: 22px; }
+}
+@media (min-width: 760px) and (prefers-reduced-motion: reduce) {
+  [data-theme="dark"] .cleaning-rules summary,
+  [data-theme="dark"] .cleaning-rules summary::before,
+  [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"]) { transition: none; }
+}

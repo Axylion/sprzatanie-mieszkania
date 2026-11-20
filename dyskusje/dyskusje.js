@@ -201,7 +201,11 @@
       reactions.className = "discussion-reactions";
       reactions.append(reactionButton(message, 1), reactionButton(message, -1));
       meta.append(author, time);
-      row.append(meta, content, reactions);
+      const avatar = document.createElement("span");
+      avatar.className = "discussion-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      avatar.textContent = message.room;
+      row.append(avatar, meta, content, reactions);
       fragment.append(row);
     }
     history.replaceChildren(fragment);

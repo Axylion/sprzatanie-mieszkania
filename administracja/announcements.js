@@ -173,8 +173,10 @@
       items = rows;
       articles();
       updateExpiredStatuses();
+      return true;
     } catch (error) {
       if (generation === sessionGeneration) handleError(error);
+      return false;
     }
   }
 
@@ -304,6 +306,7 @@
     document.getElementById("announcement-publish").hidden = !draft;
     document.getElementById("announcement-save-changes").hidden = draft;
     message.textContent = "";
+    document.getElementById("admin-status").textContent = "";
     listView.hidden = true;
     form.hidden = false;
     initial = JSON.stringify(data());

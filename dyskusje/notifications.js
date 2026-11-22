@@ -6,6 +6,8 @@
   const chatBadge = document.querySelector("#chat-count");
   const chatLink = document.querySelector("#chat-open");
   let chatCount = 0;
+  let privateCount = 0;
+  let capabilities = window.g19ChatCapabilities || {};
   let chatVisitPending = true;
   let chatNavigationRequest = 0;
   const chatCursorKey = key => "goleszan19-chat-visited:" + config?.url + ":" + key;
@@ -21,9 +23,10 @@
     try { localStorage.setItem(chatCursorKey(key), value); } catch { /* Storage can be unavailable. */ }
   }
   function renderChatCount() {
-    chatBadge.hidden = chatCount === 0;
-    chatBadge.textContent = chatCount > 99 ? "99+" : String(chatCount);
-    chatLink.setAttribute("aria-label", chatCount ? "Dyskusje, nowe wiadomości: " + chatCount : "Dyskusje");
+    const total = chatCount + privateCount;
+    chatBadge.hidden = total === 0;
+    chatBadge.textContent = total > 99 ? "99+" : String(total);
+    chatLink.setAttribute("aria-label", total ? "Dyskusje, nowe wiadomości: " + total : "Dyskusje");
   }
   async function refreshChatCount() {
     const request = ++chatNavigationRequest;
@@ -65,7 +68,7 @@
   let foregroundSince = Date.now();
   let baseline;
   let audio;
-  const onChat = () => !document.querySelector("#discussion-view").hidden;
+  const onChat = () => !document.querySelector("#discussion-view").hidden && !location.hash.startsWith("#dyskusje/prywatne");
   const active = () => !document.hidden && document.hasFocus() && Date.now() - lastActivity < 120000;
   const tabId = () => tab ||= crypto.randomUUID();
   const token = () => localStorage.getItem(tokenKey);
@@ -92,7 +95,7 @@
     presence = isActive;
     const seen = isActive && onChat() ? chatSeen : null;
     // Send hide immediately. A server-side timeout covers a closed tab or lost network.
-    const send = () => key === token() && rpc("notification_activity", {
+    const send = () => key === token() && rpc(capabilities.version === 1 ? "notification_activity_v2" : "notification_activity", {
       p_token: key, p_tab: tabId(), p_active: isActive, p_seen: seen,
       p_presented: isActive ? presented : []
     }, !isActive);
@@ -132,13 +135,13 @@
 
   function present(items, key) {
     if (!active()) return [];
-    const latest = items.filter(item => !item.read && (!onChat() || item.category !== "messages"));
+    const latest = items.filter(item => !item.read && (item.kind === "private" ? location.hash !== item.target : (!onChat() || item.category !== "messages")));
     const previous = baseline;
     baseline = new Set(items.map(item => item.id));
     const incoming = latest.filter(item => !previous?.has(item.id));
     // Keep the existing push acknowledgement separate from sound playback.
     const presented = incoming.filter(item => key ? new Date(item.receivedAt).getTime() > foregroundSince : Boolean(previous));
-    const audible = incoming.filter(item => item.category === "messages"
+    const audible = incoming.filter(item => item.kind === "private" ? previous && location.hash !== item.target : item.category === "messages"
       ? previous && location.hash !== "#dyskusje" && !document.querySelector("#harmonogram").hidden
       : presented.includes(item));
     if (audible.length) {
@@ -222,7 +225,7 @@
       link.append(icon, content);
       link.addEventListener("click", async event => {
         event.preventDefault();
-        if (!item.read && !await mark(item.id)) return;
+        if (item.kind !== "private" && !item.read && !await mark(item.id)) return;
         panel.close();
         location.hash = item.target;
         scrollToTarget();
@@ -239,9 +242,9 @@
     try {
       const items = !ready || !key ? publicAnnouncements() : null;
       const result = items ? { items, unread: items.filter(item => !item.read).length }
-        : await rpc("notifications", { p_token: key, p_categories: inboxCategories });
+        : await rpc(capabilities.version === 1 ? "notifications_v2" : "notifications", { p_token: key, p_categories: inboxCategories });
       if (id !== refreshId || key !== token()) return;
-      if (ready && key && onChat() && !document.hidden && (chatVisitPending || result.items.some(item => item.category === "messages" && !item.read))) {
+      if (ready && key && onChat() && !document.hidden && (chatVisitPending || result.items.some(item => item.category === "messages" && item.kind !== "private" && !item.read))) {
         await rpc("notification_read", {p_token:key, p_id:null, p_categories:["messages"]});
         if (id !== refreshId || key !== token()) return;
         chatVisitPending = false;
@@ -266,7 +269,8 @@
   async function mark(id) {
     try {
       if (ready && token()) {
-        await rpc("notification_read", { p_token: token(), p_id: id, p_categories: inboxCategories });
+        await rpc(capabilities.version === 1 ? "notification_read_v2" : "notification_read", { p_token: token(), p_id: id, p_categories: inboxCategories });
+        window.dispatchEvent(new Event("g19-inbox-read"));
       } else {
         const ids = id === null ? snapshot.items.map(item => item.id) : [id];
         localStorage.setItem(localReadKey, JSON.stringify({ ...localRead(), ...Object.fromEntries(ids.map(id => [id, true])) }));
@@ -415,6 +419,7 @@
 
   window.addEventListener("g19-announcements", () => { if (!token()) refresh(); scrollToTarget(); });
   function deviceChanged() {
+    privateCount = 0;
     refreshId++;
     snapshot = { items: [], unread: 0 };
     baseline = undefined;
@@ -437,6 +442,9 @@
     if (event.key === tokenKey || event.key === null) deviceChanged();
     else if (token() && event.key === chatCursorKey(token())) refreshChatCount();
   });
+  window.addEventListener("g19-chat-capabilities", event => {capabilities = event.detail || {};refresh();});
+  window.addEventListener("g19-private-count", event => {privateCount = Number.isSafeInteger(event.detail) && event.detail > 0 ? event.detail : 0;renderChatCount();});
+  window.addEventListener("g19-private-read", () => refresh());
   window.addEventListener("g19-chat-connected", () => {
     chatSwitch.parentElement.hidden = false;
   });

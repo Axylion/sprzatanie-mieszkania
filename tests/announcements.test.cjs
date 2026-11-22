@@ -26,7 +26,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-10-1 to v13-10-2 update under the GitHub Pages subpath', async () => {
+test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -56,7 +56,7 @@ test('PWA v13-10-1 to v13-10-2 update under the GitHub Pages subpath', async () 
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-10-2', 'shell-v13-10-1')
+      ? contents.toString().replace('shell-v13-11-0', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js"', '')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -98,17 +98,30 @@ test('PWA v13-10-1 to v13-10-2 update under the GitHub Pages subpath', async () 
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-10-1');
+      const cache = await caches.open('goleszan19-shell-v13-10-2');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
       localStorage.setItem('goleszan19-hidden-announcements-v1', JSON.stringify([JSON.stringify(['old-hidden', 1])]));
       localStorage.removeItem('goleszan19-hidden-announcements-v2');
     });
+    assert.equal(await page.evaluate(async () => Boolean(await (await caches.open('goleszan19-shell-v13-10-2')).match(new URL('./dyskusje/private-chat.js',location.href).href))),false);
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-    await page.waitForFunction(async () => {
-      const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-10-2') && !keys.includes('goleszan19-shell-v13-10-1');
-    });
+    // Cache Storage is asynchronous. Poll its resolved result and activation,
+    // rather than treating an async predicate's pending Promise as readiness.
+    const deadline = Date.now() + 10000;
+    let cacheState;
+    do {
+      cacheState = await page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const keys = await caches.keys();
+        const hasShell = keys.includes('goleszan19-shell-v13-11-0');
+        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0')).match(new URL('./dyskusje/private-chat.js',location.href).href));
+        return {ready:hasPrivate && !keys.includes('goleszan19-shell-v13-10-2') && registration.active?.state === 'activated' && !registration.installing && !registration.waiting,hasPrivate};
+      });
+      if (cacheState.ready) break;
+      await new Promise(resolve => setTimeout(resolve,50));
+    } while (Date.now() < deadline);
+    assert.equal(cacheState.ready,true,JSON.stringify(cacheState));
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
     assert.equal(await page.locator('#ogloszenie-postgres-microseconds').count(),1);
@@ -462,7 +475,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-10-2');
+      const c = await caches.open('goleszan19-shell-v13-11-0');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

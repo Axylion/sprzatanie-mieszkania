@@ -1,11 +1,11 @@
-// Stage A architecture probes only. No private-chat RPCs/UI have been implemented.
+// Foundation-only probes; full API and browser integration are tested separately.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,readdir} from 'node:fs/promises';
 import {randomUUID,randomBytes} from 'node:crypto';
 const {PGlite}=await import(process.env.G19_PGLITE || '@electric-sql/pglite');
 const directory=new URL('../supabase/migrations/',import.meta.url);
-const proposal=await readFile(new URL('../supabase/proposals/v13-11-0/020_private_foundation.proposed.sql',import.meta.url),'utf8');
+const proposal=await readFile(new URL('../supabase/migrations/202611220020_private_chat_foundation.sql',import.meta.url),'utf8');
 const proof=()=>randomBytes(32).toString('hex');
 async function setup(t){
   const db=new PGlite();t.after(()=>db.close());
@@ -14,7 +14,7 @@ async function setup(t){
     create table auth.sessions(id uuid primary key,user_id uuid references auth.users,created_at timestamptz not null default now());
     create function auth.jwt() returns jsonb language sql as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
     create function auth.uid() returns uuid language sql as $$select (auth.jwt()->>'sub')::uuid$$;`);
-  for(const name of (await readdir(directory)).filter(n=>n.endsWith('.sql')).sort())await db.exec(await readFile(new URL(name,directory),'utf8'));
+  for(const name of (await readdir(directory)).filter(n=>n.endsWith('.sql') && n<'202611220020').sort())await db.exec(await readFile(new URL(name,directory),'utf8'));
   const rpc=(name,args=[],role='anon',claims={})=>db.transaction(async tx=>{
     await tx.exec('set local role '+role);
     await tx.query("select set_config('request.jwt.claims',$1,true)",[JSON.stringify(claims)]);
@@ -26,14 +26,14 @@ async function setup(t){
   const device=async token=>(await rpc('my_devices',[token,null,null])).find(d=>d.current).id;
   return {db,rpc,bind,state,device};
 }
-test('Proposed foundation preserves all existing data, public RPC definitions and subscriptions',async t=>{
+test('Private foundation preserves all existing data, public RPC definitions and subscriptions',async t=>{
   const {db,rpc,bind}=await setup(t);const one=await bind(1),two=await bind(2);
   await rpc('send',[one,randomUUID(),'Wiadomość wyłącznie w izolowanej bazie']);
   await rpc('push_subscription',[two,'https://fcm.googleapis.com/fcm/send/proposal','A'.repeat(87),'B'.repeat(22),['messages']]);
   const snapshot=async()=>{
     const result={};
     for(const table of ['rooms','devices','messages','reactions','pairings','notification_inbox','push_delivery','push_subscriptions']){
-      const omit=table==='messages' ? "-'reply_to'" : table==='notification_inbox' ? "-'private_conversation_id'-'private_message_id'" : '';
+      const omit=table==='messages' ? "-'reply_to'-'sender_period'" : table==='notification_inbox' ? "-'private_conversation_id'-'private_message_id'" : '';
       result[table]=(await db.query(`select to_jsonb(t)${omit} as v from g19_private.${table} t order by to_jsonb(t)::text`)).rows;
     }
     result.rpc=(await db.query(`select p.proname,pg_get_functiondef(p.oid) as definition from pg_proc p
@@ -45,7 +45,7 @@ test('Proposed foundation preserves all existing data, public RPC definitions an
   assert.equal((await rpc('push_status',[two,'https://fcm.googleapis.com/fcm/send/proposal'])).includes('messages'),true);
   assert.equal((await db.query('select count(*)::int n from g19_private.private_messages')).rows[0].n,0);
 });
-test('Existing last-device release reuses auth generation; proposed private period rotates independently',async t=>{
+test('Existing last-device release reuses auth generation; independent private period rotates independently',async t=>{
   const {db,rpc,bind,state,device}=await setup(t);const one=await bind(1);await db.exec(proposal);
   const pair=await rpc('pair_start',[1,proof()]);await rpc('pair_decide',[one,pair.code,true]);
   const second=(await rpc('pair_claim',[pair.secret])).token;
@@ -66,7 +66,7 @@ test('Existing last-device release reuses auth generation; proposed private peri
   const reset=await state(1);assert.equal(reset.generation,rebound.generation+1);assert.notEqual(reset.period_id,rebound.period_id);
   assert.ok(active);assert.deepEqual(await state(2),peer);
 });
-test('Proposed private tables deny every API role, including a valid web-admin session; RLS fails closed',async t=>{
+test('Private tables deny every API role, including a valid web-admin session; RLS fails closed',async t=>{
   const {db,rpc}=await setup(t);await db.exec(proposal);
   const user=randomUUID(),session=randomUUID();
   await db.query('insert into auth.users values($1)',[user]);await db.query('insert into auth.sessions(id,user_id) values($1,$2)',[session,user]);
@@ -87,13 +87,13 @@ test('Proposed private tables deny every API role, including a valid web-admin s
   });
   await assert.rejects(db.transaction(async tx=>{await tx.exec('set local role anon');await tx.exec('insert into g19_private.private_periods(room) values(1)');}),{code:'42501'});
 });
-test('Proposed constraints separate pair identities, replies and read cursors; closed history is retained',async t=>{
+test('Private constraints separate pair identities, replies and read cursors; closed history is retained',async t=>{
   const {db,rpc,bind,state,device}=await setup(t);const tokens=[];for(let r=1;r<=4;r++)tokens[r]=await bind(r);
   await db.exec(proposal);const periods=[];for(let r=1;r<=4;r++)periods[r]=(await state(r)).period_id;
   const conversation=async(a,b)=>(await db.query(`insert into g19_private.private_conversations(room_low,period_low,room_high,period_high)
     values($1,$2,$3,$4) returning id`,[a,periods[a],b,periods[b]])).rows[0].id;
   const first=await conversation(1,2),other=await conversation(2,4);
-  // A wrapper exists only in this in-memory fixture; the proposal exposes no RPC.
+  // A wrapper exists only in this in-memory fixture; foundation 020 alone exposes no RPC.
   await db.exec(`create function public.probe_private_context(text,uuid) returns uuid language sql security definer set search_path='' as
     $$select (g19_private.require_private_conversation($1,$2)).id$$;
     revoke all on function public.probe_private_context(text,uuid) from public;
@@ -129,14 +129,18 @@ test('Proposed constraints separate pair identities, replies and read cursors; c
   assert.notEqual((await state(1)).period_id,periods[1]);
   const newcomer=await bind(1);
   await assert.rejects(access(newcomer,first),{code:'PT404'});
-  await assert.rejects(access(tokens[2],first),{code:'PT404'});
+  assert.equal(await access(tokens[2],first),first);
+  await assert.rejects(db.query('select g19_private.require_writable_private_conversation($1,$2)',[tokens[2],first]),{code:'PT409'});
+  await rpc('revoke_device',[tokens[2],await device(tokens[2])]);
+  const secondNewcomer=await bind(2);
+  await assert.rejects(access(secondNewcomer,first),{code:'PT404'});
   assert.equal((await db.query('select count(*)::int n from g19_private.private_messages where conversation_id=$1',[first])).rows[0].n,2);
   assert.equal((await db.query(`select count(*)::int n from g19_private.private_conversations c
     join g19_private.private_current_period l on (l.room,l.period_id)=(c.room_low,c.period_low)
     join g19_private.private_current_period h on (h.room,h.period_id)=(c.room_high,c.period_high) where c.id=$1`,[first])).rows[0].n,0);
 });
 
-test('Proposed migration aborts atomically if an ALL TABLES publication could expose new tables',async t=>{
+test('Foundation migration aborts atomically if an ALL TABLES publication could expose new tables',async t=>{
   const {db}=await setup(t);
   await db.exec('create publication g19_proposal_guard for all tables');
   await assert.rejects(db.exec(proposal),/Review ALL TABLES publications/);

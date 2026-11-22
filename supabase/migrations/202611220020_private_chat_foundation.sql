@@ -1,7 +1,5 @@
--- STAGE A PROPOSAL ONLY. Not an installable release migration.
--- Do not move into supabase/migrations or apply to a connected database before
--- approval of server-side privacy and the room-period lifecycle.
--- Public/private RPCs and the inbox bridge belong to the subsequent Stage B.
+-- v13-11-0: apply only to the explicitly approved test project.
+-- Private API starts disabled; enable separately after deployment verification.
 begin;
 
 -- Fail closed: an ALL TABLES publication would automatically include new tables.
@@ -62,8 +60,8 @@ create table g19_private.private_conversations (
   foreign key (room_high, period_high) references g19_private.private_periods(room, id),
   unique (room_low, period_low, room_high, period_high)
 );
--- Draft authorization primitive for the later RPC layer. It grants no API
--- entry point. The tests call it through an isolated, test-only wrapper.
+-- Shared authorization primitive. No direct API entry point: public RPCs
+-- must use this read guard or the stricter write guard below.
 create function g19_private.require_private_conversation(p_token text, p_conversation uuid)
 returns g19_private.private_conversations language plpgsql set search_path = '' as $$
 declare
@@ -83,19 +81,36 @@ begin
     order by room for share;
   viewer := g19_private.lock_device(p_token);
   if not exists (
-    select 1 from g19_private.private_current_period l
-      join g19_private.private_periods lp on lp.id = l.period_id and lp.ended_at is null
-      join g19_private.rooms lr on lr.room = l.room and lr.occupied
-      join g19_private.private_current_period h on h.room = conversation.room_high
-      join g19_private.private_periods hp on hp.id = h.period_id and hp.ended_at is null
-      join g19_private.rooms hr on hr.room = h.room and hr.occupied
-    where l.room = conversation.room_low and l.period_id = conversation.period_low
-      and h.period_id = conversation.period_high
+    select 1 from g19_private.private_current_period current_period
+      join g19_private.private_periods period on period.id = current_period.period_id and period.ended_at is null
+      join g19_private.rooms room on room.room = current_period.room and room.occupied
+    where current_period.room = viewer.room and current_period.period_id =
+      case when viewer.room = conversation.room_low then conversation.period_low else conversation.period_high end
   ) then raise sqlstate 'PT404' using message = 'private_conversation_unavailable'; end if;
   return conversation;
 end;
 $$;
 revoke all on function g19_private.require_private_conversation(text,uuid)
+  from public, anon, authenticated, service_role;
+
+-- Archive reading requires only the caller's original period. Sending always
+-- uses this separate, stricter helper; no client-supplied "readOnly" flag grants writes.
+create function g19_private.require_writable_private_conversation(p_token text, p_conversation uuid)
+returns g19_private.private_conversations language plpgsql set search_path = '' as $$
+declare conversation g19_private.private_conversations := g19_private.require_private_conversation(p_token, p_conversation);
+begin
+  if not exists (
+    select 1 from g19_private.private_current_period l
+      join g19_private.rooms lr on lr.room = l.room and lr.occupied
+      join g19_private.private_current_period h on h.room = conversation.room_high
+      join g19_private.rooms hr on hr.room = h.room and hr.occupied
+    where l.room = conversation.room_low and l.period_id = conversation.period_low
+      and h.period_id = conversation.period_high
+  ) then raise sqlstate 'PT409' using message = 'private_conversation_archived'; end if;
+  return conversation;
+end;
+$$;
+revoke all on function g19_private.require_writable_private_conversation(text,uuid)
   from public, anon, authenticated, service_role;
 
 create table g19_private.private_members (
@@ -106,6 +121,7 @@ create table g19_private.private_members (
   unique (conversation_id, room, period_id),
   foreign key (room, period_id) references g19_private.private_periods(room, id)
 );
+create index private_members_by_period on g19_private.private_members(room,period_id,conversation_id);
 create function g19_private.seed_private_members()
 returns trigger language plpgsql set search_path = '' as $$
 begin
@@ -140,7 +156,7 @@ create table g19_private.private_messages (
     references g19_private.private_messages(conversation_id, id),
   check (reply_to is null or reply_to <> id)
 );
-create index private_messages_recent on g19_private.private_messages(conversation_id, seq desc);
+-- UNIQUE(conversation_id,seq) also supports reverse history pagination.
 
 create table g19_private.private_read_cursors (
   conversation_id uuid not null,
@@ -179,12 +195,12 @@ revoke all on g19_private.private_periods, g19_private.private_current_period,
   g19_private.private_presence from public, anon, authenticated, service_role;
 
 -- Additive, backwards-compatible general-chat reply pointer. No duplicated body.
-alter table g19_private.messages add column reply_to bigint
-  references g19_private.messages(id);
+alter table g19_private.messages add column reply_to bigint references g19_private.messages(id),
+  add column sender_period uuid references g19_private.private_periods(id);
 create index messages_reply_to on g19_private.messages(reply_to) where reply_to is not null;
 
--- Metadata only. DO NOT create private inbox events until the Stage B bridge
--- guards legacy bigint casts, read-all calls, delivery, and route validation.
+-- Metadata only. Migration 021 adds the guarded inbox bridge and publishers.
+-- Keep private_chat_settings disabled until that API and its clients are ready.
 alter table g19_private.notification_inbox
   add column private_conversation_id uuid,
   add column private_message_id uuid,
@@ -200,5 +216,12 @@ alter table g19_private.notification_inbox
   );
 create index private_notification_lookup on g19_private.notification_inbox
   (private_conversation_id, device_id) where private_conversation_id is not null;
+
+create table g19_private.private_chat_settings (
+  singleton boolean primary key default true check (singleton), enabled boolean not null default false
+);
+insert into g19_private.private_chat_settings default values;
+alter table g19_private.private_chat_settings enable row level security;
+revoke all on g19_private.private_chat_settings from public, anon, authenticated, service_role;
 
 commit;

@@ -54,6 +54,20 @@
   let sending = false;
   let reacting = false;
   let draft;
+  let replyTarget = null;
+  let capabilities = {};
+  const generalMode = () => !location.hash.startsWith("#dyskusje/prywatne");
+  const replyBanner = document.getElementById("discussion-reply-target");
+  function setReply(message) {
+    replyTarget = message;
+    replyBanner.hidden = !message;
+    replyBanner.querySelector("span").textContent = message ? "Odpowiedź · Pokój nr " + message.room + ": " + message.body.slice(0,160) : "";
+  }
+  replyBanner.querySelector("button").addEventListener("click",()=>{setReply(null);body.focus();});
+  window.addEventListener("g19-chat-capabilities",event=>{
+    capabilities = event.detail || {};
+    if(messages.length) renderMessages(messages,false,false);
+  });
   let pollTimer;
   let pollDelay = 5000;
   let refreshError = false;
@@ -116,6 +130,9 @@
     localStorage.removeItem(enrollmentKey);
     localStorage.removeItem(pairingKey);
     token = pairing = null;
+    setReply(null);
+    body.value = "";
+    draft = undefined;
     window.dispatchEvent(new Event("g19-device-changed"));
     clearInterval(pairTimer);
     clearHistory();
@@ -200,12 +217,37 @@
       const reactions = document.createElement("div");
       reactions.className = "discussion-reactions";
       reactions.append(reactionButton(message, 1), reactionButton(message, -1));
+      if (capabilities.privateChat && !message.mine && !message.former && message.canPrivate !== false && message.authorPeriod) {
+        const link = document.createElement("a");
+        link.href = "#dyskusje/prywatne/pokoj/" + message.room + "/" + message.authorPeriod;
+        link.textContent = author.textContent;
+        link.className = "message-author-link";
+        author.replaceChildren(link);
+      }
       meta.append(author, time);
       const avatar = document.createElement("span");
       avatar.className = "discussion-avatar";
       avatar.setAttribute("aria-hidden", "true");
       avatar.textContent = message.room;
-      row.append(avatar, meta, content, reactions);
+      if (capabilities.privateChat && !message.mine && !message.former && message.canPrivate !== false && message.authorPeriod) {
+        const link = document.createElement("a");
+        link.className = avatar.className;
+        link.href = "#dyskusje/prywatne/pokoj/" + message.room + "/" + message.authorPeriod;
+        link.textContent = message.room;
+        link.setAttribute("aria-label", "Rozmowa prywatna: Pokój nr " + message.room);
+        row.append(link);
+      } else row.append(avatar);
+      row.append(meta);
+      if (message.reply) {
+        const quote = document.createElement("button");
+        quote.type="button";quote.className="message-quote";quote.dataset.original=message.reply.id;
+        quote.textContent="Pokój nr " + message.reply.room + ": " + message.reply.body;
+        row.append(quote);
+      }
+      if(capabilities.replies) {
+        const reply=document.createElement("button");reply.type="button";reply.className="message-reply-action";reply.dataset.reply=message.id;reply.textContent="Odpowiedz";reactions.append(reply);
+      }
+      row.append(content, reactions);
       fragment.append(row);
     }
     history.replaceChildren(fragment);
@@ -224,7 +266,7 @@
   }
 
   async function loadHistory({ reset = false, bottom = false } = {}) {
-    if (!token || view.hidden) return;
+    if (!token || view.hidden || (!generalMode() && !chat.hidden)) return;
     const id = ++loadId;
     const usedToken = token;
     loading = true;
@@ -244,6 +286,7 @@
         approvalDetails.open = true;
         approvalCode.focus();
       }
+      if (!generalMode()) return;
       if (data.unchanged) return;
 
       const nearEnd = history.scrollHeight - history.scrollTop - history.clientHeight < 55;
@@ -423,8 +466,8 @@
       return;
     }
     if (token) {
-      status.textContent = "Wczytywanie rozmowy…";
-      await loadHistory({ reset: true, bottom: true });
+      status.textContent = generalMode() ? "Wczytywanie rozmowy…" : "";
+      await loadHistory({ reset: messages.length === 0, bottom: messages.length === 0 });
     } else if (pairing) {
       renderPairing();
       await checkPairing();
@@ -622,12 +665,14 @@
     event.preventDefault();
     const text = body.value.trim();
     if (!token || sending || !text || text.length > 1500) return;
-    if (draft?.text !== text) draft = { text, id: crypto.randomUUID() };
+    const reply = replyTarget?.id || null;
+    if (draft?.text !== text || draft?.reply !== reply) draft = { text, reply, id: crypto.randomUUID() };
     const usedToken = token;
     sending = true;
     updateSend();
     try {
-      await rpc("send", { p_token: usedToken, p_request: draft.id, p_body: text });
+      await rpc(capabilities.replies ? "send_reply" : "send", { p_token: usedToken, p_request: draft.id, p_body: text, ...(capabilities.replies ? {p_reply:reply} : {}) });
+      if(replyTarget?.id === reply) setReply(null);
       if (body.value.trim() === text) body.value = "";
       draft = undefined;
       status.textContent = "";
@@ -642,6 +687,23 @@
   });
 
   history.addEventListener("click", async event => {
+    const reply = event.target.closest("[data-reply]");
+    if(reply && !sending) {setReply(messages.find(m=>m.id===reply.dataset.reply));body.focus();return;}
+    const quote = event.target.closest("[data-original]");
+    if(quote && token) {
+      const usedToken=token;
+      try {
+        let row=history.querySelector('[data-message="'+quote.dataset.original+'"]');
+        if(!row) {
+          const data=await rpc("general_message",{p_token:usedToken,p_message:quote.dataset.original});
+          if(token!==usedToken || !generalMode() || view.hidden) return;
+          before=data.before;version=null;messages=data.messages;renderMessages(messages,false,true);older.hidden=!data.hasOlder;latest.hidden=false;
+          row=history.querySelector('[data-message="'+data.focusId+'"]');
+        }
+        if(row){row.tabIndex=-1;row.focus({preventScroll:true});row.scrollIntoView({block:"center"});row.classList.add("message-highlight");setTimeout(()=>row.classList.remove("message-highlight"),1800);}
+      }catch(error){showRequestError(error,usedToken,"Wiadomość jest niedostępna.");}
+      return;
+    }
     const button = event.target.closest("[data-reaction]");
     if (!button || reacting || !token) return;
     const message = messages.find(item => item.id === button.closest("[data-message]").dataset.message);

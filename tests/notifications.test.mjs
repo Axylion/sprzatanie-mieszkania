@@ -269,4 +269,12 @@ test('Service worker displays scoped push events and opens the target route', as
   await dispatch('push', { data: { json: () => ({ id: '11', category: 'announcements', target: '#ogloszenie-old' }) } });
   assert.equal(shown[3][0], 'Ważne ogłoszenie');
   assert.equal(shown[3][1].body, 'Otwórz ogłoszenie w Goleszan 19.');
+  const privateTarget='#dyskusje/prywatne/'+randomUUID();
+  await dispatch('push',{data:{json:()=>({id:'12',category:'messages',kind:'private',room:3,target:privateTarget,preview:'NEVER SHOW PRIVATE TEXT'})}});
+  assert.equal(shown[4][0],'Goleszan 19 · Nowa wiadomość prywatna');
+  assert.equal(shown[4][1].body,'Nowa wiadomość prywatna od pokoju nr 3');
+  await dispatch('notificationclick',{notification:{data:shown[4][1].data,close(){}}});
+  assert.equal(opened.at(-1),scope+privateTarget);
+  await dispatch('push',{data:{json:()=>({id:'13',category:'messages',kind:'private',target:'#dyskusje/prywatne/not-a-uuid'})}});
+  assert.equal(shown.length,5);
 });

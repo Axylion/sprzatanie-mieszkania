@@ -70,6 +70,8 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   })),{color:'rgb(99, 229, 239)',arrow:'rgb(99, 229, 239)',shadow:'none'});
   await summary.click();
   assert.equal(await summary.evaluate(el=>el.parentElement.open),true);
+  assert.equal(await page.locator('#calendar-title').evaluate(el=>el.getBoundingClientRect().width),1);
+  assert.equal(await page.locator('.dashboard-calendar').getAttribute('aria-labelledby'),'calendar-title');
   assert.equal(await page.locator('#calendar-next-date').isVisible(),true);
   assert.match(await page.locator('#calendar-next-room').innerText(),/^Pokój nr [1-4]$/);
   const output = process.env.G19_DARK_SCREENSHOTS;

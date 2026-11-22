@@ -902,3 +902,55 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   [data-theme="dark"] .cleaning-rules summary::before,
   [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"]) { transition: none; }
 }
+
+/* Replies and private conversations share the existing theme tokens. */
+.discussion-panel { --private-tint: #e4f3f4; --private-accent: #17616b; }
+[data-theme="dark"] .discussion-panel { --private-tint: #194750; --private-accent: #a7f5fa; }
+.discussion-tabs:not([hidden]) { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+.discussion-tabs a { padding: 9px 16px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--surface-alt); text-decoration: none; }
+.discussion-tabs a[aria-current="page"] { background: var(--private-tint); color: var(--private-accent); border-color: var(--accent); font-weight: 700; }
+.private-unread, #private-tab-count:not([hidden]) { display: inline-grid; place-items: center; min-width: 20px; padding: 1px 5px; border-radius: 10px; background: var(--private-tint); color: var(--private-accent); font-size: .8rem; }
+.private-list { list-style: none; padding: 0; margin: 12px 0; }
+.private-list li + li { border-top: 1px solid var(--border); }
+.private-list a { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: start; gap: 12px; padding: 15px 0; color: var(--text); text-decoration: none; }
+.private-list a:hover { background: var(--surface-alt); }
+.private-list-content { display: grid; gap: 4px; min-width: 0; }
+.private-list-content > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.private-list time { color: var(--muted); font-size: .8rem; }
+.private-avatar { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 10px; background: var(--private-tint); color: var(--private-accent); }
+.private-privacy { margin-top: 20px; color: var(--muted); font-size: .85rem; }
+.private-privacy summary { display: flex; gap: 8px; align-items: start; cursor: pointer; }
+.private-privacy svg { width: 20px; height: 20px; flex: none; color: var(--private-accent); }
+.private-dialog-heading { display: flex; align-items: center; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
+.private-dialog-heading h2 { margin: 0; font-size: clamp(1.05rem,3vw,1.5rem); }
+.private-history { height: auto; min-height: 180px; max-height: min(55dvh,520px); }
+.private-history .private-message { display: grid; grid-template-columns: 38px minmax(0,1fr); column-gap: 11px; margin: 0; padding: 15px 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.private-message > .private-avatar { grid-row: 1 / 5; }
+.private-message > :is(.discussion-meta,p,.discussion-reactions,.message-quote) { grid-column: 2; min-width: 0; }
+.private-message p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.message-author-link { color: inherit; }
+.message-quote { display: block; grid-column: 2; text-align: start; max-width: 100%; padding: 7px 10px; margin: 6px 0; border: 0; border-left: 3px solid var(--accent); border-radius: 4px; background: var(--surface-alt); color: var(--muted); font-size: .85rem; overflow-wrap: anywhere; }
+.discussion-reactions .message-reply-action { color: var(--private-accent); padding-inline: 6px; margin-left: auto; }
+.reply-target:not([hidden]) { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0; padding: 8px 10px; border-left: 3px solid var(--accent); border-radius: 5px; background: var(--surface-alt); font-size: .85rem; }
+.reply-target span { overflow-wrap: anywhere; min-width: 0; }
+.reply-target button { flex: none; min-width: 36px; min-height: 36px; padding: 2px 8px; }
+.private-compose:not([hidden]) { display: grid; grid-template-columns: minmax(0,1fr) 38px; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin-top: 12px; background: var(--surface-alt); }
+.private-compose textarea { font: inherit; line-height: 1.5; color: var(--chat-text); max-height: 24dvh; width: 100%; min-width: 0; min-height: 38px; border: 0; background: transparent; resize: vertical; }
+.private-compose button { display: grid; place-items: center; width: 38px; height: 38px; min-height: 38px; padding: 8px; border: 0; border-radius: 8px; background: #247f88; color: white; }
+.private-compose button:not(:disabled):hover { background: #2d919b; }
+.private-compose button:disabled { background: #31575c; color: #a7bfc2; }
+.private-compose svg { width: 20px; height: 20px; }
+#private-readonly { padding: 8px 0; color: var(--muted); font-size: .9rem; }
+.message-highlight { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (min-width: 760px) {
+  [data-theme="dark"] .discussion-tabs a[aria-current="page"] { background: #194750; color: #a7f5fa; border-color: #39626a; }
+  [data-theme="dark"] .private-avatar { background: #1b4852; color: #a4dbe2; }
+  [data-theme="dark"] .private-compose { background: #14373f; border-color: #39626a; }
+  [data-theme="dark"] .private-compose:focus-within { border-color: var(--field-focus); box-shadow: 0 0 0 3px var(--field-glow); }
+  [data-theme="dark"] .discussion-panel .private-compose textarea:focus { outline: none; box-shadow: none; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .discussion-tabs a:hover, .private-list a:hover { text-decoration: none; background: var(--private-tint); }
+  .discussion-tabs a[aria-current="page"]:hover { filter: brightness(1.1); }
+}

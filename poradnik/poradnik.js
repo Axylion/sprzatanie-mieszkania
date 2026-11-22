@@ -130,7 +130,7 @@
     const showAdmin = hash === "#administracja";
     const wasAdmin = !admin.hidden;
     admin.hidden = !showAdmin;
-    const showDiscussion = hash === "#dyskusje";
+    const showDiscussion = hash === "#dyskusje" || hash.startsWith("#dyskusje/prywatne");
     const showGuide = hash === "#poradnik" || hash.startsWith("#poradnik/");
     currentHash = hash;
     if (gallery.open) gallery.close();

@@ -1,9 +1,9 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v13-10-2";
+const CACHE_NAME = "goleszan19-shell-v13-11-0";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
   "./dyskusje/notifications.js", "./administracja/admin.js", "./administracja/announcements.js", "./ogloszenia/content.js",
-  "./dyskusje/dyskusje.css", "./dyskusje/config.js", "./dyskusje/dyskusje.js",
+  "./dyskusje/dyskusje.css", "./dyskusje/config.js", "./dyskusje/dyskusje.js", "./dyskusje/private-chat.js",
   "./poradnik/poradnik.css", "./poradnik/dane.js", "./poradnik/poradnik.js",
   "./poradnik/media/kabina-1.webp",
   "./poradnik/media/kabina-2.webp",
@@ -89,15 +89,16 @@ self.addEventListener("fetch", event => {
 self.addEventListener("push", event => {
   let data;
   try { data = event.data?.json(); } catch { return; }
-  if (!data || !/^[0-9]+$/.test(data.id) || !/^#(dyskusje|calendar-title|ogloszenie-.+)$/.test(data.target)) return;
+  if (!data || !/^[0-9]+$/.test(data.id) || !/^#(dyskusje(?:\/prywatne\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?|calendar-title|ogloszenie-.+)$/i.test(data.target)) return;
   const titles = { messages: "Nowa wiadomość", announcements: "Ważne ogłoszenie", duties: "Przypomnienie o sprzątaniu" };
   if (!Object.hasOwn(titles, data.category)) return;
   const message = data.category === "messages";
+  const privateMessage = message && data.kind === "private";
   const preview = message && [1, 2, 3, 4].includes(data.room) &&
     typeof data.preview === "string" && data.preview.length <= 401 && data.preview.trim();
   const announcementTitle = data.category === "announcements" && notificationText(data.title);
-  const title = message ? "Goleszan 19 · Nowa wiadomość" : announcementTitle || titles[data.category];
-  const body = message
+  const title = privateMessage ? "Goleszan 19 · Nowa wiadomość prywatna" : message ? "Goleszan 19 · Nowa wiadomość" : announcementTitle || titles[data.category];
+  const body = privateMessage ? ([1,2,3,4].includes(data.room) ? "Nowa wiadomość prywatna od pokoju nr " + data.room : "Nowa wiadomość prywatna") : message
     ? (preview ? "Pokój nr " + data.room + ": " + preview : "Otwórz Goleszan 19.")
     : notificationText(data.body) || (data.category === "duties"
       ? "Sprawdź harmonogram sprzątania."
@@ -116,7 +117,7 @@ function notificationText(value) {
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const hash = event.notification.data?.target;
-  if (!/^#(dyskusje|calendar-title|ogloszenie-.+)$/.test(hash || "")) return;
+  if (!/^#(dyskusje(?:\/prywatne\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?|calendar-title|ogloszenie-.+)$/i.test(hash || "")) return;
   const target = new URL(self.registration.scope);
   target.hash = hash;
   event.waitUntil((async () => {

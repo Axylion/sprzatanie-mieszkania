@@ -367,6 +367,7 @@
   <link rel="stylesheet" href="./dyskusje/dyskusje.css">
   <script defer src="./dyskusje/config.js"></script>
   <script defer src="./dyskusje/dyskusje.js"></script>
+  <script defer src="./dyskusje/private-chat.js"></script>
   <script defer src="./dyskusje/notifications.js"></script>
   <script defer src="./ogloszenia/content.js"></script>
   <script defer src="./administracja/announcements.js"></script>
@@ -537,7 +538,7 @@
     </div>
     <div class="dashboard-secondary">
       <section class="card dashboard-calendar" aria-labelledby="calendar-title">
-    <h2 id="calendar-title">Kalendarz sprzątania</h2>
+    <h2 class="sr-only" id="calendar-title">Kalendarz sprzątania</h2>
     <div class="calendar-upcoming" id="calendar-upcoming"><strong class="calendar-upcoming-label"><span class="calendar-upcoming-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg></span><span>Najbliższy dyżur</span></strong><span id="calendar-next"></span><span id="calendar-next-date" class="calendar-desktop-detail"></span><span id="calendar-next-room" class="calendar-desktop-detail"></span></div>
     <div class="calendar-month">
       <button type="button" id="calendar-prev" aria-label="Poprzedni miesiąc">‹</button>
@@ -616,7 +617,7 @@
         <summary>Podłącz kolejne urządzenie</summary>
         <div class="device-roles">
           <div><strong><span aria-hidden="true">✓ </span>To urządzenie jest połączone</strong>
-            <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia.</p></div>
+            <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia. Otrzyma ono dostęp do historii bieżącego okresu pokoju. Przy zmianie mieszkańca administrator powinien najpierw zwolnić pokój.</p></div>
           <div><strong><span aria-hidden="true">＋ </span>Nowe urządzenie</strong>
             <p>Otwórz Dyskusje na nowym urządzeniu, wybierz numer pokoju i odczytaj wyświetlony sześciocyfrowy kod.</p></div>
         </div>
@@ -627,17 +628,51 @@
           <button type="submit" value="reject" disabled>Odrzuć</button>
         </form>
       </details>
+      <nav id="discussion-tabs" class="discussion-tabs" aria-label="Rodzaj rozmowy" hidden>
+        <a id="general-tab" href="#dyskusje" aria-current="page">Ogólne</a>
+        <a id="private-tab" href="#dyskusje/prywatne">Prywatne <span id="private-tab-count" hidden></span></a>
+      </nav>
+      <div id="discussion-general">
       <div class="discussion-history-controls">
         <button type="button" id="discussion-older" hidden>Starsze wiadomości</button>
       </div>
       <ol class="discussion-history" id="discussion-history" aria-label="Historia wiadomości" tabindex="0"></ol>
       <button type="button" id="discussion-latest" hidden>Najnowsze wiadomości</button>
+      <div id="discussion-reply-target" class="reply-target" hidden><span></span><button type="button" aria-label="Anuluj odpowiedź">×</button></div>
       <form class="discussion-compose" id="discussion-compose">
         <span class="discussion-compose-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/></svg></span>
         <label for="discussion-body">Wiadomość</label>
         <textarea id="discussion-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
         <button type="submit" id="discussion-send" aria-label="Wyślij" disabled><span class="discussion-send-label">Wyślij</span><svg class="discussion-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
       </form>
+      </div>
+      <section id="private-view" hidden aria-label="Prywatne rozmowy">
+        <p id="private-status" role="status"></p>
+        <div id="private-list-view">
+          <ul id="private-list" class="private-list"></ul>
+          <a id="private-archive-open" href="#dyskusje/prywatne/archiwum" hidden>Archiwum <span id="private-archive-count"></span></a>
+          <details class="private-privacy"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg>Prywatne rozmowy są dostępne wyłącznie dla uczestniczących w nich pokoi.</summary>
+            <p>Panel administratora nie udostępnia cudzych prywatnych rozmów. Wiadomości nie są szyfrowane end-to-end. Osoby z bezpośrednim dostępem administracyjnym do bazy danych mogą odczytać ich treść. Dostęp do pokoju współdzielą jego podłączone urządzenia.</p>
+          </details>
+        </div>
+        <div id="private-archive-view" hidden>
+          <a href="#dyskusje/prywatne">‹ Prywatne</a><h2>Archiwum</h2>
+          <ul id="private-archive-list" class="private-list"></ul><button id="private-archive-more" type="button" hidden>Starsze rozmowy</button>
+        </div>
+        <div id="private-dialog-view" hidden>
+          <div class="private-dialog-heading"><a id="private-back" href="#dyskusje/prywatne">‹ Rozmowy</a><span class="private-avatar" id="private-peer-avatar" aria-hidden="true"></span><h2 id="private-peer-title" tabindex="-1"></h2></div>
+          <p id="private-readonly" hidden>Rozmowa archiwalna — tylko do odczytu.</p>
+          <button id="private-older" type="button" hidden>Starsze wiadomości</button>
+          <ol class="discussion-history private-history" id="private-history" aria-label="Historia prywatnej rozmowy" tabindex="0"></ol>
+          <button id="private-latest" type="button" hidden>Najnowsze wiadomości</button>
+          <div id="private-reply-target" class="reply-target" hidden><span></span><button type="button" aria-label="Anuluj prywatną odpowiedź">×</button></div>
+          <form class="private-compose" id="private-compose">
+            <label for="private-body" class="sr-only">Wiadomość prywatna</label>
+            <textarea id="private-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
+            <button id="private-send" type="submit" aria-label="Wyślij prywatną wiadomość" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
+          </form>
+        </div>
+      </section>
     </div>
   </section>
 </main>

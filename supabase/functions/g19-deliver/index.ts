@@ -32,11 +32,15 @@ Deno.serve(async request => {
     if (!publicKey || !privateKey || !subject) return Response.json({ pushConfigured: false });
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const batch = await rpc("push_take");
-    const outcomes = await Promise.all(batch.map(async (item: { id: string; lease: string; endpoint: string; p256dh: string; auth: string; category: string; target: string; room?: number; message?: string }) => {
+    const outcomes = await Promise.all(batch.map(async (item: { id: string; lease: string; endpoint: string; p256dh: string; auth: string; category: string; kind?: string; target: string; room?: number; message?: string }) => {
       let outcome = "failed";
       const endpoint = new URL(item.endpoint);
       if (endpoint.protocol === "https:" && !endpoint.port && !endpoint.username && !endpoint.password && allowedHosts.test(endpoint.hostname)) {
         try {
+          if (item.kind === "private" && !await rpc("private_delivery_active", { p_notification: item.id })) {
+            await rpc("push_finish", { p_id: item.id, p_lease: item.lease, p_outcome: "failed" });
+            return "skipped";
+          }
           if (item.category === "announcements" &&
               !await rpc("announcement_delivery_active", { p_id: item.id })) {
             await rpc("push_finish", { p_id: item.id, p_lease: item.lease, p_outcome: "failed" });

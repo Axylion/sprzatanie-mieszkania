@@ -97,6 +97,10 @@ function dutyText(value) {
 
 export function pushPayload(item) {
   const payload = { id: item.id, category: item.category, target: item.target };
+  if (item.category === "messages" && item.kind === "private") {
+    return { ...payload, kind: "private", room: item.room,
+      body: [1,2,3,4].includes(item.room) ? "Nowa wiadomość prywatna od pokoju nr " + item.room : "Nowa wiadomość prywatna" };
+  }
   if (item.category === "duties") {
     return { ...payload, body: dutyText(item.duty_saturday) || "Sprawdź harmonogram sprzątania." };
   }

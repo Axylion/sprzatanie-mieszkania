@@ -27,6 +27,7 @@ test('Dark desktop presentation preserves notification reading, field focus and 
     createdAt:['2026-11-19T06:51:00Z','2026-11-16T07:41:00Z','2026-11-16T07:00:00Z'][index],read:index===2
   }));
   const reads = [];
+  let devices = [{id:'fixture-pc',kind:'computer',current:true,createdAt:'2026-11-21T12:00:00Z'}, {id:'fixture-phone',kind:'phone',current:false,createdAt:'2026-11-21T12:00:00Z'}];
   await context.addInitScript(() => localStorage.setItem('goleszan19-discussion-device','fixture-device'));
   await context.route('https://g19test.supabase.co/**', async route => {
     const method = new URL(route.request().url()).pathname.split('/').at(-1);
@@ -40,7 +41,8 @@ test('Dark desktop presentation preserves notification reading, field focus and 
     if (method === 'g19_chat_navigation_count') json={latest:'1',unread:0};
     if (method === 'g19_notification_preferences') json=['messages','announcements','duties'];
     if (method === 'g19_push_status') json={categories:[],registered:false};
-    if (method === 'g19_my_devices') json={devices:[],room:2,canPair:true};
+    if (method === 'g19_my_devices') json=devices;
+    if (method === 'g19_public_announcements') json=[{id:'fixture-announcement',title:'Informacja testowa',body:'Dłuższa treść ogłoszenia. '.repeat(30),publishedAt:'2026-01-01T12:00:00Z',expiresAt:null}];
     if (method === 'g19_read') json={room:2,deviceCount:1,hasOlder:false,version:'1',messages:[
       {id:'1',room:1,mine:false,vote:1,up:2,down:0,body:'Dziękujemy za posprzątanie kuchni.\nPamiętajmy o porządku w częściach wspólnych.',createdAt:'2026-11-21T12:00:00Z'},
       {id:'2',room:3,mine:false,vote:0,up:0,down:1,body:'Proszę pamiętać o opróżnieniu kosza i przetarciu blatu po gotowaniu.',createdAt:'2026-11-21T12:05:00Z'},
@@ -82,19 +84,59 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   assert.ok(await page.locator('#calendar-days .calendar-own').count()>=2);
   await page.evaluate(()=>localStorage.removeItem('cleaning-room'));
   await page.reload();
+  assert.equal(await page.locator('#duty-push-warning').isVisible(),true);
+  assert.match(await page.locator('#duty-push-warning').innerText(),/Powiadomienia są wyłączone/);
+  if(output) await page.locator('.dashboard-calendar').screenshot({path:join(output,'calendar-reminder-warning.png')});
+  for(const selector of ['#theme-toggle','[data-push-category="duties"]','.cleaning-rules summary','#announcements-open']) {
+    const control=page.locator(selector).first();
+    await control.hover();
+    assert.equal(await control.evaluate(el=>getComputedStyle(el).boxShadow),'none',selector);
+  }
+  await page.locator('#device-list [data-kind="phone"][data-connected]').waitFor();
+  const phonePath=await page.locator('#device-list [data-kind="phone"] path').getAttribute('d');
+  const computerPath=await page.locator('#device-list [data-kind="computer"] path').getAttribute('d');
+  devices=devices.filter(d=>d.kind==='computer');
+  await page.evaluate(()=>dispatchEvent(new Event('online')));
+  await page.locator('#device-list [data-kind="phone"]:not([data-connected])').waitFor();
+  assert.equal(await page.locator('#device-list [data-kind="phone"] path').getAttribute('d'),phonePath);
+  assert.equal(await page.locator('#device-list [data-kind="phone"] svg').evaluate(el=>getComputedStyle(el).color),'rgb(142, 174, 181)');
+  await page.reload();
+  await page.locator('#device-list [data-kind="phone"]:not([data-connected])').waitFor();
+  assert.equal(await page.locator('#device-list [data-kind="phone"] path').getAttribute('d'),phonePath);
+  devices=[{id:'fixture-pc',kind:'computer',current:false,createdAt:'2026-11-21T12:00:00Z'},{id:'fixture-phone',kind:'phone',current:true,createdAt:'2026-11-21T12:00:00Z'}];
+  await page.evaluate(()=>dispatchEvent(new Event('online')));
+  await page.locator('#device-list [data-kind="phone"][data-connected]').waitFor();
+  devices=devices.filter(d=>d.kind==='phone');
+  await page.evaluate(()=>dispatchEvent(new Event('online')));
+  await page.locator('#device-list [data-kind="computer"]:not([data-connected])').waitFor();
+  assert.equal(await page.locator('#device-list [data-kind="computer"] path').getAttribute('d'),computerPath);
+  if(output) await page.locator('#device-list').screenshot({path:join(output,'devices-dark-desktop.png')});
+  await page.locator('#announcements-open').click();
+  await page.locator('#hidden-announcements-list button').waitFor();
+  assert.equal(await page.locator('.announcement-list-icon').evaluate(el=>el.getBoundingClientRect().width),38);
+  if(output) await page.locator('#announcements-panel').screenshot({path:join(output,'announcements-dark-desktop.png')});
+  await page.locator('#hidden-announcements-list button').click();
+  assert.equal(await page.locator('#ogloszenie-fixture-announcement').isVisible(),true);
+  await page.goto(base);
   await page.locator('#notification-open').click();
   const panel = page.locator('#notification-panel');
   await panel.locator('#notification-list li').nth(2).waitFor();
   assert.equal(await panel.locator('.notification-category-icon').count(),3);
   assert.equal(await panel.evaluate(el=>Math.round(el.getBoundingClientRect().width)),736);
-  assert.equal(await panel.locator('#notification-read-all').evaluate(el=>{
-    const a=el.getBoundingClientRect(),p=el.closest('dialog').getBoundingClientRect();
-    return Math.round(p.right-a.right);
-  }),13);
-  assert.ok(await panel.locator('a[data-unread] .notification-unread-dot').first().evaluate(el=>{
-    const dot=el.getBoundingClientRect(),row=el.closest('a').getBoundingClientRect();
-    return row.right-dot.right<2;
+  const headerPositions = () => panel.evaluate(el => ['#notification-title','#notification-list','.notification-heading form'].map(s=>{const r=el.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.height];}));
+  const beforeRead = await headerPositions();
+  assert.ok(await panel.locator('#notification-read-all').evaluate(el=>{
+    const r=el.getBoundingClientRect(),h=document.querySelector('#notification-title').getBoundingClientRect();
+    return Math.abs((r.top+r.bottom)/2-(h.top+h.bottom)/2)<2;
   }));
+  assert.ok(await panel.locator('a[data-unread] .notification-unread-dot').first().evaluate(el=>{
+    const dot=el.getBoundingClientRect(),icon=el.parentElement.getBoundingClientRect();
+    return dot.right>icon.right && dot.bottom>icon.bottom && dot.left>icon.left+20 && dot.top>icon.top+20;
+  }));
+  assert.equal(await panel.locator('.notification-category-icon').first().evaluate(el=>el.getBoundingClientRect().width),38);
+  assert.equal(await panel.locator('#notification-list a').first().evaluate(el=>getComputedStyle(el).paddingTop),'15px');
+  await panel.locator('#notification-list a').first().hover();
+  assert.equal(await panel.locator('#notification-list a').first().evaluate(el=>getComputedStyle(el).boxShadow),'none');
   assert.equal(await panel.locator('a[data-unread]').count(),2);
   assert.equal(await panel.locator('.notification-unread-dot').evaluateAll(dots=>dots.filter(e=>getComputedStyle(e).display!=='none').length),2);
   assert.equal(await panel.locator('a[data-unread]').first().evaluate(el=>getComputedStyle(el).borderInlineStartWidth),'0px');
@@ -102,6 +144,8 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   await panel.locator('#notification-read-all').click();
   await page.waitForFunction(()=>document.querySelector('#notification-count').hidden);
   assert.equal(reads.length,1);
+  assert.deepEqual(await headerPositions(), beforeRead);
+  if(output) await panel.screenshot({path:join(output,'notifications-all-read.png')});
   assert.equal(await panel.locator('.notification-unread-dot').evaluateAll(dots=>dots.filter(e=>getComputedStyle(e).display!=='none').length),0);
   await panel.getByRole('button',{name:'Zamknij powiadomienia'}).click();
   await page.locator('#chat-open').click();
@@ -114,7 +158,10 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   await page.waitForFunction(()=>getComputedStyle(document.querySelector('#discussion-body')).borderColor==='rgb(99, 229, 239)');
   assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderColor),'rgb(99, 229, 239)');
   assert.equal(await page.locator('.discussion-send-icon').isVisible(),true);
-  assert.equal(await page.locator('#discussion-send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(47, 136, 66)');
+  assert.equal(await page.locator('#discussion-send').isDisabled(),true);
+  assert.equal(await page.locator('#discussion-send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(49, 87, 92)');
+  await page.locator('#discussion-body').fill('Tekst wyłącznie lokalnego testu');
+  assert.equal(await page.locator('#discussion-send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(36, 127, 136)');
   assert.equal(await page.locator('#discussion-compose').evaluate(el=>getComputedStyle(el).borderRadius),'12px');
   assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderTopWidth),'0px');
   await page.locator('.discussion-subtitle').click();

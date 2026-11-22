@@ -215,9 +215,11 @@
       const unreadDot = document.createElement("span");
       unreadDot.className = "notification-unread-dot";
       unreadDot.setAttribute("aria-hidden", "true");
-      heading.append(title, unreadDot);
+      heading.append(title);
       content.append(heading, detail, time);
-      link.append(categoryIcon(item.category), content);
+      const icon = categoryIcon(item.category);
+      icon.append(unreadDot);
+      link.append(icon, content);
       link.addEventListener("click", async event => {
         event.preventDefault();
         if (!item.read && !await mark(item.id)) return;
@@ -311,6 +313,7 @@
       const name = button.dataset.pushCategory;
       const enabled = permitted && confirmed.includes(name);
       button.setAttribute("aria-checked", String(enabled));
+      if (name === "duties") document.getElementById("duty-push-warning").hidden = enabled;
       const status = document.getElementById("push-" + name + "-status");
       status.dataset.enabled = String(enabled);
       const explanation = blocked

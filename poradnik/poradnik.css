@@ -134,7 +134,7 @@
 }
 
 .guide-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.guide-photo:hover { border-color: var(--guide-yellow); }
+.guide-photo:hover { border-color: var(--guide-photo-hover, var(--guide-yellow)); }
 .guide-detail { flex: none; width: 56px; height: 56px; border-radius: 9px; }
 
 .guide-instructions { grid-template-columns: minmax(0, 1.06fr) minmax(0, 1fr); }

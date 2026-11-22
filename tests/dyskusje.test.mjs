@@ -550,6 +550,12 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await b.getByRole('link', { name: 'Strona główna' }).click();
   const dutiesSwitch = b.getByRole('switch', { name: 'Powiadomienia o dyżurach' });
   assert.equal(await dutiesSwitch.getAttribute('aria-checked'), 'false');
+  assert.equal(await b.locator('#duty-push-warning').getAttribute('hidden'),null);
+  await dutiesSwitch.click();
+  await b.waitForFunction(()=>document.querySelector('#duty-push-warning').hidden);
+  assert.equal(await dutiesSwitch.getAttribute('aria-checked'),'true');
+  await dutiesSwitch.click();
+  await b.waitForFunction(()=>!document.querySelector('#duty-push-warning').hidden);
   await b.locator('#announcements-open').click();
   const announcementsSwitch = b.getByRole('switch', { name: 'Powiadomienia o ogłoszeniach' });
   await announcementsSwitch.click();
@@ -566,6 +572,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     window.dispatchEvent(new Event("online"));
   });
   await b.locator('#push-duties-status').filter({ hasText: 'Powiadomienia są zablokowane' }).waitFor();
+  assert.equal(await b.locator('#duty-push-warning').getAttribute('hidden'),null);
   assert.equal(await b.evaluate(() => window.pushRequests), 1);
   await c.goto(base + '#dyskusje');
   await c.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();

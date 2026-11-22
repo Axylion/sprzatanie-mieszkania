@@ -26,7 +26,7 @@ const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () => {
+test('PWA v13-10-1 to v13-10-2 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
@@ -56,7 +56,7 @@ test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () 
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-10-1', 'shell-v13-10-0')
+      ? contents.toString().replace('shell-v13-10-2', 'shell-v13-10-1')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -98,7 +98,7 @@ test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () 
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v13-10-0');
+      const cache = await caches.open('goleszan19-shell-v13-10-1');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
       localStorage.setItem('goleszan19-hidden-announcements-v1', JSON.stringify([JSON.stringify(['old-hidden', 1])]));
       localStorage.removeItem('goleszan19-hidden-announcements-v2');
@@ -107,7 +107,7 @@ test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () 
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
     await page.waitForFunction(async () => {
       const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v13-10-1') && !keys.includes('goleszan19-shell-v13-10-0');
+      return keys.includes('goleszan19-shell-v13-10-2') && !keys.includes('goleszan19-shell-v13-10-1');
     });
     await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
@@ -133,7 +133,9 @@ test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () 
     page.on('console', entry => { if (entry.type() === 'error' && entry.text().includes('MIME type')) mimeErrors.push(entry.text()); });
     for (const width of [390, 1280]) {
       await page.setViewportSize({width,height:850});
-      await page.goto(appUrl + 'administracja/?utm_source=chatgpt.com#dyskusje');
+      // The intermediate HTML redirects synchronously; wait for the actual route below,
+      // rather than a load event from the document being discarded.
+      await page.goto(appUrl + 'administracja/?utm_source=chatgpt.com#dyskusje', {waitUntil:'commit'});
       await page.waitForURL(appUrl + '?utm_source=chatgpt.com#dyskusje');
       await page.locator('#discussion-view').waitFor();
       for (const [route, selector] of [
@@ -142,7 +144,7 @@ test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () 
         ['poradnik', '#poradnik-view'],
         ['harmonogram', '#harmonogram']
       ]) {
-        await page.goto(appUrl + route + '/?check=1');
+        await page.goto(appUrl + route + '/?check=1', {waitUntil:'commit'});
         await page.waitForURL(appUrl + '?check=1#' + route);
         await page.locator(selector).waitFor();
         assert.equal(await page.locator('.brand-icon svg').evaluate(icon=>icon.getBoundingClientRect().width),25);
@@ -168,7 +170,10 @@ test('PWA v13-10-0 to v13-10-1 update under the GitHub Pages subpath', async () 
       await page.mouse.move(0,0);
       const before = await shadow(control);
       await control.hover();
-      assert.notEqual(await shadow(control), before, selector);
+      if (await page.evaluate(()=>innerWidth>=760 && document.documentElement.dataset.theme==='dark')) {
+        assert.equal(await shadow(control), 'none', selector);
+        assert.equal(await control.evaluate(el=>getComputedStyle(el).filter), 'brightness(1.08)', selector);
+      } else assert.notEqual(await shadow(control), before, selector);
     }
     for (const width of [390,1280]) {
       await page.setViewportSize({width,height:850});
@@ -457,7 +462,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-10-1');
+      const c = await caches.open('goleszan19-shell-v13-10-2');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

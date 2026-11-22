@@ -200,6 +200,11 @@ test('Announcement editor formats the current block, previews, publishes, hides 
       assert.deepEqual(await active.evaluate(appearance),before);
       assert.equal(await active.isDisabled(),true);
       assert.equal(await active.getAttribute('aria-pressed'),'true');
+      if(theme==='dark' && width===1280) {
+        await publish.hover();
+        assert.equal(await publish.evaluate(el=>getComputedStyle(el).boxShadow),'none');
+        assert.equal(await publish.evaluate(el=>getComputedStyle(el).filter),'brightness(1.08)');
+      }
       await publish.click();
       await confirmation.getByRole('button',{name:'Anuluj'}).waitFor();
       assert.equal(await page.evaluate(()=>document.activeElement.textContent),'Anuluj');

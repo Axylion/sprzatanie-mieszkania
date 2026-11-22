@@ -697,6 +697,7 @@
       other: "M4 5h16v14H4zM10 16h4"
     };
     const row = document.createElement("li");
+    row.dataset.kind = kind;
     if (connected) row.dataset.connected = "";
     const ns = "http://www.w3.org/2000/svg";
     const icon = document.createElementNS(ns, "svg");
@@ -734,6 +735,12 @@
         connectionStatus.textContent = "";
         connectionStatus.hidden = true;
       }
+      let previousDevices = [];
+      try { previousDevices = JSON.parse(localStorage.getItem("goleszan19-device-icons:" + usedToken) || "[]"); } catch { /* Optional local presentation state. */ }
+      if (!Array.isArray(previousDevices)) previousDevices = [];
+      if (devices.length > 1) {
+        try { localStorage.setItem("goleszan19-device-icons:" + usedToken, JSON.stringify(devices.map(({id,kind}) => ({id,kind})))); } catch { /* Keep functioning without storage. */ }
+      }
       const rows = devices.map(device => {
         const row = deviceRow(device.kind, true, device.current);
         const button = document.createElement("button");
@@ -755,7 +762,10 @@
         return row;
       });
       if (devices.length === 1) {
-        const row = deviceRow("other", false);
+        const missing = previousDevices.find(device => device && !devices.some(current => current.id === device.id));
+        const vacantKind = ["phone", "computer"].includes(missing?.kind) ? missing.kind
+          : devices[0].kind === "phone" ? "computer" : "phone";
+        const row = deviceRow(vacantKind, false);
         const button = document.createElement("button");
         button.type = "button";
         button.textContent = "Podłącz";

@@ -407,8 +407,8 @@
 </header>
 
 <dialog id="notification-panel" class="shortcut-help" aria-labelledby="notification-title">
-  <div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" aria-label="Zamknij powiadomienia">×</button></form></div>
-  <button type="button" id="notification-read-all" hidden>Oznacz wszystkie jako przeczytane</button>
+  <div class="notification-toolbar"><div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" aria-label="Zamknij powiadomienia">×</button></form></div>
+  <button type="button" id="notification-read-all" hidden>Oznacz wszystkie jako przeczytane</button></div>
   <p id="notification-empty">Brak powiadomień.</p>
   <p id="notification-status" role="status"></p>
   <ul id="notification-list"></ul>
@@ -548,8 +548,12 @@
     <div class="calendar-grid" id="calendar-days" role="group" aria-label="Kalendarz dyżurów"></div>
     <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
     <div class="calendar-date-info"><span id="calendar-duty" class="sr-only" aria-live="polite"></span><div class="push-control">
-      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status" data-push-category="duties">Powiadomienia o dyżurach</button>
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status duty-push-warning" data-push-category="duties">Powiadomienia o dyżurach</button>
       <p class="push-feedback" id="push-duties-status" role="status"></p>
+      <div id="duty-push-warning" class="duty-push-warning" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3v1"/></svg>
+        <div><strong>Powiadomienia są wyłączone.</strong><span>Warto je włączyć, aby nie zapomnieć o swoim dyżurze.</span></div>
+      </div>
     </div></div>
   </section>
     </div>
@@ -586,7 +590,7 @@
 <main class="container discussion-view" id="discussion-view" hidden>
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
   <section class="card discussion-panel" aria-labelledby="discussion-title">
-    <div class="discussion-heading"><h1 id="discussion-title" tabindex="-1">Dyskusje</h1><span class="discussion-heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/></svg></span><div class="push-control" hidden>
+    <div class="discussion-heading"><h1 id="discussion-title" tabindex="-1">Dyskusje</h1><div class="push-control" hidden>
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-messages-status" data-push-category="messages">Powiadomienia o wiadomościach</button>
       <p class="push-feedback" id="push-messages-status" role="status"></p>
     </div></div>
@@ -614,7 +618,7 @@
           <div><strong><span aria-hidden="true">✓ </span>To urządzenie jest połączone</strong>
             <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia.</p></div>
           <div><strong><span aria-hidden="true">＋ </span>Nowe urządzenie</strong>
-            <p>Otwórz na nim Dyskusje i odczytaj sześciocyfrowy kod.</p></div>
+            <p>Otwórz Dyskusje na nowym urządzeniu, wybierz numer pokoju i odczytaj wyświetlony sześciocyfrowy kod.</p></div>
         </div>
         <form id="discussion-approve-form" class="discussion-approval">
           <label for="discussion-approve-code">Kod z nowego urządzenia</label>
@@ -1288,7 +1292,14 @@
       const sample = document.createElement("span");
       const pieces = [...excerpt.segment(item.body.replace(/\s+/gu, " ").trim())];
       sample.textContent = pieces.slice(0, 130).map(part => part.segment).join("") + (pieces.length > 130 ? "…" : "");
-      button.append(title, sample);
+      const icon = document.createElement("span");
+      icon.className = "announcement-list-icon";
+      icon.setAttribute("aria-hidden", "true");
+      icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="m8 8 12-4v16L8 16H4V8h4Zm0 0v8m-3 0 2 5h4l-2-5M2 9v6"/></svg>';
+      const content = document.createElement("span");
+      content.className = "announcement-list-content";
+      content.append(title, sample);
+      button.append(icon, content);
       button.addEventListener("click", () => {
         if (!isActiveAnnouncement(item, Date.now())) return renderAnnouncements(loadedAnnouncements);
         const wasHidden = hiddenAnnouncements.delete(item.id);

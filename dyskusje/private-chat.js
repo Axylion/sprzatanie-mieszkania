@@ -130,11 +130,15 @@
       if(key===token()&&ctx===current&&active){window.dispatchEvent(new Event('g19-private-read'));await refreshSummary();}
     }catch(error){if(ctx===current){ctx.lastSeen=null;fail(error,key);}}
   }
+  function describePrivateDialog(archived) {
+    $('private-back').setAttribute('aria-label', archived ? 'Wróć do archiwum' : 'Wróć do listy rozmów');
+    $('private-peer-context').textContent = archived ? 'Rozmowa archiwalna' : 'Rozmowa prywatna';
+  }
   function applyRead(data,bottom){
     current.id=data.conversation;current.room=data.peerRoom;current.readOnly=data.readOnly;current.items=data.messages;
-    $('private-peer-title').textContent='Pokój nr '+data.peerRoom;$('private-peer-avatar').textContent=data.peerRoom;
+    $('private-peer-title').textContent='Pokój nr '+data.peerRoom;
     $('private-back').href=data.readOnly?prefix+'/archiwum':prefix;
-    $('private-back').textContent=data.readOnly?'‹ Archiwum':'‹ Rozmowy';
+    describePrivateDialog(data.readOnly);
     $('private-older').hidden=!data.hasOlder;$('private-latest').hidden=!current.before;
     renderMessages(data.messages,bottom);updateComposer();
   }
@@ -186,8 +190,8 @@
     const draft=drafts.get(ctx.key);$('private-body').value=draft?.text||'';ctx.reply=draft?.reply||null;ctx.request=draft?.request||null;
     $('private-reply-target').querySelector('span').textContent=ctx.reply?'Odpowiedź · Pokój nr '+ctx.reply.room+': '+ctx.reply.body.slice(0,160):'';
     $('private-back').href=ctx.readOnly&&ctx.id?prefix+'/archiwum':prefix;
-    $('private-back').textContent=ctx.readOnly&&ctx.id?'‹ Archiwum':'‹ Rozmowy';
-    $('private-peer-title').textContent='Pokój nr '+ctx.room;$('private-peer-avatar').textContent=ctx.room;
+    describePrivateDialog(ctx.readOnly && ctx.id);
+    $('private-peer-title').textContent='Pokój nr '+ctx.room;
     $('private-dialog-view').hidden=false;renderMessages(ctx.items,true);updateComposer();
     if(ctx.id&&roomMatch)window.history.replaceState(window.history.state,'',prefix+'/'+ctx.id);
     await refreshDialog(true);

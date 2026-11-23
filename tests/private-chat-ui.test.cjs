@@ -63,6 +63,22 @@ test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both
  await b.locator('#private-body').fill('Odpowiedź prywatna');await freeRate();await b.locator('#private-send').click();
  await b.locator('.private-message').nth(1).waitFor();await b.locator('.private-message .message-quote').click();
  assert.equal(await b.locator('.private-message.message-highlight').count(),1);
+ // The quote, body and reply action must belong to one row and stay inside its bounds.
+ for(const width of [320,375,390,768,1280]){
+  await b.setViewportSize({width,height:900});
+  const cards=await b.locator('#private-history > li[data-message]').evaluateAll(rows=>rows.map(row=>{
+   const content=row.querySelector(':scope > .discussion-card-content');
+   const box=row.getBoundingClientRect();
+   const children=Array.from(content.children, element=>element.getBoundingClientRect());
+   return {
+    nested:row.querySelectorAll('[data-message]').length,
+    quote:content.querySelector(':scope > .message-quote')?.nextElementSibling?.localName||null,
+    contained:children.every(child=>child.left>=box.left&&child.right<=box.right&&child.top>=box.top&&child.bottom<=box.bottom)
+   };
+  }));
+  assert.deepEqual(cards,[{nested:0,quote:null,contained:true},{nested:0,quote:'p',contained:true}]);
+ }
+
  await b.reload();await b.locator('.private-message').nth(1).waitFor();
  await b.locator('#private-body').fill('Szkic dla pokoju 1');await b.locator('#private-back').click();
  await b.locator('#private-list a').filter({hasText:'Pokój nr 3'}).click();await b.locator('#private-body').fill('Inny szkic');

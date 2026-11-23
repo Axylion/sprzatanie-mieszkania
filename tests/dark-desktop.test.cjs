@@ -87,8 +87,7 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   assert.ok(await page.locator('#calendar-days .calendar-own').count()>=2);
   await page.evaluate(()=>localStorage.removeItem('cleaning-room'));
   await page.reload();
-  assert.equal(await page.locator('#duty-push-warning').isVisible(),true);
-  assert.match(await page.locator('#duty-push-warning').innerText(),/Powiadomienia są wyłączone/);
+  assert.match(await page.locator('#push-duties-status').innerText(),/Powiadomienia wyłączone/);
   if(output) await page.locator('.dashboard-calendar').screenshot({path:join(output,'calendar-reminder-warning.png')});
   for(const selector of ['#theme-toggle','[data-push-category="duties"]','.cleaning-rules summary','#announcements-open']) {
     const control=page.locator(selector).first();
@@ -154,12 +153,12 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   await page.locator('#chat-open').click();
   await page.locator('.discussion-message').first().waitFor();
   assert.equal(await page.locator('#discussion-view').evaluate(el=>Math.round(el.getBoundingClientRect().width)),736);
-  assert.equal(await page.locator('.discussion-avatar').first().innerText(),'1');
+  assert.equal(await page.locator('.discussion-avatar use').first().getAttribute('href'),'#g19-person-icon');
   assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'10px');
   assert.equal(await page.locator('[data-reaction="1"]').first().evaluate(el=>getComputedStyle(el).color),'rgb(99, 229, 239)');
   await page.locator('#discussion-body').focus();
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#discussion-body')).borderColor==='rgb(99, 229, 239)');
-  assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderColor),'rgb(99, 229, 239)');
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#discussion-compose')).outlineStyle==='solid');
+  assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderWidth),'0px');
   assert.equal(await page.locator('.discussion-send-icon').isVisible(),true);
   assert.equal(await page.locator('#discussion-send').isDisabled(),true);
   assert.equal(await page.locator('#discussion-send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(49, 87, 92)');

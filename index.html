@@ -376,11 +376,11 @@
   <link rel="stylesheet" href="./poradnik/poradnik.css">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui2">
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui3">
   <script defer src="./dyskusje/config.js"></script>
-  <script defer src="./dyskusje/dyskusje.js?v=ui2"></script>
-  <script defer src="./dyskusje/private-chat.js?v=ui2"></script>
-  <script defer src="./dyskusje/notifications.js?v=ui2"></script>
+  <script defer src="./dyskusje/dyskusje.js?v=ui3"></script>
+  <script defer src="./dyskusje/private-chat.js?v=ui3"></script>
+  <script defer src="./dyskusje/notifications.js?v=ui3"></script>
   <script defer src="./ogloszenia/content.js"></script>
   <script defer src="./administracja/announcements.js?v=ui2"></script>
   <script defer src="./administracja/admin.js?v=ui2"></script>
@@ -392,6 +392,10 @@
 </head>
 
 <body>
+<svg class="sr-only" width="0" height="0" aria-hidden="true">
+  <symbol id="g19-chat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></symbol>
+  <symbol id="g19-person-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 19v-1a6 6 0 0 1 12 0v1"/></symbol>
+</svg>
 <header>
   <div class="container header-inner">
     <div class="brand">
@@ -400,7 +404,7 @@
     </div>
     <div class="header-actions">
       <button type="button" class="settings-entry notification-bell" id="notification-open" aria-label="Powiadomienia" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg><span id="notification-count" hidden></span></button>
-      <a class="settings-entry notification-bell chat-entry" id="chat-open" href="#dyskusje" aria-label="Dyskusje" aria-describedby="chat-push-indicator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg><span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="chat-push-indicator">Powiadomienia wyłączone</span><span class="header-unread-count" id="chat-count" hidden></span></a>
+      <a class="settings-entry notification-bell chat-entry" id="chat-open" href="#dyskusje" aria-label="Dyskusje" aria-describedby="chat-push-indicator"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-chat-icon"/></svg><span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="chat-push-indicator">Powiadomienia wyłączone</span><span class="header-unread-count" id="chat-count" hidden></span></a>
       <button type="button" class="settings-entry notification-bell" id="announcements-open" aria-label="Ważne ogłoszenia" aria-describedby="announcements-push-indicator" aria-haspopup="dialog">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v5h5l9 4V6l-9 4H4Zm4 5 2 5m10-10 2-2m-2 6 2 2"/></svg>
         <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span><span class="header-unread-count" id="announcements-count" hidden></span>
@@ -429,12 +433,12 @@
 
 <dialog id="announcements-panel" class="shortcut-help" aria-labelledby="announcements-title">
   <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" aria-label="Zamknij ogłoszenia">×</button></form></div>
-  <p id="hidden-announcements-empty">Brak aktywnych ogłoszeń.</p>
-  <ul id="hidden-announcements-list"></ul>
   <div class="push-control">
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-announcements-status" data-push-category="announcements">Powiadomienia o ogłoszeniach</button>
       <p class="push-feedback" id="push-announcements-status" role="status"></p>
     </div>
+  <p id="hidden-announcements-empty">Brak aktywnych ogłoszeń.</p>
+  <ul id="hidden-announcements-list"></ul>
 </dialog>
 
 <dialog id="shortcut-help" class="shortcut-help" aria-labelledby="shortcut-title">
@@ -561,12 +565,8 @@
     <div class="calendar-grid" id="calendar-days" role="group" aria-label="Kalendarz dyżurów"></div>
     <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
     <div class="calendar-date-info"><span id="calendar-duty" class="sr-only" aria-live="polite"></span><div class="push-control">
-      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status duty-push-warning" data-push-category="duties">Powiadomienia o dyżurach</button>
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status" data-push-category="duties">Powiadomienia o dyżurach</button>
       <p class="push-feedback" id="push-duties-status" role="status"></p>
-      <div id="duty-push-warning" class="duty-push-warning" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 3 10 18H2L12 3Z"/><path d="M12 9v5m0 3v1"/></svg>
-        <div><strong>Powiadomienia są wyłączone.</strong><span>Warto je włączyć, aby nie zapomnieć o swoim dyżurze.</span></div>
-      </div>
     </div></div>
   </section>
     </div>
@@ -661,8 +661,8 @@
       <button type="button" id="discussion-latest" hidden>Najnowsze wiadomości</button>
       <div id="discussion-reply-target" class="reply-target" hidden><span></span><button type="button" aria-label="Anuluj odpowiedź">×</button></div>
       <form class="discussion-compose" id="discussion-compose">
-        <span class="discussion-compose-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/></svg></span>
-        <label for="discussion-body">Wiadomość</label>
+        <span class="discussion-compose-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-chat-icon"/></svg></span>
+        <label class="sr-only" for="discussion-body">Wiadomość</label>
         <textarea id="discussion-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
         <button type="submit" id="discussion-send" aria-label="Wyślij" disabled><span class="discussion-send-label">Wyślij</span><svg class="discussion-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
       </form>
@@ -692,6 +692,7 @@
           <div id="private-reply-target" class="reply-target" hidden><span></span><button type="button" aria-label="Anuluj prywatną odpowiedź">×</button></div>
           <form class="private-compose" id="private-compose">
             <label for="private-body" class="sr-only">Wiadomość prywatna</label>
+            <span class="discussion-compose-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-chat-icon"/></svg></span>
             <textarea id="private-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
             <button id="private-send" type="submit" aria-label="Wyślij prywatną wiadomość" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
           </form>
@@ -1347,7 +1348,7 @@
       const target = document.getElementById("ogloszenie-" + targetId);
       if (!target || !announcementCard.getClientRects().length) return;
       if (focus) { target.tabIndex = -1; target.focus({preventScroll: true}); }
-      announcementCard.scrollIntoView({block: "start"});
+      window.scrollTo({top: 0, behavior: "instant"});
     });
   }
 
@@ -1356,6 +1357,29 @@
     requestLinkedAnnouncement();
     if (wasLinked || linkedAnnouncementId) renderSlides();
   });
+
+  function openAnnouncement(target) {
+    const id = target.slice(announcementPrefix.length);
+    const item = activeAnnouncements.find(entry => entry.id === id);
+    if (!item || !isActiveAnnouncement(item, Date.now())) return false;
+    if (hiddenAnnouncements.delete(id)) {
+      saveHiddenAnnouncements();
+      announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
+    }
+    if (document.getElementById("harmonogram").hidden) {
+      focusRestoredAnnouncement = true;
+      location.hash = target;
+    } else {
+      if (location.hash.startsWith(announcementPrefix)) history.replaceState(history.state, "", target);
+      linkedAnnouncementId = undefined;
+      pendingScroll = false;
+      currentAnnouncementId = id;
+      renderSlides();
+      scrollToAnnouncement(true);
+    }
+    return true;
+  }
+  window.g19OpenAnnouncement = openAnnouncement;
 
   function renderHiddenAnnouncements() {
     const items = activeAnnouncements.filter(item => isActiveAnnouncement(item, Date.now()));
@@ -1380,22 +1404,8 @@
       button.append(icon, content);
       button.addEventListener("click", () => {
         if (!isActiveAnnouncement(item, Date.now())) return renderAnnouncements(loadedAnnouncements);
-        const wasHidden = hiddenAnnouncements.delete(item.id);
-        if (wasHidden) saveHiddenAnnouncements();
         announcementsPanel.close();
-        if (wasHidden) announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
-        const target = announcementPrefix + item.id;
-        if (document.getElementById("harmonogram").hidden) {
-          focusRestoredAnnouncement = true;
-          location.hash = target;
-        } else {
-          if (location.hash.startsWith(announcementPrefix)) history.replaceState(history.state, "", target);
-          linkedAnnouncementId = undefined;
-          pendingScroll = false;
-          currentAnnouncementId = item.id;
-          renderSlides();
-          scrollToAnnouncement(true);
-        }
+        openAnnouncement(announcementPrefix + item.id);
       });
       li.append(button);
       return li;

@@ -213,7 +213,7 @@
     const focusedSelector = active?.dataset.reaction ? `[data-reaction="${active.dataset.reaction}"]`
       : active?.closest("[data-original]") ? "[data-original]"
       : active?.closest("[data-reply]") ? "[data-reply]"
-      : active?.matches(".message-author-link, .discussion-avatar") ? "." + active.className : null;
+      : active?.matches(".message-author-link") ? ".message-author-link" : null;
     const fragment = document.createDocumentFragment();
     if (!items.length) {
       const empty = document.createElement("li");
@@ -248,26 +248,21 @@
       const avatar = document.createElement("span");
       avatar.className = "discussion-avatar";
       avatar.setAttribute("aria-hidden", "true");
-      avatar.textContent = message.room;
-      if (capabilities.privateChat && !message.mine && !message.former && message.canPrivate !== false && message.authorPeriod) {
-        const link = document.createElement("a");
-        link.className = avatar.className;
-        link.href = "#dyskusje/prywatne/pokoj/" + message.room + "/" + message.authorPeriod;
-        link.textContent = message.room;
-        link.setAttribute("aria-label", "Rozmowa prywatna: Pokój nr " + message.room);
-        row.append(link);
-      } else row.append(avatar);
-      row.append(meta);
+      avatar.innerHTML = '<svg viewBox="0 0 24 24"><use href="#g19-person-icon"/></svg>';
+      const card = document.createElement("div");
+      card.className = "discussion-card-content";
+      card.append(meta);
+      row.append(avatar, card);
       if (message.reply) {
         const quote = document.createElement("button");
         quote.type="button";quote.className="message-quote";quote.dataset.original=message.reply.id;
         quote.textContent="Pokój nr " + message.reply.room + ": " + message.reply.body;
-        row.append(quote);
+        card.append(quote);
       }
       if(capabilities.replies) {
         const reply=document.createElement("button");reply.type="button";reply.className="message-reply-action";reply.dataset.reply=message.id;reply.textContent="Odpowiedz";reactions.append(reply);
       }
-      row.append(content, reactions);
+      card.append(content, reactions);
       fragment.append(row);
     }
     history.replaceChildren(fragment);

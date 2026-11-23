@@ -242,6 +242,7 @@
         event.preventDefault();
         if (item.kind !== "private" && !item.read && !await mark(item.id)) return;
         panel.close();
+        if (item.target.startsWith("#ogloszenie-") && window.g19OpenAnnouncement?.(item.target)) return;
         location.hash = item.target;
         scrollToTarget();
       });
@@ -313,9 +314,8 @@
 
   function scrollToTarget() {
     const target = location.hash.slice(1);
-    if (target === "calendar-title" || target.startsWith("ogloszenie-")) {
-      requestAnimationFrame(() => (document.getElementById(target) ||
-        (target.startsWith("ogloszenie-") && document.getElementById("announcements-card")))?.scrollIntoView?.());
+    if (target === "calendar-title") {
+      requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView());
     }
   }
 
@@ -349,7 +349,6 @@
       const name = button.dataset.pushCategory;
       const enabled = canReceivePush(name);
       button.setAttribute("aria-checked", String(enabled));
-      if (name === "duties") document.getElementById("duty-push-warning").hidden = enabled;
       const status = document.getElementById("push-" + name + "-status");
       status.dataset.enabled = String(enabled);
       const explanation = blocked
@@ -358,9 +357,7 @@
           ? "Ta przeglądarka nie obsługuje push. Na iPhonie dodaj aplikację do ekranu początkowego."
           : !token() ? "Połącz urządzenie w Dyskusjach, aby włączyć powiadomienia."
             : !ready || !config.vapidPublicKey ? "Powiadomienia w tle czekają na konfigurację." : "";
-      const state = name === "announcements"
-        ? enabled ? "Powiadomienia włączone" : "Powiadomienia wyłączone — zalecamy włączenie"
-        : "";
+      const state = enabled ? "Powiadomienia włączone" : "Powiadomienia wyłączone";
       status.textContent = [state, category === name && message ? message : explanation].filter(Boolean).join(". ");
     }
     renderChatCount();
@@ -419,7 +416,7 @@
         if (!categories.length) await current?.unsubscribe().catch(() => {});
       } catch (error) {
         if (!currentContext()) return;
-        if (!category) confirmed = [];
+        confirmed = [];
         if (error.code === "device_invalid") window.dispatchEvent(new Event("g19-device-revoked"));
         showPush("Nie udało się zapisać lub sprawdzić subskrypcji. Spróbuj ponownie.", category || "announcements");
         return;

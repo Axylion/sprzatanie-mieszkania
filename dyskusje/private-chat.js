@@ -101,22 +101,42 @@
     const anchor=[...history.children].find(e=>e.dataset.message&&e.getBoundingClientRect().bottom>bounds.top);
     const offset=anchor?anchor.getBoundingClientRect().top-bounds.top:0;
     const active=document.activeElement?.closest('[data-message]');
-    const focusedId=active?.dataset.message,focusedAction=document.activeElement?.dataset.original?'original':document.activeElement?.dataset.reply?'reply':null;
+    const focusedId=active?.dataset.message;
+    const focusedAction=document.activeElement?.dataset.original?'[data-original]':document.activeElement?.dataset.reply?'[data-reply]':document.activeElement?.matches('.message-author-link')?'.message-author-link':null;
     history.replaceChildren(...items.map(message=>{
       const row=document.createElement('li');row.className='discussion-message private-message';row.dataset.message=message.id;row.dataset.mine=message.mine;
       const meta=document.createElement('div');meta.className='discussion-meta';
-      const title=document.createElement('strong');title.textContent='Pokój nr '+message.room+(message.mine?' · Ty':'');
+      const title=document.createElement('strong');
+      title.textContent='Pokój nr '+message.room+(message.mine?' · Ty':'');
+      const peer=summary?.items.find(item=>item.room===message.room);
+      if(!current.readOnly&&!message.mine&&peer?.canSend&&peer.peerPeriod===current.expectedPeerPeriod){
+        const link=document.createElement('a');
+        link.className='message-author-link';
+        link.href=prefix+'/'+(peer.conversation||'pokoj/'+peer.room+'/'+peer.peerPeriod);
+        link.textContent=title.textContent;
+        title.replaceChildren(link);
+      }
       const time=document.createElement('time');time.dateTime=message.createdAt;time.textContent=format.format(new Date(message.createdAt));meta.append(title,time);
-      row.append(roomAvatar(message.room),meta);
-      if(message.reply){const quote=document.createElement('button');quote.type='button';quote.className='message-quote';quote.dataset.original=message.reply.id;quote.textContent='Pokój nr '+message.reply.room+': '+message.reply.body;row.append(quote);}
-      const body=document.createElement('p');body.textContent=message.body;row.append(body);
-      if(!current.readOnly){const actions=document.createElement('div');actions.className='discussion-reactions';const reply=document.createElement('button');reply.type='button';reply.className='message-reply-action';reply.dataset.reply=message.id;reply.textContent='Odpowiedz';actions.append(reply);row.append(actions);}
+      const avatar=roomAvatar(message.room);
+      avatar.innerHTML='<svg viewBox="0 0 24 24"><use href="#g19-person-icon"/></svg>';
+      const card=document.createElement('div');card.className='discussion-card-content';card.append(meta);
+      if(message.reply){
+        const quote=document.createElement('button');quote.type='button';quote.className='message-quote';
+        quote.dataset.original=message.reply.id;quote.textContent='Pokój nr '+message.reply.room+': '+message.reply.body;card.append(quote);
+      }
+      const body=document.createElement('p');body.textContent=message.body;card.append(body);
+      if(!current.readOnly){
+        const actions=document.createElement('div');actions.className='discussion-reactions';
+        const reply=document.createElement('button');reply.type='button';reply.className='message-reply-action';
+        reply.dataset.reply=message.id;reply.textContent='Odpowiedz';actions.append(reply);card.append(actions);
+      }
+      row.append(avatar,card);
       return row;
     }));
     if(!items.length){const row=document.createElement('li');row.textContent='Nie ma jeszcze wiadomości.';history.append(row);}
     if(bottom)history.scrollTop=history.scrollHeight;
     else if(anchor){const restored=[...history.children].find(e=>e.dataset.message===anchor.dataset.message);if(restored)history.scrollTop+=restored.getBoundingClientRect().top-bounds.top-offset;}
-    if(focusedId&&focusedAction)history.querySelector('[data-message="'+focusedId+'"] [data-'+focusedAction+']')?.focus({preventScroll:true});
+    if(focusedId&&focusedAction)history.querySelector('[data-message="'+focusedId+'"] '+focusedAction)?.focus({preventScroll:true});
   }
   async function reportSeen(force=false){
     const ctx=current,key=token();if(!ctx?.id||!key||!isPrivate())return;

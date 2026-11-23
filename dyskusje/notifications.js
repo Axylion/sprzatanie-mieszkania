@@ -4,7 +4,11 @@
   const panel = document.querySelector("#notification-panel");
   const badge = document.querySelector("#notification-count");
   const chatBadge = document.querySelector("#chat-count");
-  const chatLink = document.querySelector("#chat-open");
+  const announcementBadge = document.getElementById("announcements-count");
+  const indicators = {
+    messages: document.getElementById("chat-push-indicator"),
+    announcements: document.getElementById("announcements-push-indicator")
+  };
   let chatCount = 0;
   let privateCount = 0;
   let capabilities = window.g19ChatCapabilities || {};
@@ -23,10 +27,20 @@
     try { localStorage.setItem(chatCursorKey(key), value); } catch { /* Storage can be unavailable. */ }
   }
   function renderChatCount() {
-    const total = chatCount + privateCount;
-    chatBadge.hidden = total === 0;
-    chatBadge.textContent = total > 99 ? "99+" : String(total);
-    chatLink.setAttribute("aria-label", total ? "Dyskusje, nowe wiadomości: " + total : "Dyskusje");
+    renderHeaderIndicator(chatBadge, indicators.messages, "messages", chatCount + privateCount, "Dyskusje");
+  }
+
+  function renderHeaderIndicator(count, indicator, category, unread, label) {
+    const active = canReceivePush(category);
+    count.hidden = !active || unread === 0;
+    count.textContent = unread > 99 ? "99+" : String(unread);
+    indicator.textContent = active ? "Powiadomienia włączone" : "Powiadomienia wyłączone";
+    indicator.previousElementSibling.dataset.active = String(active);
+    count.parentElement.setAttribute("aria-label", count.hidden ? label : label + ", nieprzeczytane: " + unread);
+  }
+
+  function renderAnnouncementCount() {
+    renderHeaderIndicator(announcementBadge, indicators.announcements, "announcements", announcementUnread, "Ważne ogłoszenia");
   }
   async function refreshChatCount() {
     const request = ++chatNavigationRequest;
@@ -50,7 +64,6 @@
   const notice = document.querySelector("#notification-status");
   const readAll = document.querySelector("#notification-read-all");
   const switches = [...document.querySelectorAll("[data-push-category]")];
-  const indicator = document.getElementById("announcements-push-indicator");
   const chatSwitch = switches.find(button => button.dataset.pushCategory === "messages");
   const inboxCategories = ["duties", "messages", "announcements"];
   let confirmed = [];
@@ -59,6 +72,7 @@
   const format = new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Warsaw" });
   const localReadKey = "goleszan19-public-notifications-read";
   let snapshot = { items: [], unread: 0 };
+  let announcementUnread = 0;
   let refreshId = 0;
   let tab;
   let lastActivity = Date.now();
@@ -174,7 +188,7 @@
   function publicAnnouncements() {
     const read = localRead();
     return activeAnnouncements.slice(0, 50).map(item => ({
-      id: item.id, title: "Ważne ogłoszenie", description: item.title,
+      id: item.id, category: "announcements", title: "Ważne ogłoszenie", description: item.title,
       target: "#ogloszenie-" + item.id, createdAt: new Date(announcementDates(item).published),
       read: Object.hasOwn(read, item.id)
     }));
@@ -195,6 +209,7 @@
   }
 
   function render() {
+    renderAnnouncementCount();
     badge.hidden = readAll.hidden = snapshot.unread === 0;
     badge.textContent = snapshot.unread > 99 ? "99+" : String(snapshot.unread);
     badge.parentElement.setAttribute("aria-label", snapshot.unread ? "Powiadomienia, nieprzeczytane: " + snapshot.unread : "Powiadomienia");
@@ -252,6 +267,18 @@
       }
       const presented = present(result.items, key);
       snapshot = result;
+      const visibleUnread = result.items.filter(item => !item.read);
+      announcementUnread = visibleUnread.filter(item => item.category === "announcements").length;
+      if (key && ready && result.unread > visibleUnread.length) {
+        // The mixed inbox can omit older unread announcements beyond its page limit.
+        const endpoint = capabilities.version === 1 ? "notifications_v2" : "notifications";
+        rpc(endpoint, {p_token: key, p_categories: ["announcements"]}).then(count => {
+          if (id === refreshId && key === token() && Number.isSafeInteger(count?.unread)) {
+            announcementUnread = count.unread;
+            renderAnnouncementCount();
+          }
+        }).catch(() => {});
+      }
       if (presented.length && key) reportActivity(presented).catch(() => {});
       notice.textContent = "";
       render();
@@ -259,6 +286,7 @@
       if (id !== refreshId || key !== token()) return;
       if (error.code === "device_invalid") {
         snapshot = { items: [], unread: 0 };
+        announcementUnread = 0;
         render();
         window.dispatchEvent(new Event("g19-device-revoked"));
         notice.textContent = "Dostęp urządzenia został zakończony.";
@@ -310,12 +338,16 @@
     });
   }
 
+  function canReceivePush(category) {
+    return Boolean(supported && ready && token() && config.vapidPublicKey &&
+      Notification.permission === "granted" && confirmed.includes(category));
+  }
+
   function showPush(message = "", category) {
-    const permitted = supported && Notification.permission === "granted";
     const blocked = supported && Notification.permission === "denied";
     for (const button of switches) {
       const name = button.dataset.pushCategory;
-      const enabled = permitted && confirmed.includes(name);
+      const enabled = canReceivePush(name);
       button.setAttribute("aria-checked", String(enabled));
       if (name === "duties") document.getElementById("duty-push-warning").hidden = enabled;
       const status = document.getElementById("push-" + name + "-status");
@@ -331,9 +363,8 @@
         : "";
       status.textContent = [state, category === name && message ? message : explanation].filter(Boolean).join(". ");
     }
-    const announcementActive = permitted && confirmed.includes("announcements");
-    indicator.textContent = announcementActive ? "Powiadomienia włączone" : "Powiadomienia wyłączone";
-    indicator.previousElementSibling.dataset.active = String(announcementActive);
+    renderChatCount();
+    renderAnnouncementCount();
   }
 
   async function registrationForPush() {
@@ -344,7 +375,7 @@
 
   function readPush(key, current) {
     if (!current || (current.expirationTime != null && current.expirationTime <= Date.now())) return [];
-    return rpc("push_status", { p_token: key, p_endpoint: current.endpoint }).then(categories => categories || []);
+    return rpc("push_status", { p_token: key, p_endpoint: current.endpoint }).then(categories => Array.isArray(categories) ? categories : []);
   }
 
   function updatePush(category) {
@@ -422,6 +453,7 @@
     privateCount = 0;
     refreshId++;
     snapshot = { items: [], unread: 0 };
+    announcementUnread = 0;
     baseline = undefined;
     chatSeen = null;
     chatCount = 0;

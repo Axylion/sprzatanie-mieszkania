@@ -242,8 +242,8 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   await resident.locator('#announcements-open').click();
   await resident.getByRole('button',{name:/aktualizacja/}).click();
   await card.getByRole('heading',{name:/aktualizacja/}).waitFor();
-  page.once('dialog',dialog=>dialog.accept());
   await list.getByRole('button',{name:'Wycofaj z publikacji'}).click();
+  await page.locator('#announcement-confirm-dialog').getByRole('button',{name:'Wycofaj z publikacji'}).click();
   await page.getByRole('button',{name:'Wycofane (1)',exact:true}).waitFor();
   assert.equal(await list.locator('article').count(),0);
   await page.getByRole('button',{name:'Szkice (0)',exact:true}).click();

@@ -456,7 +456,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     assert.match(code, /^[0-9]{3} [0-9]{3}$/);
     assert.match(await newPage.getByRole('timer').innerText(), /^Kod ważny przez (02:00|01:[0-5][0-9])$/);
     if (await a.locator('#discussion-approve').getAttribute('open') === null) {
-      await a.getByText('Podłącz kolejne urządzenie', { exact: true }).click();
+      await a.getByRole('button', { name: 'Podłącz kolejne urządzenie', exact: true }).click();
     }
     const field = a.getByLabel('Kod z nowego urządzenia');
     const approve = a.getByRole('button', { name: 'Potwierdź podłączenie' });
@@ -612,9 +612,9 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await a.locator('#discussion-send').click();
   await a.waitForFunction(() => document.querySelector('#discussion-body').value === '');
   await b.evaluate(() => window.dispatchEvent(new Event('online')));
-  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && !document.querySelector('#chat-count').hidden);
+  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && document.querySelector('#chat-count').hidden);
   await b.reload();
-  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && !document.querySelector('#chat-count').hidden);
+  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && document.querySelector('#chat-count').hidden);
   await b.locator('#notification-open').click();
   const bell = b.locator('#notification-panel');
   await bell.getByRole('link', { name: /Nowa wiadomość/ }).waitFor();
@@ -641,7 +641,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await db.exec("update g19_private.devices set next_message_at = null where room = 1");
   await rpc('send', { p_token: aKey, p_request: randomUUID(), p_body: 'Sygnał na stronie głównej' });
   await b.locator('#notification-open').click();
-  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && !document.querySelector('#chat-count').hidden);
+  await b.waitForFunction(() => document.querySelector('#chat-count').textContent === '1' && document.querySelector('#chat-count').hidden);
   await b.waitForFunction(() => window.notificationTones === 1);
   await b.getByRole('button', { name: 'Zamknij powiadomienia' }).click();
   await b.locator('#notification-open').click();

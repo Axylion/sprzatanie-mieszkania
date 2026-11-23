@@ -349,7 +349,7 @@
   });
 
   document.getElementById("admin-logout").addEventListener("click", async () => {
-    if (!announcements.canLeave()) return;
+    if (!await announcements.canLeave()) return;
     const token = session;
     endSession();
     if (token) {

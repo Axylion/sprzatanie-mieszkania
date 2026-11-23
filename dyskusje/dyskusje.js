@@ -14,6 +14,13 @@
   const pairRenew = document.getElementById("discussion-pair-renew");
   const pairBack = document.getElementById("discussion-pair-back");
   const approvalDetails = document.getElementById("discussion-approve");
+  const deviceToggle = document.getElementById("discussion-device-toggle");
+  function showApproval(open) {
+    approvalDetails.open = open;
+    approvalDetails.hidden = !open;
+    deviceToggle.setAttribute("aria-expanded", String(open));
+  }
+  deviceToggle.addEventListener("click", () => showApproval(!approvalDetails.open));
   const connectionStatus = document.getElementById("device-connection-status");
   const deviceConnect = document.getElementById("device-connect");
   const deviceSettings = document.getElementById("device-settings");
@@ -98,7 +105,16 @@
     return saved && /^[0-9]{6}$/.test(saved.code) && Number.isFinite(saved.deadline) ? saved : null;
   }
 
+  let boundRoom = null;
+  function setBoundRoom(room) {
+    if (room === boundRoom) return;
+    boundRoom = room;
+    window.dispatchEvent(new CustomEvent("g19-bound-room", {detail: room}));
+  }
+
   function rememberRoom(room) {
+    const number = Number(room);
+    if ([1, 2, 3, 4].includes(number)) setBoundRoom(number);
     if (!/^[1-4]$/.test(localStorage.getItem("cleaning-room"))) {
       window.dispatchEvent(new CustomEvent("g19-room-linked", { detail: room }));
     }
@@ -130,6 +146,7 @@
     localStorage.removeItem(enrollmentKey);
     localStorage.removeItem(pairingKey);
     token = pairing = null;
+    setBoundRoom(null);
     setReply(null);
     body.value = "";
     draft = undefined;
@@ -193,7 +210,10 @@
     const anchorOffset = anchor ? anchor.getBoundingClientRect().top - bounds.top : 0;
     const active = history.contains(document.activeElement) ? document.activeElement : null;
     const focusedId = active?.closest("[data-message]")?.dataset.message;
-    const focusedVote = active?.dataset.reaction;
+    const focusedSelector = active?.dataset.reaction ? `[data-reaction="${active.dataset.reaction}"]`
+      : active?.closest("[data-original]") ? "[data-original]"
+      : active?.closest("[data-reply]") ? "[data-reply]"
+      : active?.matches(".message-author-link, .discussion-avatar") ? "." + active.className : null;
     const fragment = document.createDocumentFragment();
     if (!items.length) {
       const empty = document.createElement("li");
@@ -259,9 +279,9 @@
       const restored = [...history.children].find(row => row.dataset.message === anchor.dataset.message);
       if (restored) history.scrollTop += restored.getBoundingClientRect().top - bounds.top - anchorOffset;
     }
-    if (focusedId && focusedVote) {
+    if (focusedId && focusedSelector) {
       const focused = [...history.children].find(row => row.dataset.message === focusedId);
-      focused?.querySelector(`[data-reaction="${focusedVote}"]`)?.focus({ preventScroll: true });
+      focused?.querySelector(focusedSelector)?.focus({ preventScroll: true });
     }
   }
 
@@ -281,9 +301,9 @@
       join.hidden = pairPanel.hidden = true;
       if (data.room) rememberRoom(data.room);
       updateDeviceCount(data.deviceCount);
-      if (openApproval && !approvalDetails.hidden) {
+      if (openApproval && !deviceToggle.hidden) {
         openApproval = false;
-        approvalDetails.open = true;
+        showApproval(true);
         approvalCode.focus();
       }
       if (!generalMode()) return;
@@ -458,7 +478,7 @@
       clearInterval(pairTimer);
       clearHistory();
       chat.hidden = true;
-      approvalDetails.open = false;
+      showApproval(false);
       return;
     }
     if (!configured) {
@@ -642,7 +662,7 @@
         rate_limited: "Za dużo prób. Odczekaj minutę i spróbuj ponownie."
       }[result.state] || "Nie udało się sprawdzić kodu.";
       if (result.state === "approved") {
-        approvalDetails.open = false;
+        showApproval(false);
         clearTimeout(approvalNoticeTimer);
         approvalNoticeTimer = setTimeout(() => {
           if (status.textContent === "Urządzenie zostało pomyślnie połączone.") status.textContent = "";
@@ -738,9 +758,9 @@
 
   function updateDeviceCount(count) {
     deviceCount = count;
-    approvalDetails.hidden = deviceCount !== 1;
-    if (approvalDetails.hidden) {
-      approvalDetails.open = false;
+    deviceToggle.hidden = deviceCount !== 1;
+    if (deviceToggle.hidden) {
+      showApproval(false);
       approvalCode.value = "";
       updateApproval();
     }
@@ -787,6 +807,10 @@
   async function loadDevices() {
     deviceConnect.hidden = !configured || Boolean(token);
     deviceSettings.hidden = !configured || !token;
+    if (!deviceConnect.hidden && connectionStatus.hidden) {
+      connectionStatus.textContent = "To urządzenie nie jest połączone.";
+      connectionStatus.hidden = false;
+    }
     if (deviceSettings.hidden || document.getElementById("harmonogram").hidden) return;
     const usedToken = token;
     try {
@@ -796,6 +820,12 @@
       if (devices.some(device => device.current)) {
         connectionStatus.textContent = "";
         connectionStatus.hidden = true;
+        // An empty history page still reports the verified room, without loading messages.
+        if (!boundRoom) {
+          const data = await rpc("read", {p_token: usedToken, p_before: 0, p_version: null});
+          if (token !== usedToken || document.getElementById("harmonogram").hidden) return;
+          if (data.room) rememberRoom(data.room);
+        }
       }
       let previousDevices = [];
       try { previousDevices = JSON.parse(localStorage.getItem("goleszan19-device-icons:" + usedToken) || "[]"); } catch { /* Optional local presentation state. */ }
@@ -900,7 +930,9 @@
   document.addEventListener("visibilitychange", resume);
   window.addEventListener("storage", event => {
     if (event.key === tokenKey || event.key === pairingKey || event.key === null) {
-      token = localStorage.getItem(tokenKey);
+      const stored = localStorage.getItem(tokenKey);
+      if (token !== stored) setBoundRoom(null);
+      token = stored;
       pairing = storedPairing();
       if (!pairing && !expiredRoom) {
         pairPanel.hidden = true;

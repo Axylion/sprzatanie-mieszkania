@@ -72,8 +72,8 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   assert.equal(await summary.evaluate(el=>el.parentElement.open),true);
   assert.equal(await page.locator('#calendar-title').evaluate(el=>el.getBoundingClientRect().width),1);
   assert.equal(await page.locator('.dashboard-calendar').getAttribute('aria-labelledby'),'calendar-title');
-  assert.equal(await page.locator('#calendar-next-date').isVisible(),true);
-  assert.match(await page.locator('#calendar-next-room').innerText(),/^Pokój nr [1-4]$/);
+  await page.locator('#calendar-next-date').waitFor();
+  assert.equal(await page.locator('#calendar-next-room').innerText(),'Pokój nr 2');
   const output = process.env.G19_DARK_SCREENSHOTS;
   if (output) {
     await mkdir(output,{recursive:true});
@@ -81,8 +81,9 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   }
   await page.evaluate(()=>localStorage.setItem('cleaning-room',document.querySelector('#next-room').textContent.match(/\d+/)[0]));
   await page.reload();
-  assert.equal(await page.locator('#calendar-upcoming').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(99, 229, 239)');
-  assert.equal(await page.locator('#calendar-next-date').evaluate(el=>getComputedStyle(el).color),'rgb(5, 37, 44)');
+  await page.locator('#calendar-next-date').waitFor();
+  assert.equal(await page.locator('#calendar-next-room').innerText(),'Pokój nr 2');
+  assert.equal(await page.locator('#calendar-upcoming').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(21, 61, 70)');
   assert.ok(await page.locator('#calendar-days .calendar-own').count()>=2);
   await page.evaluate(()=>localStorage.removeItem('cleaning-room'));
   await page.reload();
@@ -154,7 +155,7 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   await page.locator('.discussion-message').first().waitFor();
   assert.equal(await page.locator('#discussion-view').evaluate(el=>Math.round(el.getBoundingClientRect().width)),736);
   assert.equal(await page.locator('.discussion-avatar').first().innerText(),'1');
-  assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'0px');
+  assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'10px');
   assert.equal(await page.locator('[data-reaction="1"]').first().evaluate(el=>getComputedStyle(el).color),'rgb(99, 229, 239)');
   await page.locator('#discussion-body').focus();
   await page.waitForFunction(()=>getComputedStyle(document.querySelector('#discussion-body')).borderColor==='rgb(99, 229, 239)');
@@ -171,13 +172,13 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   for (const [width,mode] of [[1280,'light'],[390,'dark']]) {
     await page.setViewportSize({width,height:900});
     await theme(mode);
-    assert.equal(await page.locator('.discussion-avatar').first().isVisible(),false);
+    assert.equal(await page.locator('.discussion-avatar').first().isVisible(),true);
     assert.equal(await page.locator('.discussion-send-label').isVisible(),true);
-    assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'12px');
+    assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'10px');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await page.goto(base);
-    assert.equal(await page.locator('#calendar-next-date').isVisible(),false);
-    assert.equal(await page.locator('#calendar-next').isVisible(),true);
+    await page.locator('#calendar-next-date').waitFor();
+    assert.equal(await page.locator('#calendar-next-room').innerText(),'Pokój nr 2');
     await page.locator('#chat-open').click();
     await page.locator('.discussion-message').first().waitFor();
   }

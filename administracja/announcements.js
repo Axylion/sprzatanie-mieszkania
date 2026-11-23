@@ -57,10 +57,24 @@
     return { title: titleInput.value, content: content.read(editor), endsOn: dateInput.value || null };
   }
 
-  function canLeave() {
+  const confirmDialog = document.getElementById("announcement-confirm-dialog");
+
+  function confirmAction(title, description, label) {
+    if (confirmDialog.open) return false;
+    document.getElementById("announcement-confirm-title").textContent = title;
+    document.getElementById("announcement-confirm-description").textContent = description;
+    confirmDialog.querySelector('[value="confirm"]').textContent = label;
+    confirmDialog.returnValue = "";
+    confirmDialog.showModal();
+    return new Promise(resolve => {
+      confirmDialog.addEventListener("close", () => resolve(confirmDialog.returnValue === "confirm"), {once: true});
+    });
+  }
+
+  async function canLeave() {
     if (busy && !form.hidden) return false;
     return form.hidden || JSON.stringify(data()) === initial ||
-      window.confirm("Masz niezapisane zmiany. Opuścić formularz?");
+      confirmAction("Opuścić formularz?", "Masz niezapisane zmiany.", "Opuść formularz");
   }
 
   function button(label, callback) {
@@ -139,8 +153,8 @@
       const actions = document.createElement("div");
       actions.className = "admin-actions";
       actions.append(button("Edytuj", () => edit(item)));
-      if (item.status === "published") actions.append(button("Wycofaj z publikacji", () => {
-        if (window.confirm("Wycofać z publikacji ogłoszenie „" + item.title + "”?")) {
+      if (item.status === "published") actions.append(button("Wycofaj z publikacji", async () => {
+        if (!busy && await confirmAction("Wycofać ogłoszenie?", "„" + item.title + "” zniknie z listy aktywnych ogłoszeń.", "Wycofaj z publikacji")) {
           save("withdraw_announcement", { p_id: item.id, p_revision: item.revision }, "Ogłoszenie wycofane.");
         }
       }));
@@ -181,6 +195,7 @@
   }
 
   function showList() {
+    if (confirmDialog.open) confirmDialog.close();
     if (publishDialog.open) publishDialog.close();
     if (dateDialog.open) dateDialog.close();
     if (deleteDialog.open) deleteDialog.close();
@@ -350,7 +365,7 @@
   form.addEventListener("submit", event => event.preventDefault());
   form.addEventListener("input", () => { rememberEditorSelection(); previewContent(); });
   document.getElementById("announcement-new").addEventListener("click", () => edit());
-  document.getElementById("announcement-cancel").addEventListener("click", () => { if (canLeave()) showList(); });
+  document.getElementById("announcement-cancel").addEventListener("click", async () => { if (await canLeave()) showList(); });
   document.getElementById("announcement-save-draft").addEventListener("click", () => saveForm(false));
   document.getElementById("announcement-save-changes").addEventListener("click", () => saveForm(false));
   publishButton.addEventListener("click", () => {
@@ -443,8 +458,8 @@
   });
   editor.addEventListener("drop", event => event.preventDefault());
 
-  function activate(announcements) {
-    if (section.hidden === !announcements || !canLeave()) return;
+  async function activate(announcements) {
+    if (section.hidden === !announcements || !await canLeave()) return;
     showList();
     rooms.hidden = announcements;
     section.hidden = !announcements;
@@ -456,10 +471,10 @@
     if (announcements) refresh();
     document.getElementById("admin-title").textContent = announcements ? "Ważne ogłoszenia" : "Zarządzanie pokojami";
   }
-  nav.addEventListener("click", event => {
+  nav.addEventListener("click", async event => {
     if (!event.target.dataset.section) return;
     const openAnnouncements = event.target.dataset.section === "announcements";
-    activate(openAnnouncements);
+    await activate(openAnnouncements);
     if (openAnnouncements === !section.hidden) {
       document.getElementById("admin-title").focus();
     }
@@ -470,10 +485,13 @@
       event.returnValue = "";
     }
   });
-  window.addEventListener("hashchange", () => {
-    if (location.hash.toLowerCase() === "#administracja" || form.hidden) return;
-    if (!canLeave()) location.hash = "administracja";
-    else showList();
+  window.addEventListener("hashchange", async () => {
+    const target = location.hash;
+    if (target.toLowerCase() === "#administracja" || form.hidden || confirmDialog.open) return;
+    const allowed = await canLeave();
+    if (location.hash !== target) return;
+    if (allowed) showList();
+    else location.hash = "administracja";
   });
   window.g19AdminAnnouncements = {
     init(call, unauthorized) { rpc = call; onUnauthorized = unauthorized; },

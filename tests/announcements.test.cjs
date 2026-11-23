@@ -56,7 +56,7 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-11-0', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js"', '')
+      ? contents.toString().replace('shell-v13-11-0-ui1', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js"', '')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -114,8 +114,8 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
       cacheState = await page.evaluate(async () => {
         const registration = await navigator.serviceWorker.getRegistration();
         const keys = await caches.keys();
-        const hasShell = keys.includes('goleszan19-shell-v13-11-0');
-        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0')).match(new URL('./dyskusje/private-chat.js',location.href).href));
+        const hasShell = keys.includes('goleszan19-shell-v13-11-0-ui1');
+        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-ui1')).match(new URL('./dyskusje/private-chat.js',location.href).href));
         return {ready:hasPrivate && !keys.includes('goleszan19-shell-v13-10-2') && registration.active?.state === 'activated' && !registration.installing && !registration.waiting,hasPrivate};
       });
       if (cacheState.ready) break;
@@ -274,7 +274,9 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.equal(await month.textContent(), 'listopad 2026');
     assert.equal(await page.locator('#calendar-days span[aria-hidden="true"]').count(), 12);
     assert.equal(await days.count(), 30);
-    assert.match(await page.locator('#calendar-next').textContent(), /7–8 listopada 2026 · Pokój 4/);
+    assert.equal(await page.locator('#next-room').textContent(), 'Pokój nr 4');
+    assert.match(await page.locator('#next-date').textContent(), /7–8 listopada 2026/);
+    assert.match(await page.locator('#calendar-next-room').textContent(), /Podłącz urządzenie/);
     await next.click();
     assert.equal(await month.textContent(), 'grudzień 2026');
     assert.ok(await days.getByText('26', { exact: true }).evaluate(el => el.classList.contains('calendar-weekend')));
@@ -354,7 +356,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.equal(await page.locator('#shortcut-open svg').evaluate(e => getComputedStyle(e).stroke), 'rgb(255, 255, 255)');
     const dismiss = page.locator('.announcement-dismiss').first();
     assert.match(await dismiss.getAttribute('aria-label'), /na tym urządzeniu/);
-    assert.deepEqual(await dismiss.evaluate(e => ({width:e.offsetWidth,height:e.offsetHeight,bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,svg:e.querySelector('svg').getBoundingClientRect().width})), {width:44,height:44,bg:'rgba(0, 0, 0, 0)',color:'rgb(51, 51, 51)',svg:26});
+    assert.deepEqual(await dismiss.evaluate(e => ({width:e.offsetWidth,height:e.offsetHeight,bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,svg:e.querySelector('svg').getBoundingClientRect().width})), {width:44,height:44,bg:'rgba(0, 0, 0, 0)',color:'rgb(119, 102, 60)',svg:26});
     await page.locator('#announcements-open').click();
     assert.equal(await page.locator('#hidden-announcements-list button').count(),3);
     await page.getByRole('button', { name: 'Zamknij ogłoszenia' }).click();
@@ -394,14 +396,20 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
       const violations = await page.evaluate(async () => (await axe.run({include:['#announcements-panel']})).violations);
       assert.deepEqual(violations.map(v => v.id), []);
     }
+    const homeUrl = page.url();
     await hidden.filter({hasText:'Informacja a'}).click();
+    assert.equal(page.url(), homeUrl);
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(), ['Informacja a']);
     await page.reload();
     await page.locator('#ogloszenie-a').waitFor();
     assert.equal(await page.locator('.announcement-entry').count(), 1);
+    await page.locator('#chat-open').click();
+    await page.locator('#discussion-view').waitFor();
     for (const title of ['Informacja b', 'Informacja short']) {
       await restore.click();
       await hidden.filter({hasText:title}).click();
+      await page.locator('#harmonogram').waitFor();
+      assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(), [title]);
     }
     // Editing keeps the same ID hidden; a different ID does not inherit its state.
     await dismiss.click();
@@ -475,7 +483,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-11-0');
+      const c = await caches.open('goleszan19-shell-v13-11-0-ui1');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

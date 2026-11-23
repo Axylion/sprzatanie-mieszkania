@@ -248,20 +248,19 @@
       border: 1px solid #e4ca49;
       color: #302b16;
     }
+    #announcements-card { position: relative; scroll-margin-block-start: 80px; }
     #announcements-card[hidden], .announcement-toggle[hidden] { display: none; }
-    .announcement-heading { font-size: 20px; font-weight: 700; }
-    .announcement-entry { position: relative; }
-    .announcement-entry > h3, .announcement-date { padding-right: 40px; }
+    .announcement-heading { font-size: clamp(20px, 3vw, 28px); font-weight: 700; padding-inline-end: 34px; }
     .announcement-dismiss {
       position: absolute;
-      top: -9px;
-      right: -9px;
+      inset-block-start: 5px;
+      inset-inline-end: 5px;
       width: 44px;
       height: 44px;
       padding: 9px;
       border: 0;
       background: transparent;
-      color: #333333;
+      color: #77663c;
       display: grid;
       place-items: center;
     }
@@ -278,7 +277,20 @@
     }
     .announcement-slider { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 8px; }
     .announcement-slider.single { display: block; }
-    .announcement-slider button[data-slide] { min-width: 40px; min-height: 44px; font-size: 22px; }
+    .announcement-slider button[data-slide] {
+      display: grid; place-items: center; align-self: center;
+      width: 44px; height: 44px; padding: 0; border-radius: 50%;
+      border: 1px solid #c6ac63; background: #fff8d8; color: #685834;
+      font-size: 22px; line-height: 1;
+    }
+    .announcement-slider button[data-slide]:not(:disabled):hover,
+    .announcement-dismiss:hover { background: #faedb9; }
+    .announcement-slider button[data-slide]:focus-visible {
+      outline: 2px solid #2f8842; outline-offset: 2px;
+    }
+    @media (max-width: 440px) {
+      .announcement-slider { gap: 4px; }
+    }
     .announcement-slider button[data-slide]:disabled { opacity: .48; }
     .announcement-slider button[data-slide][hidden], #announcement-position[hidden] { display: none; }
     #announcements-list { touch-action: pan-y pinch-zoom; }
@@ -388,10 +400,10 @@
     </div>
     <div class="header-actions">
       <button type="button" class="settings-entry notification-bell" id="notification-open" aria-label="Powiadomienia" aria-haspopup="dialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"/></svg><span id="notification-count" hidden></span></button>
-      <a class="settings-entry notification-bell chat-entry" id="chat-open" href="#dyskusje" aria-label="Dyskusje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg><span id="chat-count" hidden></span></a>
+      <a class="settings-entry notification-bell chat-entry" id="chat-open" href="#dyskusje" aria-label="Dyskusje" aria-describedby="chat-push-indicator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></svg><span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="chat-push-indicator">Powiadomienia wyłączone</span><span class="header-unread-count" id="chat-count" hidden></span></a>
       <button type="button" class="settings-entry notification-bell" id="announcements-open" aria-label="Ważne ogłoszenia" aria-describedby="announcements-push-indicator" aria-haspopup="dialog">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v5h5l9 4V6l-9 4H4Zm4 5 2 5m10-10 2-2m-2 6 2 2"/></svg>
-        <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span>
+        <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span><span class="header-unread-count" id="announcements-count" hidden></span>
       </button>
       <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19 na ekran główny"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
       <div class="theme-picker">
@@ -539,7 +551,7 @@
     <div class="dashboard-secondary">
       <section class="card dashboard-calendar" aria-labelledby="calendar-title">
     <h2 class="sr-only" id="calendar-title">Kalendarz sprzątania</h2>
-    <div class="calendar-upcoming" id="calendar-upcoming"><strong class="calendar-upcoming-label"><span class="calendar-upcoming-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg></span><span>Najbliższy dyżur</span></strong><span id="calendar-next"></span><span id="calendar-next-date" class="calendar-desktop-detail"></span><span id="calendar-next-room" class="calendar-desktop-detail"></span></div>
+    <div class="calendar-upcoming" id="calendar-upcoming"><strong class="calendar-upcoming-label"><span class="calendar-upcoming-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18"/></svg></span><span>Twój najbliższy dyżur</span></strong><span id="calendar-next-date"></span><span id="calendar-next-room"></span></div>
     <div class="calendar-month">
       <button type="button" id="calendar-prev" aria-label="Poprzedni miesiąc">‹</button>
       <strong id="calendar-month" aria-live="polite"></strong>
@@ -572,8 +584,14 @@
       </div>
       <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
     </fieldset>
-    <p id="device-connect"><a href="#dyskusje">Podłącz urządzenie w Dyskusjach</a></p>
     <p id="device-connection-status" role="status" hidden></p>
+    <div id="device-connect">
+      <a class="device-connect-button" href="#dyskusje">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m2 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/></svg>
+        Podłącz urządzenie <span aria-hidden="true">→</span>
+      </a>
+      <p class="muted">Przejdź do Dyskusji, aby połączyć urządzenie.</p>
+    </div>
     <div id="device-settings" hidden>
       <p id="device-settings-status" role="status"></p>
       <ul id="device-list" class="device-list"></ul>
@@ -613,8 +631,15 @@
       <button type="button" id="discussion-pair-back">Anuluj</button>
     </section>
     <div id="discussion-chat" hidden>
+      <div class="discussion-toolbar">
+        <nav id="discussion-tabs" class="discussion-tabs" aria-label="Rodzaj rozmowy" hidden>
+        <a id="general-tab" href="#dyskusje" aria-current="page">Ogólne</a>
+        <a id="private-tab" href="#dyskusje/prywatne">Prywatne <span id="private-tab-count" hidden></span></a>
+        </nav>
+        <button type="button" class="discussion-device-toggle" id="discussion-device-toggle" aria-controls="discussion-approve" aria-expanded="false" aria-label="Podłącz kolejne urządzenie" hidden><span aria-hidden="true">⊕</span> Urządzenie</button>
+      </div>
       <details id="discussion-approve" hidden>
-        <summary>Podłącz kolejne urządzenie</summary>
+        <summary class="sr-only" tabindex="-1" aria-hidden="true">Podłącz kolejne urządzenie</summary>
         <div class="device-roles">
           <div><strong><span aria-hidden="true">✓ </span>To urządzenie jest połączone</strong>
             <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia. Otrzyma ono dostęp do historii bieżącego okresu pokoju. Przy zmianie mieszkańca administrator powinien najpierw zwolnić pokój.</p></div>
@@ -628,10 +653,6 @@
           <button type="submit" value="reject" disabled>Odrzuć</button>
         </form>
       </details>
-      <nav id="discussion-tabs" class="discussion-tabs" aria-label="Rodzaj rozmowy" hidden>
-        <a id="general-tab" href="#dyskusje" aria-current="page">Ogólne</a>
-        <a id="private-tab" href="#dyskusje/prywatne">Prywatne <span id="private-tab-count" hidden></span></a>
-      </nav>
       <div id="discussion-general">
       <div class="discussion-history-controls">
         <button type="button" id="discussion-older" hidden>Starsze wiadomości</button>
@@ -660,7 +681,10 @@
           <ul id="private-archive-list" class="private-list"></ul><button id="private-archive-more" type="button" hidden>Starsze rozmowy</button>
         </div>
         <div id="private-dialog-view" hidden>
-          <div class="private-dialog-heading"><a id="private-back" href="#dyskusje/prywatne">‹ Rozmowy</a><span class="private-avatar" id="private-peer-avatar" aria-hidden="true"></span><h2 id="private-peer-title" tabindex="-1"></h2></div>
+          <div class="private-dialog-heading">
+            <a id="private-back" href="#dyskusje/prywatne" aria-label="Wróć do listy rozmów"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>
+            <div><h2 id="private-peer-title" tabindex="-1"></h2><p id="private-peer-context">Rozmowa prywatna</p></div>
+          </div>
           <p id="private-readonly" hidden>Rozmowa archiwalna — tylko do odczytu.</p>
           <button id="private-older" type="button" hidden>Starsze wiadomości</button>
           <ol class="discussion-history private-history" id="private-history" aria-label="Historia prywatnej rozmowy" tabindex="0"></ol>
@@ -786,12 +810,21 @@
   </form>
 </dialog>
 
+<dialog id="announcement-confirm-dialog" class="admin-announcement-dialog" aria-labelledby="announcement-confirm-title" aria-describedby="announcement-confirm-description">
+  <h2 id="announcement-confirm-title"></h2>
+  <p id="announcement-confirm-description"></p>
+  <form method="dialog" class="admin-actions">
+    <button value="cancel" autofocus>Anuluj</button>
+    <button value="confirm" class="announcement-primary"></button>
+  </form>
+</dialog>
+
 <dialog id="announcement-publish-dialog" class="admin-announcement-dialog" aria-labelledby="announcement-publish-title" aria-describedby="announcement-publish-description">
   <h2 id="announcement-publish-title">Opublikować ogłoszenie?</h2>
   <p id="announcement-publish-description">Ogłoszenie zostanie opublikowane, a subskrybenci otrzymają powiadomienie push.</p>
   <form class="admin-actions">
     <button type="button" data-cancel autofocus>Anuluj</button>
-    <button type="submit" class="announcement-primary">Opublikuj i wyślij powiadomienia</button>
+    <button type="submit" class="announcement-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m21 3-6 18-4-8-8-4 18-6ZM11 13 21 3"/></svg>Opublikuj i wyślij powiadomienia</button>
   </form>
 </dialog>
 <dialog id="announcement-delete-dialog" class="admin-announcement-dialog" aria-labelledby="announcement-delete-title" aria-describedby="announcement-delete-description">
@@ -897,10 +930,10 @@
     const room = roomFor(start);
     document.getElementById("next-room").textContent = "Pokój nr " + room;
     document.getElementById("next-date").textContent = weekendText(start);
-    document.getElementById("calendar-next").textContent = weekendText(start) + " · Pokój " + room;
-    document.getElementById("calendar-next-date").textContent = weekendText(start);
-    document.getElementById("calendar-next-room").textContent = "Pokój nr " + room;
-    document.getElementById("calendar-upcoming").classList.toggle("calendar-own", room === Number(selectedRoom));
+    const personalStart = start + (boundRoom ? (boundRoom - room + 4) % 4 : 0) * WEEK;
+    document.getElementById("calendar-next-date").textContent = boundRoom ? weekendText(personalStart) : "";
+    document.getElementById("calendar-next-room").textContent = boundRoom
+      ? "Pokój nr " + boundRoom : "Podłącz urządzenie, aby zobaczyć termin swojego dyżuru.";
     document.getElementById("calendar-month").textContent = monthFormat.format(calendarMonth);
     const end = new Date(calendarMonth);
     end.setUTCMonth(end.getUTCMonth() + 1);
@@ -937,6 +970,11 @@
   }
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) renderCalendar();
+  });
+  let boundRoom = null;
+  window.addEventListener("g19-bound-room", event => {
+    boundRoom = [1, 2, 3, 4].includes(event.detail) ? event.detail : null;
+    renderCalendar();
   });
   let selectedRoom = localStorage.getItem("cleaning-room");
   if (!["1", "2", "3", "4"].includes(selectedRoom)) selectedRoom = "";
@@ -1046,6 +1084,7 @@
   let slideIndex = 0;
   let swipe;
   let pendingScroll = false;
+  let focusRestoredAnnouncement = false;
   function requestLinkedAnnouncement() {
     linkedAnnouncementId = location.hash.startsWith(announcementPrefix)
       ? location.hash.slice(announcementPrefix.length) : undefined;
@@ -1295,7 +1334,11 @@
     if (focusClass === "announcement-toggle") {
       (announcementList.querySelector(".announcement-toggle:not([hidden])") || announcementList.querySelector(".announcement-dismiss")).focus();
     }
-    if (pendingScroll && linkedAnnouncementId === item.id) { pendingScroll = false; scrollToAnnouncement(); }
+    if (pendingScroll && linkedAnnouncementId === item.id) {
+      pendingScroll = false;
+      scrollToAnnouncement(focusRestoredAnnouncement);
+      focusRestoredAnnouncement = false;
+    }
   }
 
   function scrollToAnnouncement(focus = false) {
@@ -1304,7 +1347,7 @@
       const target = document.getElementById("ogloszenie-" + targetId);
       if (!target || !announcementCard.getClientRects().length) return;
       if (focus) { target.tabIndex = -1; target.focus({preventScroll: true}); }
-      target.scrollIntoView({block: "start"});
+      announcementCard.scrollIntoView({block: "start"});
     });
   }
 
@@ -1338,15 +1381,21 @@
       button.addEventListener("click", () => {
         if (!isActiveAnnouncement(item, Date.now())) return renderAnnouncements(loadedAnnouncements);
         const wasHidden = hiddenAnnouncements.delete(item.id);
-        saveHiddenAnnouncements();
+        if (wasHidden) saveHiddenAnnouncements();
         announcementsPanel.close();
-        clearLinkedAnnouncement();
-        currentAnnouncementId = item.id;
         if (wasHidden) announcementStatus.textContent = "Przywrócono ogłoszenie: " + item.title;
-        history.pushState(history.state, "", announcementPrefix + item.id);
-        requestLinkedAnnouncement();
-        renderSlides();
-        scrollToAnnouncement(true);
+        const target = announcementPrefix + item.id;
+        if (document.getElementById("harmonogram").hidden) {
+          focusRestoredAnnouncement = true;
+          location.hash = target;
+        } else {
+          if (location.hash.startsWith(announcementPrefix)) history.replaceState(history.state, "", target);
+          linkedAnnouncementId = undefined;
+          pendingScroll = false;
+          currentAnnouncementId = item.id;
+          renderSlides();
+          scrollToAnnouncement(true);
+        }
       });
       li.append(button);
       return li;

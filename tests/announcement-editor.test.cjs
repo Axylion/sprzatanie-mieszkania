@@ -10,7 +10,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
   const config = 'window.goleszanDiscussionsConfig={url:"https://g19test.supabase.co",publishableKey:"sb_publishable_test",adminEmail:"admin@example.test"};';
   const types = {'.css':'text/css','.js':'application/javascript','.html':'text/html'};
   const server = createServer(async (req, res) => {
-    const name = req.url === '/' ? 'index.html' : req.url.slice(1);
+    const name = new URL(req.url,'http://localhost').pathname.slice(1) || 'index.html';
     try {
       const body = name === 'dyskusje/config.js' ? config : await readFile(join(root, name));
       res.writeHead(200, {'Content-Type':types[extname(name)] || 'application/octet-stream'}).end(body);

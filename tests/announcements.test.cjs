@@ -56,7 +56,7 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-11-0-ui4', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
+      ? contents.toString().replace('shell-v13-11-0-ui5', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -114,8 +114,8 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
       cacheState = await page.evaluate(async () => {
         const registration = await navigator.serviceWorker.getRegistration();
         const keys = await caches.keys();
-        const hasShell = keys.includes('goleszan19-shell-v13-11-0-ui4');
-        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-ui4')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
+        const hasShell = keys.includes('goleszan19-shell-v13-11-0-ui5');
+        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-ui5')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
         return {ready:hasPrivate && !keys.includes('goleszan19-shell-v13-10-2') && registration.active?.state === 'activated' && !registration.installing && !registration.waiting,hasPrivate};
       });
       if (cacheState.ready) break;
@@ -331,7 +331,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
         await setTheme(page, theme);
         await page.waitForTimeout(50);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-        assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(47, 136, 66)');
+        assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(8, 109, 114)');
         assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).color), 'rgb(255, 255, 255)');
         assert.equal(await page.locator('#announcements-card').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(255, 246, 175)');
         assert.equal(await page.locator('#announcements-heading').evaluate(e => getComputedStyle(e).fontWeight), '700');
@@ -459,9 +459,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
           if (process.env.AXE_PATH) {
             await page.addScriptTag({path:process.env.AXE_PATH});
             const audit = await page.evaluate(async () => (await axe.run({include:['#announcements-card','#shortcut-open']}, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','best-practice']}})).violations);
-            // Zatwierdzone kolory przycisku #2f8842 / white mają kontrast 4.45:1 (< 4.5:1).
-            // Tylko ten istniejący wyjątek jest dopuszczony; pozostałe elementy muszą przejść audyt.
-            assert.deepEqual(audit.flatMap(v => v.nodes.filter(n => !(v.id === 'color-contrast' && n.target.length === 1 && n.target[0] === '#shortcut-open')).map(n => ({id:v.id,target:n.target}))), []);
+            assert.deepEqual(audit.flatMap(v => v.nodes.map(n => ({id:v.id,target:n.target}))), []);
           }
         }
       }
@@ -484,7 +482,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-11-0-ui4');
+      const c = await caches.open('goleszan19-shell-v13-11-0-ui5');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

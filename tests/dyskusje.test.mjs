@@ -825,7 +825,7 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await operator.getByRole('button', {name:'Pokoje',exact:true}).click();
   await setTheme(operator, 'light');
   const panel = operator.locator('#admin-panel');
-  assert.equal(await panel.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(246, 247, 251)');
+  assert.equal(await panel.evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(238, 245, 244)');
   await setTheme(operator, 'system');
   await operator.emulateMedia({ colorScheme: 'dark' });
   await operator.waitForFunction(() => document.documentElement.dataset.theme === 'dark');

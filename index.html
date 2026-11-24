@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Panel mieszkańców Goleszan 19">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f6f7fb" id="theme-color">
+  <meta name="theme-color" content="#eef5f4" id="theme-color">
   <title>Goleszan 19</title>
   <script>
     let appAtRoot = false;
@@ -53,35 +53,50 @@
     :root {
       font-family: Inter, system-ui, -apple-system, sans-serif;
       font-synthesis: none;
-      --bg: #f6f7fb;
+      --bg: #eef5f4;
       --surface: #ffffff;
-      --surface-alt: #f1f5f9;
-      --text: #162338;
-      --muted: #64748b;
-      --border: #e2e8f0;
-      --accent: #2563eb;
-      --accent-bg: #eff6ff;
-      --accent-text: #1d4ed8;
-      --shadow: 0 4px 22px rgba(15, 23, 42, .035);
+      --surface-alt: #eaf3f3;
+      --text: #173137;
+      --muted: #4d686d;
+      --border: #9db9bb;
+      --control-edge: #668d90;
+      --accent: #08777b;
+      --accent-bg: #dcf1f0;
+      --accent-text: #075c62;
+      --accent-hover: #006e75;
+      --accent-fill: #086d72;
+      --accent-fill-hover: #07585e;
+      --today-mark: #007279;
+      --own-today-mark: #bafff8;
+      --push-on: #087a7f;
+      --push-on-text: #006269;
+      --focus-wash: rgb(8 119 123 / 19%);
+      --shadow: 0 4px 22px rgb(17 57 60 / 5%);
       color-scheme: light;
     }
 
     :root[data-theme="dark"] {
-      --bg: #0e131c;
-      --surface: #19212d;
-      --surface-alt: #222d3c;
-      --text: #edf3fc;
-      --muted: #a1aec0;
-      --border: #313e50;
-      --accent: #82aaff;
-      --accent-bg: #202f49;
-      --accent-text: #b4ceff;
+      --bg: #031720;
+      --surface: #062630;
+      --surface-alt: #0b3441;
+      --text: #f1fbff;
+      --muted: #a7c6d0;
+      --border: #28606d;
+      --control-edge: #417883;
+      --accent: #63e5ef;
+      --accent-bg: #0a3642;
+      --accent-text: #b1f4f6;
+      --accent-hover: #58dde3;
+      --today-mark: #63e5ef;
+      --push-on: #1a9398;
+      --push-on-text: #8de7e9;
+      --focus-wash: rgb(99 229 239 / 22%);
       --shadow: none;
       color-scheme: dark;
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; accent-color: var(--accent); }
     body {
       margin: 0;
       min-height: 100dvh;
@@ -93,6 +108,11 @@
     }
     button, select { font: inherit; }
     button { cursor: pointer; }
+    button:disabled { cursor: default; }
+    :where(a[href]) { color: var(--accent-text); }
+    :where(a[href], button, summary, input, select, textarea) {
+      -webkit-tap-highlight-color: var(--focus-wash);
+    }
     :root { --page-width: 1080px; --page-gutter: 16px; }
     .container {
       width: min(100% - 2 * var(--page-gutter), var(--page-width));
@@ -116,12 +136,12 @@
       padding: 10px 12px;
       border: 1px solid var(--border);
       border-radius: 10px;
-      background: #2f8842;
+      background: var(--accent-fill);
       color: #ffffff;
       font-weight: 650;
       white-space: nowrap;
     }
-    .shortcut-button:hover { background: #2f8842; }
+    .shortcut-button:hover { background: var(--accent-fill-hover); }
     .shortcut-button[hidden] { display: none !important; }
     .shortcut-button { display: inline-flex; align-items: center; gap: 6px; }
     .shortcut-help {
@@ -164,6 +184,11 @@
       border-radius: 13px;
       background: #133541;
     }
+    [data-theme="light"] .brand-icon {
+      background: var(--accent-bg);
+      border: 1px solid var(--border);
+    }
+    [data-theme="light"] .brand-icon svg { stroke: var(--accent-text); }
     select {
       background: var(--surface-alt);
       border: 1px solid var(--border);
@@ -194,7 +219,6 @@
     }
     .hero {
       background: var(--accent-bg);
-      border-color: transparent;
     }
     .eyebrow {
       color: var(--accent-text);
@@ -235,7 +259,7 @@
       gap: 9px;
     }
     .room-button {
-      border: 1px solid var(--border);
+      border: 1px solid var(--control-edge);
       border-radius: 11px;
       padding: 12px 5px;
       background: var(--surface-alt);
@@ -266,7 +290,7 @@
     }
     .announcement-dismiss svg { width: 26px; height: 26px; }
     .announcement-dismiss:focus-visible {
-      outline: 2px solid #2f8842;
+      outline: 2px solid var(--accent-fill);
       outline-offset: 2px;
       border-radius: 4px;
     }
@@ -286,7 +310,7 @@
     .announcement-slider button[data-slide]:not(:disabled):hover,
     .announcement-dismiss:hover { background: #faedb9; }
     .announcement-slider button[data-slide]:focus-visible {
-      outline: 2px solid #2f8842; outline-offset: 2px;
+      outline: 2px solid var(--accent-fill); outline-offset: 2px;
     }
     @media (max-width: 440px) {
       .announcement-slider { gap: 4px; }
@@ -319,7 +343,7 @@
       .announcement-rich h3 { font-size: 1.2em; }
     }
     .announcement-body.announcement-rich:not(.expanded) { display: block; max-height: 3lh; }
-    .announcement-body a { color: #285239; text-decoration: underline; }
+    .announcement-body a { color: #075c62; text-decoration: underline; }
     .announcement-date { font-size: 12px; color: #5f5428; }
     .announcement-toggle {
       display: block;
@@ -332,7 +356,7 @@
       font-weight: 650;
     }
     .announcement-toggle:focus-visible {
-      outline: 2px solid #2f8842;
+      outline: 2px solid var(--accent-fill);
       outline-offset: 3px;
       border-radius: 3px;
     }
@@ -373,10 +397,10 @@
     }
   </style>
   <template>
-  <link rel="stylesheet" href="./poradnik/poradnik.css">
+  <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui5">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js?v=ui4"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui4">
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui5">
   <script defer src="./dyskusje/config.js"></script>
   <script defer src="./dyskusje/dyskusje.js?v=ui4"></script>
   <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
@@ -610,7 +634,6 @@
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
   <section class="card discussion-panel" aria-labelledby="discussion-title">
     <h1 id="discussion-title" tabindex="-1">Dyskusje</h1>
-    <p class="discussion-subtitle">Wspólne sprawy mieszkańców</p>
     <div class="push-control discussion-push" hidden>
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-label="Powiadomienia o wiadomościach" aria-describedby="push-messages-status" data-push-category="messages"><span class="push-state">Powiadomienia wyłączone</span></button>
       <p class="push-feedback" id="push-messages-status" role="status"></p>
@@ -1033,7 +1056,7 @@
       { system: "⚙", light: "☀", dark: "☾" }[mode];
     const actual = effectiveTheme(mode);
     document.documentElement.dataset.theme = actual;
-    document.getElementById("theme-color").content = actual === "dark" ? "#031720" : "#f6f7fb";
+    document.getElementById("theme-color").content = actual === "dark" ? "#031720" : "#eef5f4";
   }
 
   function toggleThemeMenu(open, restoreFocus = false) {

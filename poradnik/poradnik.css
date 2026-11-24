@@ -32,6 +32,7 @@
   --guide-line: #08e0ee;
   --guide-yellow: #ffeb16;
   --guide-text: #f9fdff;
+  --guide-divider: #3e6269;
   color: var(--guide-text);
   color-scheme: dark;
 }
@@ -53,11 +54,18 @@
 }
 
 .guide-top { margin-bottom: 12px; }
-:root[data-theme="light"] #poradnik-view :is(.guide-top, .guide-card-header, .guide-card-position, .guide-categories) { color: var(--text); }
-:root[data-theme="light"] .guide-card-header :is(svg, .guide-kicker) { color: #08747e; }
-:root[data-theme="light"] #poradnik-view .guide-categories a:is([aria-current], :hover) { color: #755300; }
-:root[data-theme="light"] .guide-categories a[aria-current]::after { background: #a87600; }
-:root[data-theme="light"] #poradnik-view :focus-visible { outline-color: #08747e; }
+:root[data-theme="light"] #poradnik-view {
+  --guide-panel: var(--surface);
+  --guide-tip: var(--surface-alt);
+  --guide-line: var(--accent);
+  --guide-text: var(--text);
+  --guide-divider: var(--border);
+  --guide-yellow: #edc449;
+  color-scheme: light;
+}
+:root[data-theme="light"] #poradnik-view .guide-categories a:is([aria-current], :hover),
+:root[data-theme="light"] .guide-pagination button:not(:disabled):hover { color: var(--accent-hover); }
+:root[data-theme="light"] #poradnik-view :focus-visible { outline-color: var(--accent); }
 .guide-home-link {
   display: inline-flex;
   align-items: center;
@@ -183,7 +191,7 @@
   padding-block: 9px;
 }
 
-.guide-steps li + li { border-top: 1px solid #3e6269; }
+.guide-steps li + li { border-top: 1px solid var(--guide-divider); }
 .guide-step-number {
   display: grid;
   flex: 0 0 29px;

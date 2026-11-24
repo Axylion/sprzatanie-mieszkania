@@ -85,6 +85,10 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   assert.equal(await page.locator('#calendar-next-room').innerText(),'Pokój nr 2');
   assert.equal(await page.locator('#calendar-upcoming').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(21, 61, 70)');
   assert.ok(await page.locator('#calendar-days .calendar-own').count()>=2);
+  assert.deepEqual(await page.locator('#calendar-days .calendar-own').first().evaluate(el=>{
+    const s=getComputedStyle(el);
+    return [s.backgroundColor,s.color];
+  }),['rgb(8, 109, 114)','rgb(255, 255, 255)']);
   await page.evaluate(()=>localStorage.removeItem('cleaning-room'));
   await page.reload();
   assert.match(await page.locator('#push-duties-status').innerText(),/Powiadomienia wyłączone/);
@@ -171,7 +175,8 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   assert.equal(await page.locator('#discussion-send').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(36, 127, 136)');
   assert.equal(await page.locator('#discussion-compose').evaluate(el=>getComputedStyle(el).borderRadius),'12px');
   assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderTopWidth),'0px');
-  await page.locator('.discussion-subtitle').click();
+  await page.locator('#discussion-title').click();
+  assert.equal(await page.locator('.discussion-subtitle').count(),0);
   if (output) await page.locator('#discussion-view').screenshot({path:join(output,'discussion-dark-desktop.png')});
   for (const [width,mode] of [[1280,'light'],[390,'dark']]) {
     await page.setViewportSize({width,height:900});
@@ -183,6 +188,14 @@ test('Dark desktop presentation preserves notification reading, field focus and 
     await page.goto(base);
     await page.locator('#calendar-next-date').waitFor();
     assert.equal(await page.locator('#calendar-next-room').innerText(),'Pokój nr 2');
+    if (mode === 'light') {
+      assert.equal(await page.locator('.brand-icon').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(220, 241, 240)');
+      for (const heading of await page.locator('.cleaning-rules summary').all()) {
+        await heading.hover();
+        await page.waitForFunction(el=>getComputedStyle(el).color==='rgb(0, 110, 117)',await heading.elementHandle());
+        assert.equal(await heading.evaluate(el=>getComputedStyle(el).boxShadow),'none');
+      }
+    }
     await page.locator('#chat-open').click();
     await page.locator('.discussion-message').first().waitFor();
   }

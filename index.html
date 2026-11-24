@@ -71,6 +71,8 @@
       --push-on: #087a7f;
       --push-on-text: #006269;
       --focus-wash: rgb(8 119 123 / 19%);
+      --secondary-hover: #d8efee;
+      --secondary-active: #bfe4e2;
       --shadow: 0 4px 22px rgb(17 57 60 / 5%);
       color-scheme: light;
     }
@@ -91,6 +93,8 @@
       --push-on: #1a9398;
       --push-on-text: #8de7e9;
       --focus-wash: rgb(99 229 239 / 22%);
+      --secondary-hover: #194750;
+      --secondary-active: #215863;
       --shadow: none;
       color-scheme: dark;
     }
@@ -400,7 +404,7 @@
   <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui5">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js?v=ui4"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui5">
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui6">
   <script defer src="./dyskusje/config.js"></script>
   <script defer src="./dyskusje/dyskusje.js?v=ui4"></script>
   <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
@@ -448,7 +452,7 @@
 </header>
 
 <dialog id="notification-panel" class="shortcut-help" aria-labelledby="notification-title">
-  <div class="notification-toolbar"><div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" aria-label="Zamknij powiadomienia">×</button></form></div>
+  <div class="notification-toolbar"><div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" class="modal-close" aria-label="Zamknij powiadomienia">×</button></form></div>
   <button type="button" id="notification-read-all" hidden>Oznacz wszystkie jako przeczytane</button></div>
   <p id="notification-empty">Brak powiadomień.</p>
   <p id="notification-status" role="status"></p>
@@ -456,7 +460,7 @@
 </dialog>
 
 <dialog id="announcements-panel" class="shortcut-help" aria-labelledby="announcements-title">
-  <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" aria-label="Zamknij ogłoszenia">×</button></form></div>
+  <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" class="modal-close" aria-label="Zamknij ogłoszenia">×</button></form></div>
   <div class="push-control">
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-label="Powiadomienia o ogłoszeniach" aria-describedby="push-announcements-status" data-push-category="announcements"><span class="push-state">Powiadomienia wyłączone</span></button>
       <p class="push-feedback" id="push-announcements-status" role="status"></p>
@@ -729,7 +733,7 @@
 
 <dialog id="poradnik-gallery" aria-label="Powiększone zdjęcia">
   <div class="guide-viewer">
-    <button type="button" class="guide-viewer-close" data-close autofocus aria-label="Zamknij zdjęcie">×</button>
+    <button type="button" class="guide-viewer-close modal-close" data-close autofocus aria-label="Zamknij zdjęcie">×</button>
     <figure>
       <img alt="">
       <figcaption aria-live="polite"></figcaption>
@@ -938,11 +942,18 @@
   }
 
   const dayMs = 86400000;
-  const initialDay = todayInPoland();
+  function localCalendarDay() {
+    const now = new Date();
+    return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  }
+
+  const initialDay = localCalendarDay();
   const monthFormat = new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric", timeZone: "UTC" });
   const calendarDays = document.getElementById("calendar-days");
   let calendarMonth = new Date(initialDay);
   calendarMonth.setUTCDate(1);
+  let renderedLocalDay = initialDay;
+  let midnightTimer;
 
   function dutyOn(timestamp) {
     const weekday = new Date(timestamp).getUTCDay();
@@ -952,6 +963,17 @@
   }
 
   function renderCalendar() {
+    const today = localCalendarDay();
+    if (today !== renderedLocalDay) {
+      const previousMonth = new Date(renderedLocalDay);
+      previousMonth.setUTCDate(1);
+      // Follow the current month at midnight only when it was already being viewed.
+      if (+calendarMonth === +previousMonth) {
+        calendarMonth = new Date(today);
+        calendarMonth.setUTCDate(1);
+      }
+      renderedLocalDay = today;
+    }
     const start = nearestSaturday();
     const room = roomFor(start);
     document.getElementById("next-room").textContent = "Pokój nr " + room;
@@ -963,7 +985,6 @@
     document.getElementById("calendar-month").textContent = monthFormat.format(calendarMonth);
     const end = new Date(calendarMonth);
     end.setUTCMonth(end.getUTCMonth() + 1);
-    const today = todayInPoland();
     const cells = [];
     const blank = () => {
       const span = document.createElement("span");
@@ -994,9 +1015,23 @@
       renderCalendar();
     });
   }
+  function scheduleCalendarMidnight() {
+    clearTimeout(midnightTimer);
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    midnightTimer = setTimeout(refreshCalendarDate, midnight.getTime() - Date.now());
+  }
+  function refreshCalendarDate() {
+    renderCalendar();
+    scheduleCalendarMidnight();
+  }
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) renderCalendar();
+    if (!document.hidden) refreshCalendarDate();
   });
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) refreshCalendarDate();
+  });
+  scheduleCalendarMidnight();
   let boundRoom = null;
   window.addEventListener("g19-bound-room", event => {
     boundRoom = [1, 2, 3, 4].includes(event.detail) ? event.detail : null;

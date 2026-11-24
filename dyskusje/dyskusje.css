@@ -274,8 +274,17 @@
 .calendar-month button { min-height: 44px; border-color: var(--control-edge); background: var(--surface-alt); font-size: 1.35rem; }
 .calendar-grid .calendar-weekend { background: var(--accent-bg); color: var(--accent-text); }
 .dashboard-calendar .calendar-own { background: var(--accent-fill); color: #fff; }
-.calendar-grid [aria-current="date"] { border-bottom: 3px solid var(--today-mark); font-weight: 750; }
-.calendar-grid .calendar-own[aria-current="date"] { border-bottom-color: var(--own-today-mark); }
+#calendar-days .calendar-day[aria-current="date"] { position: relative; font-weight: 750; }
+#calendar-days .calendar-day[aria-current="date"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 18% 2px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--today-mark);
+  pointer-events: none;
+}
+#calendar-days .calendar-own[aria-current="date"]::after { background: var(--own-today-mark); }
 .calendar-grid [aria-pressed="true"] { outline: 2px solid var(--accent-text); outline-offset: -2px; font-weight: 750; }
 .dashboard-calendar button:focus-visible { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
@@ -404,12 +413,7 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 }
 .cleaning-rules details[open] summary::before { transform: rotate(45deg); }
 .cleaning-rules details p { padding-inline-start: 12px; }
-#device-settings button:not(:disabled):hover, #announcements-panel form button:not(:disabled):hover {
-  background: var(--accent-bg);
-  border-color: var(--accent);
-}
-#device-settings button:active, #announcements-panel button:active { filter: brightness(.93); }
-#device-settings button:focus-visible, #announcements-panel button:focus-visible, .push-switch:focus-visible {
+.push-switch:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -768,7 +772,6 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
     padding: 12px; font-family: Arial, sans-serif; background: #0b282f; border-color: #39626a; border-radius: 16px;
   }
   [data-theme="dark"] #notification-title { font-size: 28px; margin: 0; }
-  [data-theme="dark"] #notification-panel .notification-heading button { min-height: 32px; width: 32px; height: 32px; padding: 0; }
   [data-theme="dark"] #notification-list { margin: 0; border-top: 1px solid #39626a; max-height: 60dvh; }
   [data-theme="dark"] #notification-list li + li { border-color: #39626a; }
   [data-theme="dark"] #notification-list strong { font-size: 16px; font-weight: 400; line-height: 1.5; }
@@ -876,7 +879,6 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   [data-theme="dark"] #announcements-panel { width: min(736px, calc(100vw - 48px)); padding: 12px; background: #0b282f; border-color: #39626a; border-radius: 16px; font-family: Arial, sans-serif; }
   [data-theme="dark"] #announcements-title { font-size: 28px; margin: 0; }
   [data-theme="dark"] #announcements-panel .notification-heading { min-height: 40px; margin-bottom: 12px; }
-  [data-theme="dark"] #announcements-panel form button { width: 32px; min-height: 32px; height: 32px; padding: 0; }
   [data-theme="dark"] #hidden-announcements-list { border-top: 1px solid #39626a; }
   [data-theme="dark"] #hidden-announcements-list button { grid-template-columns: 38px minmax(0, 1fr); align-items: start; gap: 12px; padding: 15px 0; border: 0; border-radius: 0; background: transparent; }
   [data-theme="dark"] #hidden-announcements-list .announcement-list-icon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: #194750; color: #78dce3; }
@@ -950,6 +952,10 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   padding: 6px 9px; margin: 4px 0 2px; border: 0; border-inline-start: 3px solid var(--chat-line);
   border-radius: 4px; background: var(--private-tint); color: var(--text); font-size: .85rem; overflow-wrap: anywhere;
 }
+[data-theme="light"] #discussion-chat .message-quote {
+  background: #c6e6e5;
+  color: #23464b;
+}
 #discussion-chat .discussion-reactions .message-reply-action {
   min-height: 32px; color: var(--private-accent); padding-inline: 6px; margin-inline-start: auto;
 }
@@ -1020,4 +1026,55 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 @media (prefers-reduced-motion: reduce) {
   :is(#notification-list, #hidden-announcements-list) strong,
   .cleaning-rules summary, .cleaning-rules summary::before { transition: none; }
+}
+
+/* Shared states for secondary controls. Content rows and primary actions keep their own styles. */
+:is(#device-settings button, #shortcut-close, #notification-panel button, #announcements-panel .modal-close,
+    .calendar-month button, .guide-pagination button, .guide-viewer button,
+    #discussion-view button:not(#discussion-send, #private-send, .message-quote, .push-switch, [aria-pressed="true"]),
+    #admin-panel button:not(.announcement-primary, .admin-overview, .admin-room-actions button, [aria-pressed="true"]),
+    #admin-confirm button[type="submit"], .admin-announcement-dialog button:is([data-cancel], [value="cancel"])) {
+  background: var(--surface-alt);
+  border: 1px solid var(--control-edge);
+  color: var(--text);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  box-shadow: none;
+  filter: none;
+
+  &:not(:disabled):hover {
+    background: var(--secondary-hover);
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  &:not(:disabled):active {
+    background: var(--secondary-active);
+    border-color: var(--accent);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    background: var(--surface);
+    color: var(--muted);
+    border-color: var(--border);
+    opacity: .65;
+  }
+
+  @media (prefers-reduced-motion: reduce) { transition: none; }
+}
+
+:is(#notification-panel, #announcements-panel, #poradnik-gallery) .modal-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 8px;
+  font: 400 24px/1 system-ui, sans-serif;
 }

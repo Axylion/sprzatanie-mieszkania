@@ -1,7 +1,1 @@
-// Wpisz adres projektu i klucz publiczny sb_publishable_… z Supabase.
-window.goleszanDiscussionsConfig = {
-  url: "",
-  publishableKey: "",
-  vapidPublicKey: "",
-  adminEmail: ""
-};
+window.goleszanDiscussionsConfig = Object.freeze({"url": "https://pbsubdmuupwmtgzncxmh.supabase.co", "publishableKey": "sb_publishable_tKzx-14LolTo2lfs5GmrCQ_580dY5ie", "vapidPublicKey": "BPq1nIhbutMTWJrjQjqaT8p2SV4Ju5v7fIq4LnvMVyUV4hRFcvW1aLW-sCyYFjJdi2US6epYxmb0ot8KxMuhX-Y", "adminEmail": "vxhu83@gmail.com"});

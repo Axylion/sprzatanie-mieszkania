@@ -28,6 +28,43 @@
   let cardIndex = 0;
   let currentHash;
   let homeScroll = 0;
+  const supplyKey = "goleszan19-guide-supplies-v1";
+  const supplies = [
+    ["degreaser", "Odtłuszczacz"], ["oven", "Środek do piekarnika"],
+    ["glass", "Płyn do szyb"], ["mould", "Środek na pleśń"],
+    ["shower", "Środek do kabin prysznicowych"], ["limescale", "Odkamieniacz"],
+    ["wc", "Środek do WC"]
+  ];
+  const accessories = [
+    ["sponge", "Gąbka"], ["microfiber", "Ściereczka z mikrofibry"],
+    ["paper", "Ręcznik papierowy"], ["gloves", "Rękawice ochronne"]
+  ];
+  let accessoriesOpen = false;
+  const checkedSupplies = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(supplyKey) || "[]");
+    if (Array.isArray(saved)) {
+      for (const [id] of [...supplies, ...accessories]) if (saved.includes(id)) checkedSupplies.add(id);
+    }
+  } catch { /* The checklist remains usable without local storage. */ }
+
+  function saveSupplies() {
+    try { localStorage.setItem(supplyKey, JSON.stringify([...checkedSupplies])); }
+    catch { /* A blocked write should not undo the current page state. */ }
+  }
+
+  function checklist() {
+    const rows = items => items.map(([id, label]) =>
+      `<li><label><input type="checkbox" data-supply="${id}"${checkedSupplies.has(id) ? " checked" : ""}><span>${label}</span></label></li>`
+    ).join("");
+    return `<section class="guide-panel guide-checklist" aria-labelledby="guide-checklist-title">
+      <h2 id="guide-checklist-title">${icon("warstwy")} <span>Lista środków do sprzątania</span></h2>
+      <ul>${rows(supplies)}</ul>
+      <details${accessoriesOpen ? " open" : ""}><summary>Pokaż akcesoria</summary><ul>${rows(accessories)}</ul></details>
+      <button type="button" class="guide-checklist-clear">Wyczyść zaznaczenia</button>
+    </section>`;
+  }
+
 
   function icon(id) {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[id]}</svg>`;
@@ -120,6 +157,7 @@
       </article>
       ${cardNavigation()}
       ${categoryNav(card.section)}
+      ${checklist()}
     `;
   }
 
@@ -174,6 +212,8 @@
         ${cardContent(currentCard)}
       </div>
     `;
+    const details = guide.querySelector(".guide-checklist details");
+    details.addEventListener("toggle", () => { if (details.isConnected) accessoriesOpen = details.open; });
     home.hidden = true;
     guide.hidden = false;
     document.title = `${currentCard.title} · Poradnik sprzątania`;
@@ -189,7 +229,20 @@
     galleryCaption.textContent = `${photoIndex + 1} / ${photos.length} · ${alt}`;
   }
 
+  guide.addEventListener("change", event => {
+    const field = event.target;
+    if (!field.dataset.supply) return;
+    if (field.checked) checkedSupplies.add(field.dataset.supply);
+    else checkedSupplies.delete(field.dataset.supply);
+    saveSupplies();
+  });
   guide.addEventListener("click", event => {
+    if (event.target.closest(".guide-checklist-clear")) {
+      checkedSupplies.clear();
+      guide.querySelectorAll("[data-supply]").forEach(input => { input.checked = false; });
+      saveSupplies();
+      return;
+    }
     const control = event.target.closest("[data-card-step]");
     if (control) {
       changeCard(Number(control.dataset.cardStep));

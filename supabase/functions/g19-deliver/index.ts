@@ -37,6 +37,10 @@ Deno.serve(async request => {
       const endpoint = new URL(item.endpoint);
       if (endpoint.protocol === "https:" && !endpoint.port && !endpoint.username && !endpoint.password && allowedHosts.test(endpoint.hostname)) {
         try {
+          if (item.kind === "manual_duty" && !await rpc("manual_duty_delivery_active", { p_notification: item.id })) {
+            await rpc("push_finish", { p_id: item.id, p_lease: item.lease, p_outcome: "failed" });
+            return "skipped";
+          }
           if (item.kind === "private" && !await rpc("private_delivery_active", { p_notification: item.id })) {
             await rpc("push_finish", { p_id: item.id, p_lease: item.lease, p_outcome: "failed" });
             return "skipped";

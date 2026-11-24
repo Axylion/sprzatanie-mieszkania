@@ -1,10 +1,11 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v13-11-0-ui7";
+const CACHE_NAME = "goleszan19-shell-v13-11-0-f1";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
-  "./dyskusje/notifications.js?v=ui4", "./administracja/admin.js?v=ui2", "./administracja/announcements.js?v=ui2", "./ogloszenia/content.js",
+  "./dyskusje/notifications.js?v=ui4", "./administracja/admin.js?v=f1", "./administracja/dyzury.js?v=f1", "./administracja/announcements.js?v=f1", "./ogloszenia/content.js",
   "./dyskusje/dyskusje.css?v=ui6-r2", "./dyskusje/config.js", "./dyskusje/dyskusje.js?v=ui4", "./dyskusje/private-chat.js?v=ui4",
-  "./poradnik/poradnik.css?v=ui7", "./poradnik/dane.js", "./poradnik/poradnik.js?v=ui7",
+  "./kalendarz/kalendarz.js?v=f1", "./kalendarz/kalendarz.css?v=f1",
+  "./poradnik/poradnik.css?v=f1", "./poradnik/dane.js", "./poradnik/poradnik.js?v=f1",
   "./poradnik/media/kabina-1.webp",
   "./poradnik/media/kabina-2.webp",
   "./poradnik/media/kabina-3.webp",
@@ -104,8 +105,9 @@ self.addEventListener("push", event => {
   const privateMessage = message && data.kind === "private";
   const preview = message && [1, 2, 3, 4].includes(data.room) &&
     typeof data.preview === "string" && data.preview.length <= 401 && data.preview.trim();
+  const manualDuty = data.category === "duties" && data.kind === "manual_duty";
   const announcementTitle = data.category === "announcements" && notificationText(data.title);
-  const title = privateMessage ? "Goleszan 19 · Nowa wiadomość prywatna" : message ? "Goleszan 19 · Nowa wiadomość" : announcementTitle || titles[data.category];
+  const title = privateMessage ? "Goleszan 19 · Nowa wiadomość prywatna" : message ? "Goleszan 19 · Nowa wiadomość" : (manualDuty && notificationText(data.title)) || announcementTitle || titles[data.category];
   const body = privateMessage ? ([1,2,3,4].includes(data.room) ? "Nowa wiadomość prywatna od pokoju nr " + data.room : "Nowa wiadomość prywatna") : message
     ? (preview ? "Pokój nr " + data.room + ": " + preview : "Otwórz Goleszan 19.")
     : notificationText(data.body) || (data.category === "duties"

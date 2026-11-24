@@ -401,17 +401,19 @@
     }
   </style>
   <template>
-  <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui7">
+  <link rel="stylesheet" href="./poradnik/poradnik.css?v=f1">
   <script defer src="./poradnik/dane.js"></script>
-  <script defer src="./poradnik/poradnik.js?v=ui7"></script>
+  <script defer src="./poradnik/poradnik.js?v=f1"></script>
   <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui6-r2">
+  <link rel="stylesheet" href="./kalendarz/kalendarz.css?v=f1">
   <script defer src="./dyskusje/config.js"></script>
   <script defer src="./dyskusje/dyskusje.js?v=ui4"></script>
   <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
   <script defer src="./dyskusje/notifications.js?v=ui4"></script>
   <script defer src="./ogloszenia/content.js"></script>
-  <script defer src="./administracja/announcements.js?v=ui2"></script>
-  <script defer src="./administracja/admin.js?v=ui2"></script>
+  <script defer src="./administracja/dyzury.js?v=f1"></script>
+  <script defer src="./administracja/announcements.js?v=f1"></script>
+  <script defer src="./administracja/admin.js?v=f1"></script>
   </template>
   <script>
     // Keep URLs out of the speculative preload scanner on redirecting documents.
@@ -764,7 +766,48 @@
     <nav id="admin-sections" class="admin-actions" aria-label="Sekcje administracji">
       <button type="button" data-section="rooms" aria-pressed="true">Pokoje</button>
       <button type="button" data-section="announcements" aria-pressed="false">Ważne ogłoszenia</button>
+      <button type="button" data-section="duties" aria-pressed="false">Dyżury</button>
     </nav>
+    <section id="admin-duties" aria-labelledby="admin-duty-title" hidden>
+      <h2 id="admin-duty-title">Zarządzanie dyżurami</h2>
+      <p>Oznacz dyżur jako niewykonany lub wyślij przypomnienie do wybranego pokoju.</p>
+      <div class="admin-duty-layout">
+        <div class="admin-duty-controls">
+          <label><span>Pokój</span>
+            <select id="admin-duty-room">
+              <option value="1">Pokój nr 1</option><option value="2">Pokój nr 2</option>
+              <option value="3">Pokój nr 3</option><option value="4">Pokój nr 4</option>
+            </select>
+          </label>
+          <label><span>Dyżur</span> <select id="admin-duty-date"></select></label>
+          <section class="admin-duty-box" aria-labelledby="admin-duty-status-heading">
+            <h3 id="admin-duty-status-heading">Status dyżuru</h3>
+            <label class="admin-duty-switch"><input type="checkbox" role="switch" id="admin-duty-missed"><span>Niewykonany</span></label>
+            <p>Oznacz dyżur jako niewykonany.</p>
+            <button type="button" class="announcement-primary" id="admin-duty-save">Zapisz status</button>
+          </section>
+          <section class="admin-duty-box" aria-labelledby="admin-duty-push-heading">
+            <h3 id="admin-duty-push-heading">Powiadomienie push</h3>
+            <p>Wyślij przypomnienie o dyżurze do wybranego pokoju.</p>
+            <p class="admin-duty-note">Powiadomienie otrzymają tylko urządzenia z aktywną subskrypcją push dla dyżurów.</p>
+            <button type="button" id="admin-duty-send">Wyślij przypomnienie</button>
+          </section>
+          <p id="admin-duty-feedback" role="status"></p>
+        </div>
+        <section class="admin-duty-box" id="admin-duty-preview" aria-labelledby="admin-duty-preview-heading">
+          <h3 id="admin-duty-preview-heading">Podgląd zmian</h3>
+          <dl>
+            <div><dt>Dyżur</dt><dd id="admin-duty-preview-date"></dd></div>
+            <div><dt>Pokój</dt><dd id="admin-duty-preview-room"></dd></div>
+            <div><dt>Status</dt><dd id="admin-duty-preview-status"></dd></div>
+            <div><dt>Powiadomienie</dt><dd id="admin-duty-preview-push">Nie wysłano</dd></div>
+          </dl>
+          <p class="admin-duty-note"><strong>Efekt na kalendarzu</strong><br>
+            Niewykonany dyżur ma czerwone tło dla wybranego pokoju, a dla pozostałych czerwoną kropkę.</p>
+          <div id="admin-duty-preview-calendar"></div>
+        </section>
+      </div>
+    </section>
     <div id="admin-room-management"><div id="admin-rooms"></div></div>
     <section id="admin-announcements" aria-labelledby="admin-title" hidden>
       <p id="admin-announcement-status" role="status"></p>
@@ -832,6 +875,14 @@
     </section>
   </section>
 </main>
+<dialog id="admin-duty-confirm" class="shortcut-help" aria-labelledby="admin-duty-confirm-title" aria-describedby="admin-duty-confirm-text">
+  <h2 id="admin-duty-confirm-title"></h2>
+  <p id="admin-duty-confirm-text"></p>
+  <form method="dialog" class="admin-actions">
+    <button value="cancel" autofocus>Anuluj</button>
+    <button value="confirm" class="announcement-primary"></button>
+  </form>
+</dialog>
 <dialog id="admin-confirm" class="shortcut-help" aria-labelledby="admin-confirm-text">
   <p id="admin-confirm-text"></p>
   <form method="dialog" class="admin-actions">
@@ -887,6 +938,8 @@
 </footer>
 
 <span class="sr-only" id="announcements-status" role="status"></span>
+<div id="calendar-tooltip" class="calendar-tooltip" role="tooltip" hidden></div>
+<script src="./kalendarz/kalendarz.js?v=f1"></script>
 
 <script>
   // Punkt odniesienia: 31.10–01.11.2026, pokój nr 3.
@@ -950,10 +1003,42 @@
   const initialDay = localCalendarDay();
   const monthFormat = new Intl.DateTimeFormat("pl-PL", { month: "long", year: "numeric", timeZone: "UTC" });
   const calendarDays = document.getElementById("calendar-days");
+  const closeCalendarTooltip = g19CalendarDetails.tooltips(calendarDays, document.getElementById("calendar-tooltip"));
   let calendarMonth = new Date(initialDay);
   calendarMonth.setUTCDate(1);
   let renderedLocalDay = initialDay;
   let midnightTimer;
+  let missed = new Map();
+  let missedRefresh;
+  let missedLoading;
+  let missedRefreshRequested = false;
+  function refreshMissedDuties() {
+    if (missedLoading) {
+      missedRefreshRequested = true;
+      return;
+    }
+    missedLoading = g19CalendarDetails.missedDuties().then(next => {
+      if (next.size === missed.size && [...next].every(([period, room]) => missed.get(period) === room)) return;
+      missed = next;
+      renderCalendar();
+    }).catch(() => {
+      // Keep the last available statuses during a temporary outage.
+    }).finally(() => {
+      missedLoading = null;
+      clearTimeout(missedRefresh);
+      if (missedRefreshRequested) {
+        missedRefreshRequested = false;
+        refreshMissedDuties();
+      } else if (!document.hidden) missedRefresh = setTimeout(refreshMissedDuties, 30000);
+    });
+  }
+  window.addEventListener("load", refreshMissedDuties);
+  window.addEventListener("online", refreshMissedDuties);
+  window.addEventListener("g19-duty-status-change", refreshMissedDuties);
+  document.addEventListener("visibilitychange", () => {
+    clearTimeout(missedRefresh);
+    if (!document.hidden) refreshMissedDuties();
+  });
 
   function dutyOn(timestamp) {
     const weekday = new Date(timestamp).getUTCDay();
@@ -985,6 +1070,7 @@
     document.getElementById("calendar-month").textContent = monthFormat.format(calendarMonth);
     const end = new Date(calendarMonth);
     end.setUTCMonth(end.getUTCMonth() + 1);
+    const holidays = g19CalendarDetails.holidays(calendarMonth.getUTCFullYear());
     const cells = [];
     const blank = () => {
       const span = document.createElement("span");
@@ -993,18 +1079,35 @@
     };
     for (let i = 0; i < (calendarMonth.getUTCDay() + 6) % 7; i++) blank();
     for (let timestamp = +calendarMonth; timestamp < +end; timestamp += dayMs) {
-      const cell = document.createElement("span");
+      const holiday = holidays.get(timestamp);
       const duty = dutyOn(timestamp);
+      const period = timestamp - (new Date(timestamp).getUTCDay() === 0 ? dayMs : 0);
+      const isMissed = Boolean(duty && missed.get(new Date(period).toISOString().slice(0, 10)) === duty);
+      const details = [isMissed ? "Dyżur niewykonany — pokój nr " + duty : "", holiday].filter(Boolean);
+      const cell = document.createElement(details.length ? "button" : "span");
       cell.className = "calendar-day";
       cell.dataset.date = String(timestamp);
-      cell.textContent = new Date(timestamp).getUTCDate();
-      cell.setAttribute("aria-label", dateText(timestamp) + (duty ? ", dyżur: pokój " + duty : ""));
+      const label = dateText(timestamp);
+      cell.setAttribute("aria-label", [label, duty ? "dyżur: pokój " + duty : "", ...details].filter(Boolean).join(", "));
+      if (details.length) {
+        cell.type = "button";
+        cell.dataset.dayLabel = label;
+        cell.dataset.details = details.join("\n");
+        const number = document.createElement("span");
+        number.className = "calendar-number";
+        number.textContent = new Date(timestamp).getUTCDate();
+        cell.append(number);
+      } else cell.textContent = new Date(timestamp).getUTCDate();
+      if (holiday) cell.classList.add("calendar-holiday");
       if (timestamp === today) cell.setAttribute("aria-current", "date");
       if (duty) cell.classList.add("calendar-weekend");
-      if (duty === Number(selectedRoom)) cell.classList.add("calendar-own");
+      const own = duty === (boundRoom || Number(selectedRoom));
+      if (isMissed ? own : duty === Number(selectedRoom)) cell.classList.add("calendar-own");
+      if (isMissed) cell.classList.add(own ? "calendar-missed-own" : "calendar-missed-other");
       cells.push(cell);
     }
     while (cells.length % 7) blank();
+    closeCalendarTooltip();
     calendarDays.replaceChildren(...cells);
 
   }

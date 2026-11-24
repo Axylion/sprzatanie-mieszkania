@@ -458,26 +458,28 @@
   });
   editor.addEventListener("drop", event => event.preventDefault());
 
-  async function activate(announcements) {
-    if (section.hidden === !announcements || !await canLeave()) return;
+  const duties = window.g19AdminDuties;
+  async function activate(name, force = false) {
+    const active = !section.hidden ? "announcements" : duties.isOpen() ? "duties" : "rooms";
+    if (!force && (active === name || (active === "announcements" && !await canLeave()) ||
+        (active === "duties" && !await duties.canLeave()))) return;
     showList();
-    rooms.hidden = announcements;
-    section.hidden = !announcements;
+    rooms.hidden = name !== "rooms";
+    section.hidden = name !== "announcements";
+    duties.setOpen(name === "duties");
     for (const control of nav.querySelectorAll("button")) {
-      const selected = (control.dataset.section === "announcements") === announcements;
+      const selected = control.dataset.section === name;
       control.setAttribute("aria-pressed", String(selected));
-      control.disabled = selected && (announcements || !document.querySelector("#admin-rooms.admin-room-selected"));
+      control.disabled = selected && (name !== "rooms" || !document.querySelector("#admin-rooms.admin-room-selected"));
     }
-    if (announcements) refresh();
-    document.getElementById("admin-title").textContent = announcements ? "Ważne ogłoszenia" : "Zarządzanie pokojami";
+    if (name === "announcements") refresh();
+    document.getElementById("admin-title").textContent = name === "announcements" ? "Ważne ogłoszenia" : "Zarządzanie pokojami";
   }
   nav.addEventListener("click", async event => {
-    if (!event.target.dataset.section) return;
-    const openAnnouncements = event.target.dataset.section === "announcements";
-    await activate(openAnnouncements);
-    if (openAnnouncements === !section.hidden) {
-      document.getElementById("admin-title").focus();
-    }
+    const name = event.target.dataset.section;
+    if (!name) return;
+    await activate(name);
+    if (event.target.getAttribute("aria-pressed") === "true") document.getElementById("admin-title").focus();
   });
   window.addEventListener("beforeunload", event => {
     if (!form.hidden && JSON.stringify(data()) !== initial) {
@@ -508,7 +510,7 @@
       list.replaceChildren();
       message.textContent = "";
       showList();
-      activate(false);
+      activate("rooms", true);
     }
   };
 })();

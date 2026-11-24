@@ -1,0 +1,133 @@
+:root { --push-off-text: #a12a36; }
+[data-theme="dark"] { --push-off-text: #ffa4ae; }
+.push-feedback[data-enabled="false"],
+.push-switch[aria-checked="false"] .push-state { color: var(--push-off-text); }
+#calendar-days .calendar-holiday { color: var(--push-off-text); font-weight: 700; }
+#calendar-days .calendar-number { color: inherit; font-size: inherit; }
+#calendar-days .calendar-holiday.calendar-own:not(.calendar-missed-own) .calendar-number {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 2px var(--surface);
+}
+#calendar-days button.calendar-day { cursor: pointer; font-family: inherit; }
+.calendar-tooltip {
+  position: fixed;
+  z-index: 30;
+  max-width: min(20rem, calc(100vw - 16px));
+  border: 1px solid var(--control-edge);
+  border-radius: 8px;
+  padding: .5rem .7rem;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: .88rem;
+  text-align: left;
+}
+.calendar-tooltip strong, .calendar-tooltip span { display: block; }
+
+:root { --missed-duty-bg: #a12a36; }
+#calendar-days .calendar-missed-own, #admin-duty-preview .calendar-missed-own {
+  background: var(--missed-duty-bg);
+  color: #fff;
+}
+#calendar-days .calendar-missed-other, #admin-duty-preview .calendar-missed-other { position: relative; }
+#calendar-days .calendar-missed-other::before, #admin-duty-preview .calendar-missed-other::before {
+  content: "";
+  position: absolute;
+  inset: 4px 4px auto auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--push-off);
+  pointer-events: none;
+}
+
+#admin-duties {
+  margin-block-start: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: clamp(12px, 2vw, 22px);
+  background: var(--surface);
+}
+#admin-duties h2, #admin-duties h3, #admin-duties p { margin-block: 0 8px; }
+.admin-duty-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.admin-duty-controls { display: grid; gap: 12px; }
+.admin-duty-controls > label { display: grid; grid-template-columns: 4rem minmax(0, 1fr); align-items: center; gap: 8px; font-weight: 650; }
+#admin-duties select {
+  width: 100%;
+  min-height: 44px;
+  color: var(--text);
+  background: var(--surface-alt);
+  border: 1px solid var(--control-edge);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+}
+.admin-duty-box {
+  min-width: 0;
+  align-self: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-alt);
+}
+.admin-duty-box:has(#admin-duty-missed:checked) { background: color-mix(in srgb, var(--missed-duty-bg) 9%, var(--surface)); }
+.admin-duty-box > button { width: 100%; }
+.admin-duty-switch { display: flex; align-items: center; gap: 8px; font-weight: 650; }
+#admin-duty-missed { width: 20px; height: 20px; min-height: 20px; }
+.admin-duty-note { padding: 8px; border-radius: 8px; background: var(--accent-bg); color: var(--accent-text); }
+#admin-duty-preview dl { display: grid; gap: 8px; }
+#admin-duty-preview dl > div { display: flex; flex-wrap: wrap; gap: 8px; }
+#admin-duty-preview dd { margin: 0; font-weight: 700; }
+#admin-duty-preview-calendar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; }
+#admin-duty-preview-calendar .calendar-day { font-weight: 700; }
+#admin-duty-feedback:empty { display: none; }
+@media (max-width: 720px) { .admin-duty-layout { grid-template-columns: minmax(0, 1fr); } }
+.admin-duty-preview-days { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-block-start: 6px; }
+#admin-duty-preview .calendar-own { background: var(--accent-fill); color: #fff; }
+#admin-duty-preview .calendar-missed-own { background: var(--missed-duty-bg); }
+#admin-duty-confirm button {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  background: var(--surface-alt);
+}
+#admin-duty-confirm .announcement-primary { color: #fff; background: var(--accent-fill); }
+#admin-duty-confirm button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+#admin-panel #admin-sections [data-section="duties"][aria-pressed="true"],
+#admin-panel #admin-duty-save:not(:disabled) {
+  color: #fff;
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  font-weight: 700;
+}
+#admin-panel #admin-duty-save:not(:disabled):hover { background: var(--accent-fill-hover); }
+#admin-panel #admin-duty-send { border-color: var(--accent); color: var(--accent-text); font-weight: 700; }
+#admin-panel #admin-duty-missed {
+  appearance: none;
+  position: relative;
+  flex: 0 0 38px;
+  width: 38px;
+  min-height: 22px;
+  padding: 0;
+  margin: 0;
+  border-radius: 11px;
+  border-color: var(--control-edge);
+  cursor: pointer;
+}
+#admin-panel #admin-duty-missed::after {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  position: absolute;
+  inset: 3px auto auto 4px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+#admin-panel #admin-duty-missed:checked { background: var(--missed-duty-bg); border-color: var(--missed-duty-bg); }
+#admin-panel #admin-duty-missed:checked::after { transform: translateX(14px); background: #fff; }
+#admin-panel #admin-duty-missed:checked + span { color: var(--push-off-text); }
+#admin-panel #admin-duty-missed:disabled { opacity: .55; cursor: default; }

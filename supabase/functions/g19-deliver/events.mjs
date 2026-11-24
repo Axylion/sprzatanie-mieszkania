@@ -82,17 +82,17 @@ function announcementText(value, limit) {
   return clipped;
 }
 
-function dutyText(value) {
+function dutyPeriod(value) {
   // The persisted key is a Warsaw calendar date. Use UTC for calendar arithmetic.
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
   const saturday = new Date(value + "T00:00:00Z");
   if (saturday.getUTCDay() !== 6 || !saturday.toISOString().startsWith(value + "T")) return null;
   const sunday = new Date(saturday);
   sunday.setUTCDate(sunday.getUTCDate() + 1);
-  const period = saturday.getUTCMonth() === sunday.getUTCMonth()
+  return saturday.getUTCMonth() === sunday.getUTCMonth()
     ? saturday.getUTCDate() + "–" + polishDate.format(sunday)
     : polishDate.format(saturday) + " – " + polishDate.format(sunday);
-  return "Twój dyżur: " + period + " (sobota–niedziela).";
+
 }
 
 export function pushPayload(item) {
@@ -102,7 +102,15 @@ export function pushPayload(item) {
       body: [1,2,3,4].includes(item.room) ? "Nowa wiadomość prywatna od pokoju nr " + item.room : "Nowa wiadomość prywatna" };
   }
   if (item.category === "duties") {
-    return { ...payload, body: dutyText(item.duty_saturday) || "Sprawdź harmonogram sprzątania." };
+    const manual = item.kind === "manual_duty";
+    const period = dutyPeriod(manual ? item.manual_duty_date : item.duty_saturday);
+    if (manual && period && [1, 2, 3, 4].includes(item.manual_duty_room)) {
+      const missed = item.manual_duty_missed === true;
+      const title = missed ? "Przypomnienie o niewykonanym dyżurze" : "Przypomnienie o dyżurze";
+      const body = missed ? `dyżur z ${period} nadal wymaga wykonania.` : `przypomnienie o sprzątaniu w dniach ${period}.`;
+      return { ...payload, kind: "manual_duty", title, body: `Pokój nr ${item.manual_duty_room} — ${body}` };
+    }
+    return { ...payload, body: period ? "Twój dyżur: " + period + " (sobota–niedziela)." : "Sprawdź harmonogram sprzątania." };
   }
   if (item.category === "announcements") {
     return { ...payload, title: announcementText(item.announcement_title, 100),

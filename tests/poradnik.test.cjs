@@ -168,6 +168,25 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.locator('.hero').waitFor();
     assert.equal(await page.locator('#theme-menu input:checked').inputValue(), 'dark');
 
+    await page.goto(`${url}#poradnik/szafki`);
+    const checklist = page.getByRole('region', { name: 'Lista środków do sprzątania' });
+    assert.equal(await checklist.getByRole('checkbox').count(), 7);
+    await checklist.getByRole('checkbox', { name: 'Płyn do szyb' }).check();
+    await checklist.getByText('Pokaż akcesoria').click();
+    assert.equal(await checklist.getByRole('checkbox').count(), 11);
+    await checklist.getByRole('checkbox', { name: 'Rękawice ochronne' }).check();
+    await setTheme(page, 'light');
+    assert.equal(await checklist.locator(':checked').count(), 2);
+    await setTheme(page, 'dark');
+    await page.reload();
+    assert.equal(await checklist.getByRole('checkbox', { name: 'Płyn do szyb' }).isChecked(), true);
+    await checklist.getByText('Pokaż akcesoria').click();
+    assert.equal(await checklist.getByRole('checkbox', { name: 'Rękawice ochronne' }).isChecked(), true);
+    await checklist.getByText('Pokaż akcesoria').click();
+    await checklist.getByRole('button', { name: 'Wyczyść zaznaczenia' }).click();
+    assert.equal(await checklist.locator(':checked').count(), 0);
+
+    await page.getByRole('link', { name: '← Harmonogram' }).click();
     // All photos must be usable on their first offline visit, including photos in the steps.
     await context.setOffline(true);
     for (const width of [320, 390, 1280]) {

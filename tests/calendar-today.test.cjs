@@ -49,6 +49,12 @@ test('Calendar marks the local date in both themes and refreshes at local midnig
 
       await page.locator('#calendar-next-month').evaluate(el => el.click());
       assert.equal(await today.count(), 0);
+      const holiday = page.getByRole('button', { name: /24 grudnia 2026.*Wigilia/ });
+      await holiday.focus();
+      const tooltip = page.getByRole('tooltip');
+      assert.match(await tooltip.textContent(), /Wigilia Bożego Narodzenia/);
+      await page.keyboard.press('Escape');
+      assert.equal(await tooltip.isVisible(), false);
       await page.locator('#calendar-prev').evaluate(el => el.click());
       assert.equal(await today.textContent(), '7');
     } finally {

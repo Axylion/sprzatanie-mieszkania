@@ -37,6 +37,8 @@
   const rpc = (name, args = {}) => request("/rest/v1/rpc/g19_web_admin_" + name, args);
 
   const announcements = window.g19AdminAnnouncements;
+  const duties = window.g19AdminDuties;
+  duties.init(rpc, () => endSession("Zaloguj się ponownie."));
   announcements.init(rpc, () => endSession("Zaloguj się ponownie."));
 
   function updateSubmit() {
@@ -72,6 +74,7 @@
     clearTimeout(expires);
     if (confirm.open) confirm.close();
     list.replaceChildren();
+    duties.reset();
     announcements.reset();
     form.reset();
     updateSubmit();
@@ -349,7 +352,7 @@
   });
 
   document.getElementById("admin-logout").addEventListener("click", async () => {
-    if (!await announcements.canLeave()) return;
+    if (!await announcements.canLeave() || !await duties.canLeave()) return;
     const token = session;
     endSession();
     if (token) {
@@ -365,7 +368,7 @@
     refreshButton.setAttribute("aria-busy", "true");
     status.textContent = "Odświeżanie…";
     try {
-      const success = await (announcements.isOpen() ? announcements.refresh() : refresh());
+      const success = await (announcements.isOpen() ? announcements.refresh() : duties.isOpen() ? duties.refresh() : refresh());
       if (expected === session) status.textContent = success ? "Dane odświeżone." : "Nie udało się odświeżyć danych. Spróbuj ponownie.";
     } finally {
       refreshButton.disabled = false;

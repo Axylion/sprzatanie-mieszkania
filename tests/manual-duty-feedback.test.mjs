@@ -5,7 +5,13 @@ import { runInNewContext } from 'node:vm';
 
 const script = readFileSync(new URL('../administracja/dyzury.js', import.meta.url), 'utf8');
 const key = 'a491f135-b14e-45d2-a397-9db4846cc7df';
-const result = status => ({ status, requestId: key, sent: status === 'sent' ? 1 : 0, total: 1 });
+const jobStarted = Date.UTC(2026, 10, 24, 11);
+const waitLimit = 240000;
+const result = (status, deadline = jobStarted + waitLimit) => ({
+  status, requestId: key, sent: status === 'sent' ? 1 : 0, total: 1,
+  expiresAt: new Date(deadline).toISOString()
+});
+const never = () => new Promise(() => {});
 
 class Element {
   constructor() {
@@ -27,7 +33,7 @@ class Element {
   }
 }
 
-function setup(handler, storage = new Map()) {
+function setup(handler, storage = new Map(), missedDuties = async () => new Map()) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, new Element());
@@ -36,7 +42,7 @@ function setup(handler, storage = new Map()) {
   element('admin-duties').hidden = true;
   const duty = name => element('admin-duty-' + name);
   const timers = new Map();
-  let now = Date.UTC(2026, 10, 24, 11);
+  let now = jobStarted;
   let timerId = 0;
   class MockDate extends Date { static now() { return now; } }
   const window = new Element();
@@ -52,7 +58,7 @@ function setup(handler, storage = new Map()) {
     todayInPoland: () => Date.UTC(2026, 10, 24),
     roomFor: () => 1,
     weekendText: String,
-    g19CalendarDetails: { missedDuties: async () => new Map() },
+    g19CalendarDetails: { missedDuties },
     crypto: { randomUUID: () => key },
     setTimeout: (callback, delay) => {
       timers.set(++timerId, { callback, at: now + delay });
@@ -143,4 +149,94 @@ test('a lost submission response retains its idempotency key after a reload', as
   await reloaded.open();
   assert.equal(checked, true);
   assert.match(reloaded.duty('push-feedback').textContent, /Usługa push przyjęła/);
+});
+
+test('opening an existing job respects its original deadline during repeated network errors', async () => {
+  const app = setup(async name => {
+    if (name === 'duty_push_result') return result('pending');
+    throw new Error('offline');
+  });
+  await app.advance(210000);
+  await app.open();
+  await app.advance(29999);
+  assert.match(app.duty('push-feedback').textContent, /Oczekuje/);
+  await app.advance(1);
+  assert.match(app.duty('push-feedback').textContent, /Nie udało się potwierdzić wyniku/);
+  assert.equal(app.duty('preview-push').textContent, app.duty('push-feedback').textContent);
+  assert.equal(app.timers.size, 0);
+});
+
+test('reopening with a saved receipt preserves the deadline even during a hung refresh', async () => {
+  const app = setup(async name => name === 'duty_push_result' ? result('pending') : never());
+  await app.open();
+  await app.advance(waitLimit - 1000);
+  app.panel.setOpen(false);
+  await app.open();
+  await app.advance(999);
+  assert.match(app.duty('push-feedback').textContent, /Oczekuje/);
+  await app.advance(1);
+  assert.match(app.duty('push-feedback').textContent, /Nie udało się potwierdzić wyniku/);
+  app.panel.setOpen(false);
+  await app.open();
+  assert.doesNotMatch(app.duty('push-feedback').textContent, /Oczekuje/);
+});
+
+test('an old saved receipt cannot carry its grace period into the updated interface', async () => {
+  const storage = new Map([['g19-manual-duty:1:2026-11-21', JSON.stringify({
+    id: key, deadline: jobStarted + waitLimit + 8000, accepted: true
+  })]]);
+  const app = setup(async name => {
+    assert.equal(name, 'duty_push_request');
+    return never();
+  }, storage);
+  await app.advance(waitLimit - 2000);
+  await app.open();
+  assert.match(app.duty('push-feedback').textContent, /Oczekuje/);
+  await app.advance(2000);
+  assert.match(app.duty('push-feedback').textContent, /Nie udało się potwierdzić wyniku/);
+});
+
+test('a hung duty lookup does not delay the push result at the deadline', async () => {
+  const app = setup(async () => result('pending'), new Map(), never);
+  await app.advance(waitLimit - 1);
+  await app.open();
+  assert.match(app.duty('push-feedback').textContent, /Oczekuje/);
+  await app.advance(1);
+  assert.match(app.duty('push-feedback').textContent, /Nie udało się potwierdzić wyniku/);
+});
+
+test('an expired server failure is ambiguous, while failure before expiry is confirmed', async () => {
+  const confirmed = setup(async () => result('failed'));
+  await confirmed.open();
+  assert.match(confirmed.duty('push-feedback').textContent, /Nie udało się wysłać/);
+
+  const expired = setup(async () => result('failed'));
+  await expired.advance(waitLimit);
+  await expired.open();
+  assert.match(expired.duty('push-feedback').textContent, /nie został potwierdzony/);
+  assert.doesNotMatch(expired.duty('push-feedback').textContent, /Nie udało się wysłać/);
+  assert.equal(expired.duty('send').disabled, false);
+});
+
+test('a hung submission can be retried with the same key and original deadline', async () => {
+  let submissions = 0;
+  const app = setup(async (name, args) => {
+    if (name === 'send_duty') {
+      assert.equal(args.p_request_id, key);
+      if (++submissions === 1) return never();
+      return result('pending', jobStarted + waitLimit + 8000);
+    }
+    if (name === 'duty_push_request') return never();
+    return null;
+  });
+  await app.open();
+  const first = app.send();
+  await new Promise(resolve => setImmediate(resolve));
+  await app.advance(8000);
+  await first;
+  assert.match(app.duty('push-feedback').textContent, /Nie potwierdzono zlecenia/);
+  await app.send();
+  assert.equal(submissions, 2);
+  await app.advance(waitLimit - 8000);
+  assert.match(app.duty('push-feedback').textContent, /Nie udało się potwierdzić wyniku/);
 });

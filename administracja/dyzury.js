@@ -11,6 +11,7 @@
   const pushFeedback = byId("push-feedback");
   const pending = new Map();
   const waitLimit = 4 * 60 * 1000;
+  const requestLimit = 8000;
   const storageKey = "g19-manual-duty:";
   const finalStatuses = ["none", "sent", "partial", "failed"];
   const messages = {
@@ -20,6 +21,7 @@
     partial: "Usługa push przyjęła część powiadomień.",
     failed: "Nie udało się wysłać powiadomienia.",
     unknown: "Nie udało się potwierdzić wyniku wysyłki. Odśwież wynik przed ponownym wysłaniem.",
+    expired: "Wynik wcześniejszej wysyłki nie został potwierdzony.",
     unconfirmed: "Nie potwierdzono zlecenia. Możesz ponowić ten sam wniosek lub odświeżyć wynik."
   };
   let rpc, unauthorized;
@@ -36,10 +38,16 @@
   const args = () => ({ p_room: Number(currentRoom), p_starts_on: currentDate });
   function readReceipt(key) {
     if (pending.has(key)) return pending.get(key);
-    try { return JSON.parse(sessionStorage.getItem(storageKey + key)); }
-    catch { return null; }
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(storageKey + key));
+      if (!stored || !Number.isFinite(stored.deadline)) return null;
+      // Old receipts could include eight seconds of grace after server expiry.
+      if (stored.accepted && !stored.strictDeadline) stored.deadline -= requestLimit;
+      return stored;
+    } catch { return null; }
   }
   function remember(key, value) {
+    if (value) value.strictDeadline = true;
     pending.set(key, value);
     try {
       if (value) sessionStorage.setItem(storageKey + key, JSON.stringify(value));
@@ -49,6 +57,21 @@
   function finishPolling() {
     clearTimeout(pollTimer);
     clearTimeout(expiryTimer);
+  }
+  async function bounded(request, deadline = Infinity) {
+    const remaining = Math.min(requestLimit, deadline - Date.now());
+    if (remaining <= 0) throw new Error("Request deadline reached");
+    let timer;
+    try {
+      return await Promise.race([
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error("Request deadline reached")), remaining);
+        }),
+        request()
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   }
   const fetchResult = () => receipt
     ? rpc("duty_push_request", { p_request_id: receipt.id })
@@ -127,30 +150,42 @@
   }
   function waitExpired() {
     finishPolling();
-    result = { status: receipt?.accepted ? "unknown" : "unconfirmed" };
+    result = { status: receipt && !receipt.accepted ? "unconfirmed" : "unknown" };
     controls();
   }
-  function schedulePoll() {
+  function scheduleExpiry() {
     finishPolling();
     const remaining = receipt.deadline - Date.now();
     if (remaining <= 0) return waitExpired();
     if (section.hidden) return;
     expiryTimer = setTimeout(waitExpired, remaining);
+    return remaining;
+  }
+  function schedulePoll() {
+    const remaining = scheduleExpiry();
+    if (!remaining) return;
     pollTimer = setTimeout(poll, Math.min(retryAfter, remaining));
   }
   function track(next) {
     retryAfter = 4000;
     finishPolling();
-    if (next && finalStatuses.includes(next.status)) {
+    const deadline = Date.parse(next?.expiresAt);
+    // The server also returns "failed" for expired jobs with unfinished delivery.
+    // After expiry that response alone cannot establish a delivery failure.
+    if (next?.status === "failed" && !Number.isFinite(deadline)) return waitExpired();
+    if (next?.status === "failed" && Date.now() >= deadline) {
+      receipt = null;
+      remember(selectionKey(), null);
+      result = { status: "expired" };
+    } else if (next && finalStatuses.includes(next.status)) {
       receipt = null;
       remember(selectionKey(), null);
       result = next;
     } else if (next?.status === "pending" && next.requestId) {
-      const deadline = Date.parse(next.expiresAt);
       receipt = {
         id: receipt?.id || next.requestId,
         deadline: Math.min(receipt?.deadline ?? Infinity,
-          Number.isFinite(deadline) ? deadline + 8000 : Date.now() + waitLimit),
+          Number.isFinite(deadline) ? deadline : Date.now()),
         accepted: true
       };
       remember(selectionKey(), receipt);
@@ -180,29 +215,37 @@
   async function refresh() {
     if (busy || !currentDate) return false;
     const request = ++generation;
-    finishPolling();
     const keepDraft = dirty();
     busy = true;
     if (!keepDraft) ready = false;
     controls();
-    const outcomes = await Promise.allSettled([g19CalendarDetails.missedDuties(), fetchResult()]);
+    if (receipt && result?.status === "pending") scheduleExpiry();
+    else finishPolling();
+    const viewDeadline = result?.status === "pending" ? receipt.deadline : Infinity;
+    const push = bounded(fetchResult, viewDeadline).then(next => {
+      if (request === generation) track(next);
+      return true;
+    }, err => {
+      if (request !== generation) return false;
+      error(err, "Nie udało się odczytać wyniku wysyłki.");
+      if (request === generation) {
+        if (result?.status === "pending") schedulePoll();
+        else waitExpired();
+      }
+      return false;
+    });
+    const [duty, outcome] = await Promise.allSettled([
+      bounded(() => g19CalendarDetails.missedDuties()), push
+    ]);
     if (request !== generation) return false;
     busy = false;
-    if (outcomes[0].status === "fulfilled") {
-      saved = outcomes[0].value.get(currentDate) === Number(currentRoom);
+    if (duty.status === "fulfilled") {
+      saved = duty.value.get(currentDate) === Number(currentRoom);
       ready = true;
       if (!keepDraft) missed.checked = saved;
     } else feedback.textContent = "Nie udało się pobrać statusu dyżuru.";
     preview();
-    if (outcomes[1].status === "fulfilled") track(outcomes[1].value);
-    else {
-      error(outcomes[1].reason, "Nie udało się odczytać wyniku wysyłki.");
-      if (request === generation && receipt) {
-        if (result?.status === "pending") schedulePoll();
-        else waitExpired();
-      }
-    }
-    return outcomes.every(item => item.status === "fulfilled");
+    return duty.status === "fulfilled" && outcome.value === true;
   }
   function pick(roomNumber, period) {
     if (roomNumber !== currentRoom || !periods) populate(roomNumber);
@@ -211,7 +254,9 @@
     currentDate = date.value;
     ready = saved = missed.checked = false;
     receipt = readReceipt(selectionKey());
-    result = null;
+    result = receipt && { status: receipt.accepted
+      ? (Date.now() < receipt.deadline ? "pending" : "unknown")
+      : "unconfirmed" };
     feedback.textContent = "";
     preview();
     return refresh();
@@ -255,13 +300,13 @@
     if (section.hidden || key !== selectionKey() || send.disabled) return;
     const request = ++generation;
     const id = receipt?.id || crypto.randomUUID();
-    receipt = { id, deadline: Date.now() + waitLimit, accepted: false };
+    receipt = { id, deadline: receipt?.deadline ?? Date.now() + waitLimit, accepted: false };
     remember(key, receipt);
     busy = true;
     feedback.textContent = "";
     controls();
     try {
-      const next = await rpc("send_duty", { ...args(), p_request_id: id });
+      const next = await bounded(() => rpc("send_duty", { ...args(), p_request_id: id }));
       if (request !== generation) return;
       track(next);
     } catch (err) {
@@ -300,9 +345,14 @@
     isOpen: () => !section.hidden,
     setOpen(open) {
       const changed = open === section.hidden;
+      if (!changed) return;
       section.hidden = !open;
       finishPolling();
-      if (open && changed) pick(currentRoom || room.value, currentDate);
+      if (open) pick(currentRoom || room.value, currentDate);
+      else {
+        ++generation;
+        busy = false;
+      }
     },
     canLeave,
     refresh,

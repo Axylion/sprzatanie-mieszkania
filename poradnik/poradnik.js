@@ -67,8 +67,10 @@
 
   function illustration(card, index) {
     if (index === undefined) return "";
+    const image = `./poradnik/media/${card.id}-ikony`;
     return `<span class="guide-illustration" aria-hidden="true" style="--tile: ${index}">
-      <img src="./poradnik/media/${card.id}-ikony.webp" alt="" decoding="async">
+      <img class="guide-illustration-dark" src="${image}.webp" alt="" decoding="async">
+      <img class="guide-illustration-light" src="${image}-light.webp" alt="" decoding="async">
     </span>`;
   }
 

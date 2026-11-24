@@ -181,6 +181,21 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
           return images.length === expected && illustrations.length > 0 &&
             [...images, ...illustrations].every(img => img.complete && img.naturalWidth > 0);
         }, id === 'zlewozmywak' ? 7 : 3);
+        const readIllustrations = () => page.locator('.guide-illustration').evaluateAll(tiles =>
+          tiles.map(tile => {
+            const active = [...tile.querySelectorAll('img')].filter(img => getComputedStyle(img).display !== 'none');
+            const { width, height } = tile.getBoundingClientRect();
+            return { sources: active.map(img => new URL(img.currentSrc).pathname), width, height };
+          })
+        );
+        assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+        const dark = await readIllustrations();
+        assert.ok(dark.every(tile => tile.sources.length === 1 && tile.sources[0].endsWith(`/${id}-ikony.webp`)));
+        await setTheme(page, 'light');
+        const light = await readIllustrations();
+        assert.deepEqual(light, dark.map(tile => ({ ...tile, sources: tile.sources.map(src => src.replace('.webp', '-light.webp')) })));
+        await setTheme(page, 'dark');
+        assert.deepEqual(await readIllustrations(), dark);
         assert.equal(await page.locator('.guide-categories [aria-current]').innerText(), section);
         assert.equal(await position.innerText(), `${index + 1} / 8`);
         assert.equal(await previous.isDisabled(), index === 0);

@@ -219,6 +219,21 @@
   transform: translateX(calc(-1 * var(--tile) * var(--tile-size)));
 }
 
+.guide-illustration .guide-illustration-light,
+:root[data-theme="light"] .guide-illustration-dark {
+  display: none;
+}
+
+:root[data-theme="light"] .guide-illustration {
+  background: var(--surface);
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, var(--surface));
+  outline-offset: -1px;
+}
+
+:root[data-theme="light"] .guide-illustration .guide-illustration-light {
+  display: block;
+}
+
 .guide-items {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 76px), 1fr));

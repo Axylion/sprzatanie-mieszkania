@@ -18,10 +18,11 @@ class Element {
     this.value = '1';
     this.textContent = '';
     this.listeners = new Map();
-    this.classList = { add() {} };
+    this.classList = { add() {}, toggle() {} };
   }
   addEventListener(type, fn) { this.listeners.set(type, fn); }
   trigger(type) { return this.listeners.get(type)?.(); }
+  dispatchEvent() {}
   append() {}
   replaceChildren(...children) { this.options = children; }
   querySelector() { return new Element(); }
@@ -47,6 +48,7 @@ function setup(handler, storage = new Map(), missedDuties = async () => new Map(
   class MockDate extends Date { static now() { return now; } }
   const window = new Element();
   runInNewContext(script, {
+    Event: class {},
     document: { getElementById: element, createElement: () => new Element() },
     window,
     sessionStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
@@ -239,4 +241,27 @@ test('a hung submission can be retried with the same key and original deadline',
   assert.equal(submissions, 2);
   await app.advance(waitLimit - 8000);
   assert.match(app.duty('push-feedback').textContent, /Nie udało się potwierdzić wyniku/);
+});
+
+test('the status save and confirmed push submit remain independent', async () => {
+  const calls = [];
+  const app = setup(async (name, args) => {
+    calls.push([name, args]);
+    if (name === 'save_duty') return true;
+    if (name === 'send_duty') return result('sent');
+    return null;
+  });
+  await app.open();
+  app.duty('missed').checked = true;
+  app.duty('missed').trigger('change');
+  await app.duty('save').trigger('click');
+  assert.deepEqual(calls.map(([name]) => name), ['duty_push_result', 'save_duty']);
+  assert.equal(calls[1][1].p_missed, true);
+  const sending = app.duty('send').trigger('click');
+  assert.equal(calls.length, 2);
+  app.duty('confirm').confirm();
+  await sending;
+  assert.deepEqual(calls.map(([name]) => name), ['duty_push_result', 'save_duty', 'send_duty']);
+  assert.equal(calls[2][1].p_request_id, key);
+  assert.equal(calls[2][1].p_missed, undefined);
 });

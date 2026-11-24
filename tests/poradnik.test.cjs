@@ -170,9 +170,9 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
 
     await page.goto(`${url}#poradnik/szafki`);
     const checklist = page.getByRole('region', { name: 'Lista środków do sprzątania' });
-    assert.equal(await checklist.getByRole('checkbox').count(), 7);
+    assert.equal(await checklist.getByRole('checkbox').count(), 11);
+    assert.equal(await checklist.getByRole('heading', { name: 'Akcesoria' }).isVisible(), true);
     await checklist.getByRole('checkbox', { name: 'Płyn do szyb' }).check();
-    await checklist.getByText('Pokaż akcesoria').click();
     assert.equal(await checklist.getByRole('checkbox').count(), 11);
     await checklist.getByRole('checkbox', { name: 'Rękawice ochronne' }).check();
     await setTheme(page, 'light');
@@ -180,9 +180,7 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await setTheme(page, 'dark');
     await page.reload();
     assert.equal(await checklist.getByRole('checkbox', { name: 'Płyn do szyb' }).isChecked(), true);
-    await checklist.getByText('Pokaż akcesoria').click();
     assert.equal(await checklist.getByRole('checkbox', { name: 'Rękawice ochronne' }).isChecked(), true);
-    await checklist.getByText('Pokaż akcesoria').click();
     await checklist.getByRole('button', { name: 'Wyczyść zaznaczenia' }).click();
     assert.equal(await checklist.locator(':checked').count(), 0);
 
@@ -191,6 +189,13 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await context.setOffline(true);
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 844 });
+      await page.goto(`${url}#poradnik/szafki`);
+      const cols = await page.locator('.guide-checklist-columns > section').evaluateAll(items => items.map(item => {
+        const rect = item.getBoundingClientRect();
+        return { x: rect.x, y: rect.y };
+      }));
+      assert.equal(cols[0].y === cols[1].y, width === 1280);
+      assert.equal(cols[0].x === cols[1].x, width !== 1280);
       for (const [index, [id, section]] of cards.entries()) {
         await page.goto(`${url}#poradnik/${id}`);
         await page.waitForFunction(number => document.querySelector('.guide-card-position')?.textContent === `${number} / 8`, index + 1);

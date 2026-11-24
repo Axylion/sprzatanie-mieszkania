@@ -7,6 +7,9 @@
     szafki: '<rect x="3" y="2" width="18" height="20" rx="2"/><path d="M12 2v20m-3-11v3m6-3v3"/>',
     okap: '<path d="M9 3h6v7l7 5v3H2v-3l7-5V3Zm0 7h6M2 15h20M7 20c-1 1 1 2 0 3m5-3c-1 1 1 2 0 3m5-3c-1 1 1 2 0 3"/>',
     blysk: '<path d="M9 3c1.3 4.7 2.3 5.7 7 7-4.7 1.3-5.7 2.3-7 7-1.3-4.7-2.3-5.7-7-7 4.7-1.3 5.7-2.3 7-7Zm10 10c.6 2 1.4 2.8 3.5 3.5-2.1.7-2.9 1.5-3.5 3.5-.7-2-1.5-2.8-3.5-3.5 2-.7 2.8-1.5 3.5-3.5Z"/>',
+    spray: '<path d="M10 8h5l2 4v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5l3-4V8Zm0 0V4h7l3 2v2h-5M6 4H3m3 3H4"/>',
+    sponge: '<path d="m3 12 13-7 5 3v5L8 20l-5-3v-5Zm0 0 5 3 13-7M8 15v5m1-8h.01m4-2h.01m4-2h.01"/>',
+    reset: '<path d="M20 8v4h-4M4 16v-4h4m11-2A7 7 0 0 0 6 7L4 9m16 6-2 2a7 7 0 0 1-13-3"/>',
     warstwy: '<path d="m12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5"/>',
     informacja: '<circle cx="12" cy="12" r="10"/><path d="M12 11v6m0-10v.1"/>'
   };
@@ -39,7 +42,6 @@
     ["sponge", "Gąbka"], ["microfiber", "Ściereczka z mikrofibry"],
     ["paper", "Ręcznik papierowy"], ["gloves", "Rękawice ochronne"]
   ];
-  let accessoriesOpen = false;
   const checkedSupplies = new Set();
   try {
     const saved = JSON.parse(localStorage.getItem(supplyKey) || "[]");
@@ -59,9 +61,17 @@
     ).join("");
     return `<section class="guide-panel guide-checklist" aria-labelledby="guide-checklist-title">
       <h2 id="guide-checklist-title">${icon("warstwy")} <span>Lista środków do sprzątania</span></h2>
-      <ul>${rows(supplies)}</ul>
-      <details${accessoriesOpen ? " open" : ""}><summary>Pokaż akcesoria</summary><ul>${rows(accessories)}</ul></details>
-      <button type="button" class="guide-checklist-clear">Wyczyść zaznaczenia</button>
+      <div class="guide-checklist-columns">
+        <section aria-labelledby="guide-supplies-heading">
+          <h3 id="guide-supplies-heading">${icon("spray")} Środki czystości</h3>
+          <ul>${rows(supplies)}</ul>
+        </section>
+        <section aria-labelledby="guide-accessories-heading">
+          <h3 id="guide-accessories-heading">${icon("sponge")} Akcesoria</h3>
+          <ul>${rows(accessories)}</ul>
+        </section>
+      </div>
+      <button type="button" class="guide-checklist-clear">${icon("reset")} Wyczyść zaznaczenia</button>
     </section>`;
   }
 
@@ -212,8 +222,6 @@
         ${cardContent(currentCard)}
       </div>
     `;
-    const details = guide.querySelector(".guide-checklist details");
-    details.addEventListener("toggle", () => { if (details.isConnected) accessoriesOpen = details.open; });
     home.hidden = true;
     guide.hidden = false;
     document.title = `${currentCard.title} · Poradnik sprzątania`;

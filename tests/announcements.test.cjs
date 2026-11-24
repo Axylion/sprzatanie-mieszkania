@@ -56,7 +56,7 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-11-0-f1-push2', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
+      ? contents.toString().replace('shell-v13-11-0-f1-ui8-r2', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -114,8 +114,8 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
       cacheState = await page.evaluate(async () => {
         const registration = await navigator.serviceWorker.getRegistration();
         const keys = await caches.keys();
-        const hasShell = keys.includes('goleszan19-shell-v13-11-0-f1-push2');
-        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-f1-push2')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
+        const hasShell = keys.includes('goleszan19-shell-v13-11-0-f1-ui8-r2');
+        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-f1-ui8-r2')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
         return {ready:hasPrivate && !keys.includes('goleszan19-shell-v13-10-2') && registration.active?.state === 'activated' && !registration.installing && !registration.waiting,hasPrivate};
       });
       if (cacheState.ready) break;
@@ -236,15 +236,16 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
 });
 
 test('F1 PWA relaunch loads the new interface and retains local resident data', {timeout:45000}, async () => {
-  const previousCache = 'goleszan19-shell-v13-11-0-f1-push1';
-  const currentCache = 'goleszan19-shell-v13-11-0-f1-push2';
-  const currentDutyScript = './administracja/dyzury.js?v=f1-push2';
-  const previousDutyScript = './administracja/dyzury.js?v=f1-push1';
+  const previousCache = 'goleszan19-shell-v13-11-0-f1-push2';
+  const currentCache = 'goleszan19-shell-v13-11-0-f1-ui8-r2';
+  const currentDutyScript = './administracja/dyzury.js?v=ui8';
+  const previousDutyScript = './administracja/dyzury.js?v=f1-push2';
   const localData = {
     'cleaning-theme': 'dark',
     'cleaning-room': '1',
     'goleszan19-hidden-announcements-v2': '["previously-hidden"]',
-    'goleszan19-public-notifications-read': '{"previously-read":true}'
+    'goleszan19-public-notifications-read': '{"previously-read":true}',
+    'goleszan19-guide-supplies-v1': '["glass","microfiber"]'
   };
   // Set F1_PREVIOUS_ROOT to serve an unpacked previous release verbatim.
   const previousRoot = process.env.F1_PREVIOUS_ROOT;
@@ -260,7 +261,7 @@ test('F1 PWA relaunch loads the new interface and retains local resident data', 
     res.setHeader('Content-Type', name.endsWith('.webmanifest') ? 'application/manifest+json' : mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(previous && !previousRoot && ['index.html', 'sw.js'].includes(name)
-      ? contents.toString().replaceAll('f1-push2', 'f1-push1')
+      ? contents.toString().replace(currentCache, previousCache).replace(currentDutyScript, previousDutyScript)
       : contents);
   });
   let browser;
@@ -302,6 +303,9 @@ test('F1 PWA relaunch loads the new interface and retains local resident data', 
     assert.equal(await relaunched.locator(`script[src="${currentDutyScript}"]`).count(), 1);
     assert.deepEqual(await relaunched.evaluate(keys => Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)])),
       Object.keys(localData)), localData);
+    await relaunched.getByRole('link', {name: /Poradnik sprzątania/}).click();
+    assert.equal(await relaunched.locator('.guide-checklist input:checked').count(), 2);
+    await relaunched.getByRole('link', {name: '← Harmonogram'}).click();
     await context.setOffline(true);
     await relaunched.reload();
     assert.equal(await relaunched.getByText('Harmonogram sprzątania', {exact:true}).first().isVisible(), true);
@@ -558,7 +562,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-11-0-f1-push2');
+      const c = await caches.open('goleszan19-shell-v13-11-0-f1-ui8-r2');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

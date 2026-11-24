@@ -12,6 +12,16 @@
     [12, 26, "Boże Narodzenie — drugi dzień"]
   ];
 
+  function monthDays(start, end) {
+    const leading = (start.getUTCDay() + 6) % 7;
+    const trailing = (7 - (end.getUTCDay() + 6) % 7) % 7;
+    const days = [];
+    for (let timestamp = +start - leading * day; timestamp < +end + trailing * day; timestamp += day) {
+      days.push(timestamp);
+    }
+    return days;
+  }
+
   function holidays(year) {
     // Gregorian computus (Meeus–Jones–Butcher).
     const a = year % 19;
@@ -103,6 +113,6 @@
     }).then(rows => new Map(rows.map(row => [row.startsOn, row.room])));
   }
 
-  globalThis.g19CalendarDetails = { holidays, tooltips, missedDuties };
+  globalThis.g19CalendarDetails = { holidays, monthDays, tooltips, missedDuties };
 
 })();

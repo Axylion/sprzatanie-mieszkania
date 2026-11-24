@@ -105,6 +105,16 @@
     byId("preview-date").textContent = periods?.get(currentDate) || "—";
     byId("preview-room").textContent = currentRoom ? "nr " + currentRoom : "—";
     byId("preview-status").textContent = ready ? (missed.checked ? "Niewykonany" : "Brak oznaczenia") : "—";
+    byId("preview-status").classList.toggle("duty-preview-missed", ready && missed.checked);
+    byId("push-description").textContent = currentRoom
+      ? "Wyślij przypomnienie o dyżurze do pokoju nr " + currentRoom + "."
+      : "Wyślij przypomnienie o dyżurze do wybranego pokoju.";
+    byId("effect-own").textContent = missed.checked
+      ? "Dla pokoju nr " + currentRoom + ": obie daty będą wyróżnione czerwonym tłem."
+      : "Dla wybranego pokoju: obie daty mają kolor własnego dyżuru.";
+    byId("effect-other").textContent = missed.checked
+      ? "Dla pozostałych pokoi: te same daty otrzymają czerwoną kropkę w prawym górnym rogu."
+      : "Dla pozostałych pokoi: obie daty są oznaczone jako dyżur.";
     const visual = byId("preview-calendar");
     visual.replaceChildren();
     if (currentDate) {
@@ -113,6 +123,9 @@
         const column = document.createElement("div");
         const title = document.createElement("strong");
         title.textContent = label;
+        const context = document.createElement("span");
+        context.className = "admin-duty-view-label";
+        context.textContent = own ? "(widok własny)" : "(widok innych)";
         const grid = document.createElement("div");
         grid.className = "admin-duty-preview-days calendar-grid";
         for (const timestamp of [value, value + dayMs]) {
@@ -123,7 +136,7 @@
           if (missed.checked) cell.classList.add(own ? "calendar-missed-own" : "calendar-missed-other");
           grid.append(cell);
         }
-        column.append(title, grid);
+        column.append(title, context, grid);
         visual.append(column);
       }
     }

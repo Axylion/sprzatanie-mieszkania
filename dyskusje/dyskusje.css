@@ -47,8 +47,8 @@
   background: var(--surface-alt);
   color: var(--chat-text);
 }
-.discussion-panel :focus-visible { outline: 2px solid var(--chat-line); outline-offset: 2px; }
-#discussion-title:focus { outline: none; }
+.discussion-panel :where(button, a[href], input, textarea, select, [role="tab"], summary):focus-visible { outline: 2px solid var(--chat-line); outline-offset: 2px; }
+#discussion-title:focus, #private-peer-title:focus { outline: none; }
 .discussion-history-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .discussion-history {
   max-height: clamp(180px, 46dvh, 520px);
@@ -300,7 +300,8 @@
   background: var(--surface-alt);
 }
 #admin-view button:not(:disabled):hover, #admin-confirm button:not(:disabled):hover { background: var(--accent-bg); }
-#admin-view :focus-visible, #admin-confirm :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#admin-view :where(button, input, select, textarea, a[href], [contenteditable="true"]):focus-visible, #admin-confirm button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#admin-title:focus { outline: none; }
 body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) { background: #061c23; transition: none; }
 #admin-login {
   width: min(100%, 380px);
@@ -358,7 +359,9 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) { background: #06
   text-align: center;
 }
 #admin-view:has(#admin-login:not([hidden])) > a { color: #b0cbd3; }
+#admin-title:focus { outline: none; }
 body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) footer,
+#admin-title:focus { outline: none; }
 body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { color: #a3bec6; }
 
 
@@ -522,7 +525,8 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   --admin-warn-border: #aa7250;
   --admin-divider: #2a505a;
 }
-[data-theme="light"] body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) { background: var(--bg); }
+[data-theme="light"] #admin-title:focus { outline: none; }
+body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) { background: var(--bg); }
 [data-theme="light"] #admin-login {
   color-scheme: light;
   background: var(--surface);
@@ -531,7 +535,8 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 }
 [data-theme="light"] #admin-login .admin-login-icon { background: var(--accent-bg); color: var(--accent-text); }
 [data-theme="light"] #admin-login :is(label, .admin-login-caption, #admin-username),
-[data-theme="light"] body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admin-link) { color: var(--muted); }
+[data-theme="light"] #admin-title:focus { outline: none; }
+body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admin-link) { color: var(--muted); }
 [data-theme="light"] #admin-login #admin-username,
 [data-theme="light"] #admin-login button:disabled { background: var(--surface-alt); color: var(--muted); }
 [data-theme="light"] #admin-login input { border-color: var(--border); }
@@ -833,12 +838,6 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   [data-theme="dark"] #admin-announcements #announcement-editor { background: #163a43; border-color: #39626a; }
   [data-theme="dark"] #announcement-tools #announcement-paragraph { width: 142px; min-height: 44px; flex: 0 0 142px; }
 
-  [data-theme="dark"] #notification-read-all {
-    min-height: 24px; padding: 0; margin: 0 0 0 auto; border: 0; border-radius: 0;
-    color: var(--field-focus); background: transparent; font-size: 14px;
-  }
-  [data-theme="dark"] #notification-read-all:not([hidden]) { display: block; }
-  [data-theme="dark"] #notification-read-all:hover { text-decoration: underline; box-shadow: none; }
   [data-theme="dark"] #notification-list a {
     grid-template-columns: 38px minmax(0, 1fr); align-items: start;
     gap: 12px; padding: 15px 0;
@@ -1029,9 +1028,9 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 }
 
 /* Shared states for secondary controls. Content rows and primary actions keep their own styles. */
-:is(#device-settings button, #shortcut-close, #notification-panel button, #announcements-panel .modal-close,
+:is(#device-settings button, #shortcut-close, #notification-panel button:not(#notification-read-all), #announcements-panel .modal-close,
     .calendar-month button, .guide-pagination button, .guide-viewer button,
-    #discussion-view button:not(#discussion-send, #private-send, .message-quote, .push-switch, [aria-pressed="true"]),
+    #discussion-view button:not(#discussion-send, #private-send, .message-quote, .push-switch, [data-reaction], [aria-pressed="true"]),
     #admin-panel button:not(.announcement-primary, .admin-overview, .admin-room-actions button, [aria-pressed="true"]),
     #admin-confirm button[type="submit"], .admin-announcement-dialog button:is([data-cancel], [value="cancel"])) {
   background: var(--surface-alt);
@@ -1078,4 +1077,50 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   padding: 0;
   border-radius: 8px;
   font: 400 24px/1 system-ui, sans-serif;
+}
+
+
+/* Programmatic heading focus is handled above. These actions retain a visible keyboard state. */
+#notification-panel #notification-read-all {
+  min-height: 44px;
+  padding: 4px 8px;
+  margin-inline-start: auto;
+  border: 0;
+  border-radius: 8px;
+  color: var(--accent-text);
+  background: transparent;
+  text-align: start;
+}
+#notification-panel #notification-read-all:not([hidden]) { display: block; }
+#notification-panel #notification-read-all:hover { text-decoration: underline; }
+#notification-panel #notification-read-all:focus-visible {
+  background: var(--accent-bg);
+  text-decoration: underline;
+}
+#discussion-chat .discussion-reactions button[data-reaction] {
+  appearance: none;
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
+  padding: 4px 9px;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: .86rem;
+}
+#discussion-chat .discussion-reactions button[data-reaction]:not(:disabled):hover {
+  background: var(--secondary-hover);
+  color: var(--accent-text);
+}
+#discussion-chat .discussion-reactions button[data-reaction][aria-pressed="true"] {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  font-weight: 700;
+}
+#discussion-chat .discussion-reactions button[data-reaction][aria-pressed="true"] svg { color: inherit; }
+#discussion-chat .discussion-reactions button[data-reaction]:focus-visible {
+  outline: 2px solid var(--chat-line);
+  outline-offset: 1px;
 }

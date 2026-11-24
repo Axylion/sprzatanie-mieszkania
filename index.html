@@ -375,12 +375,12 @@
   <template>
   <link rel="stylesheet" href="./poradnik/poradnik.css">
   <script defer src="./poradnik/dane.js"></script>
-  <script defer src="./poradnik/poradnik.js"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui3">
+  <script defer src="./poradnik/poradnik.js?v=ui4"></script>
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui4">
   <script defer src="./dyskusje/config.js"></script>
-  <script defer src="./dyskusje/dyskusje.js?v=ui3"></script>
-  <script defer src="./dyskusje/private-chat.js?v=ui3"></script>
-  <script defer src="./dyskusje/notifications.js?v=ui3"></script>
+  <script defer src="./dyskusje/dyskusje.js?v=ui4"></script>
+  <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
+  <script defer src="./dyskusje/notifications.js?v=ui4"></script>
   <script defer src="./ogloszenia/content.js"></script>
   <script defer src="./administracja/announcements.js?v=ui2"></script>
   <script defer src="./administracja/admin.js?v=ui2"></script>
@@ -434,7 +434,7 @@
 <dialog id="announcements-panel" class="shortcut-help" aria-labelledby="announcements-title">
   <div class="notification-heading"><h2 id="announcements-title">Ważne ogłoszenia</h2><form method="dialog"><button type="submit" aria-label="Zamknij ogłoszenia">×</button></form></div>
   <div class="push-control">
-      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-announcements-status" data-push-category="announcements">Powiadomienia o ogłoszeniach</button>
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-label="Powiadomienia o ogłoszeniach" aria-describedby="push-announcements-status" data-push-category="announcements"><span class="push-state">Powiadomienia wyłączone</span></button>
       <p class="push-feedback" id="push-announcements-status" role="status"></p>
     </div>
   <p id="hidden-announcements-empty">Brak aktywnych ogłoszeń.</p>
@@ -609,12 +609,14 @@
 <main class="container discussion-view" id="discussion-view" hidden>
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
   <section class="card discussion-panel" aria-labelledby="discussion-title">
-    <div class="discussion-heading"><h1 id="discussion-title" tabindex="-1">Dyskusje</h1><div class="push-control" hidden>
-      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-messages-status" data-push-category="messages">Powiadomienia o wiadomościach</button>
-      <p class="push-feedback" id="push-messages-status" role="status"></p>
-    </div></div>
+    <h1 id="discussion-title" tabindex="-1">Dyskusje</h1>
     <p class="discussion-subtitle">Wspólne sprawy mieszkańców</p>
+    <div class="push-control discussion-push" hidden>
+      <button type="button" class="push-switch" role="switch" aria-checked="false" aria-label="Powiadomienia o wiadomościach" aria-describedby="push-messages-status" data-push-category="messages"><span class="push-state">Powiadomienia wyłączone</span></button>
+      <p class="push-feedback" id="push-messages-status" role="status"></p>
+    </div>
     <p id="discussion-status" class="discussion-status" role="status"></p>
+    <button type="button" id="discussion-retry" hidden>Spróbuj ponownie</button>
     <section id="discussion-join" hidden aria-labelledby="discussion-join-title">
       <h2 id="discussion-join-title">Dołącz do dyskusji</h2>
       <p>Wybierz swój pokój, aby uczestniczyć w dyskusjach mieszkańców.</p>
@@ -663,7 +665,7 @@
       <form class="discussion-compose" id="discussion-compose">
         <span class="discussion-compose-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-chat-icon"/></svg></span>
         <label class="sr-only" for="discussion-body">Wiadomość</label>
-        <textarea id="discussion-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
+        <textarea id="discussion-body" placeholder="Napisz wiadomość..." rows="1" maxlength="1500" required></textarea>
         <button type="submit" id="discussion-send" aria-label="Wyślij" disabled><span class="discussion-send-label">Wyślij</span><svg class="discussion-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
       </form>
       </div>
@@ -693,7 +695,7 @@
           <form class="private-compose" id="private-compose">
             <label for="private-body" class="sr-only">Wiadomość prywatna</label>
             <span class="discussion-compose-icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-chat-icon"/></svg></span>
-            <textarea id="private-body" placeholder="Napisz wiadomość..." rows="2" maxlength="1500" required></textarea>
+            <textarea id="private-body" placeholder="Napisz wiadomość..." rows="1" maxlength="1500" required></textarea>
             <button id="private-send" type="submit" aria-label="Wyślij prywatną wiadomość" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
           </form>
         </div>

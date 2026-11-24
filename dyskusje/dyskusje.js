@@ -4,6 +4,8 @@
     /^sb_publishable_[A-Za-z0-9_-]+$/.test(config?.publishableKey);
   const view = document.getElementById("discussion-view");
   const status = document.getElementById("discussion-status");
+  const retryHistory = document.getElementById("discussion-retry");
+  const loadingHistory = "Wczytywanie rozmowy…";
   const join = document.getElementById("discussion-join");
   const rooms = document.getElementById("discussion-rooms");
   const joinAction = document.getElementById("discussion-join-action");
@@ -37,6 +39,17 @@
   const compose = document.getElementById("discussion-compose");
   const body = document.getElementById("discussion-body");
   const send = document.getElementById("discussion-send");
+  const nativeComposerSizing = CSS.supports("field-sizing", "content");
+  function fitComposer(input) {
+    if (nativeComposerSizing || !input.offsetHeight) return;
+    input.style.height = "auto";
+    input.style.height = input.scrollHeight + "px";
+  }
+  window.g19FitComposer = fitComposer;
+  if (!nativeComposerSizing) window.addEventListener("resize", () => {
+    fitComposer(body);
+    fitComposer(document.getElementById("private-body"));
+  });
   const tokenKey = "goleszan19-discussion-device";
   const browserKey = "goleszan19-discussion-browser";
   const randomProof = () => Array.from(crypto.getRandomValues(new Uint8Array(32)),
@@ -178,6 +191,9 @@
     before = version = null;
     messages = [];
     history.replaceChildren();
+    if (refreshError || status.textContent === loadingHistory) status.textContent = "";
+    refreshError = false;
+    retryHistory.hidden = true;
   }
 
   function reactionButton(message, value) {
@@ -281,16 +297,24 @@
   }
 
   async function loadHistory({ reset = false, bottom = false } = {}) {
-    if (!token || view.hidden || (!generalMode() && !chat.hidden)) return;
+    const general = generalMode();
+    if (!token || view.hidden || (!general && !chat.hidden)) return;
     const id = ++loadId;
     const usedToken = token;
+    const current = () => id === loadId && usedToken === token && !view.hidden && general === generalMode();
     loading = true;
+    if (general && (chat.hidden || version === null && !messages.length || refreshError)) {
+      status.textContent = loadingHistory;
+      retryHistory.hidden = true;
+    }
     try {
       const data = await rpc("read", { p_token: usedToken, p_before: before, p_version: reset ? null : version });
-      if (id !== loadId || view.hidden) return;
+      if (!current()) return;
+      if (!data || (!data.unchanged && !Array.isArray(data.messages))) throw new Error("Invalid history response");
       pollDelay = 5000;
-      if (refreshError || chat.hidden) status.textContent = "";
+      if (refreshError || status.textContent === loadingHistory) status.textContent = "";
       refreshError = false;
+      retryHistory.hidden = true;
       chat.hidden = false;
       window.dispatchEvent(new Event("g19-chat-connected"));
       join.hidden = pairPanel.hidden = true;
@@ -301,7 +325,7 @@
         showApproval(true);
         approvalCode.focus();
       }
-      if (!generalMode()) return;
+      if (!general) return;
       if (data.unchanged) return;
 
       const nearEnd = history.scrollHeight - history.scrollTop - history.clientHeight < 55;
@@ -327,15 +351,20 @@
         detail: messages.at(-1).id
       }));
     } catch (error) {
-      if (id !== loadId || view.hidden) return;
+      if (!current()) return;
       pollDelay = Math.min(pollDelay * 2, 30000);
       showRequestError(error, usedToken, "Nie udało się odświeżyć rozmowy. Sprawdź połączenie z internetem.");
       refreshError = error.code !== "device_invalid";
+      retryHistory.hidden = !general || !refreshError;
     } finally {
       if (id === loadId) loading = false;
       updateSend();
     }
   }
+
+  retryHistory.addEventListener("click", () => {
+    loadHistory({ reset: !messages.length, bottom: !messages.length }).then(schedulePoll);
+  });
 
   function updateJoinAction() {
     const selected = availableRooms.find(room => room.room === chosenRoom);
@@ -481,7 +510,11 @@
       return;
     }
     if (token) {
-      status.textContent = generalMode() ? "Wczytywanie rozmowy…" : "";
+      if (!generalMode()) {
+        if (refreshError || status.textContent === loadingHistory) status.textContent = "";
+        refreshError = false;
+        retryHistory.hidden = true;
+      }
       await loadHistory({ reset: messages.length === 0, bottom: messages.length === 0 });
     } else if (pairing) {
       renderPairing();
@@ -674,6 +707,7 @@
 
   function updateSend() {
     send.disabled = !token || sending || !body.value.trim();
+    fitComposer(body);
   }
   body.addEventListener("input", updateSend);
   compose.addEventListener("submit", async event => {

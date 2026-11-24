@@ -157,7 +157,12 @@ test('Dark desktop presentation preserves notification reading, field focus and 
   assert.equal(await page.locator('.discussion-message').first().evaluate(el=>getComputedStyle(el).borderRadius),'10px');
   assert.equal(await page.locator('[data-reaction="1"]').first().evaluate(el=>getComputedStyle(el).color),'rgb(99, 229, 239)');
   await page.locator('#discussion-body').focus();
-  await page.waitForFunction(()=>getComputedStyle(document.querySelector('#discussion-compose')).outlineStyle==='solid');
+  const composer=page.locator('#discussion-compose');
+  assert.deepEqual(await composer.evaluate(el=>{
+    const s=getComputedStyle(el);
+    return [s.borderTopWidth,s.borderTopColor,s.outlineStyle];
+  }),['1px','rgb(8, 224, 238)','none']);
+  assert.equal(await composer.evaluate(el=>el.offsetHeight),50);
   assert.equal(await page.locator('#discussion-body').evaluate(el=>getComputedStyle(el).borderWidth),'0px');
   assert.equal(await page.locator('.discussion-send-icon').isVisible(),true);
   assert.equal(await page.locator('#discussion-send').isDisabled(),true);

@@ -358,7 +358,13 @@
           : !token() ? "Połącz urządzenie w Dyskusjach, aby włączyć powiadomienia."
             : !ready || !config.vapidPublicKey ? "Powiadomienia w tle czekają na konfigurację." : "";
       const state = enabled ? "Powiadomienia włączone" : "Powiadomienia wyłączone";
-      status.textContent = [state, category === name && message ? message : explanation].filter(Boolean).join(". ");
+      const stateLabel = button.querySelector(".push-state");
+      if (stateLabel) {
+        stateLabel.textContent = state;
+        status.textContent = category === name ? message || explanation : "";
+      } else {
+        status.textContent = [state, category === name && message ? message : explanation].filter(Boolean).join(". ");
+      }
     }
     renderChatCount();
     renderAnnouncementCount();
@@ -437,7 +443,7 @@
         if (supported && ready && config.vapidPublicKey && token() && Notification.permission === "default") {
           await Notification.requestPermission().catch(() => {});
         }
-        if (!supported || Notification.permission !== "granted" || !token()) return showPush();
+        if (!supported || Notification.permission !== "granted" || !token()) return showPush("", button.dataset.pushCategory);
         await updatePush(button.dataset.pushCategory);
       } finally {
         changingPush = false;

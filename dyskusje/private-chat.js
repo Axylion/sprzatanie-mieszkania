@@ -40,6 +40,7 @@
     $('private-readonly').textContent=current?.contextChanged?'Okres pokoju się zmienił. Otwórz nową rozmowę z listy.':current?.id?'Rozmowa archiwalna — tylko do odczytu.':'Pokój nie jest obecnie połączony. Wysyłanie wiadomości jest niedostępne.';
     $('private-send').disabled=!current||readOnly||pending.has(current.key)||!$('private-body').value.trim();
     $('private-reply-target').hidden=!current?.reply||readOnly;
+    window.g19FitComposer?.($('private-body'));
   }
   function setReply(message){if(!current||current.readOnly)return;current.reply=message;current.request=null;
     $('private-reply-target').querySelector('span').textContent=message?'Odpowiedź · Pokój nr '+message.room+': '+message.body.slice(0,160):'';

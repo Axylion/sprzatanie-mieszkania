@@ -142,8 +142,10 @@
       document.title = homeTitle;
       if (showDiscussion) {
         document.title = "Dyskusje · Goleszan 19";
-        discussion.querySelector("h1").focus({ preventScroll: true });
-        window.scrollTo({ top: 0, behavior: "instant" });
+        if (!wasDiscussion) {
+          discussion.querySelector("h1").focus({ preventScroll: true });
+          window.scrollTo({ top: 0, behavior: "instant" });
+        }
       } else if (showAdmin) {
         document.title = "Administracja — Zarządzanie pokojami · Goleszan 19";
         window.scrollTo({ top: 0, behavior: "instant" });

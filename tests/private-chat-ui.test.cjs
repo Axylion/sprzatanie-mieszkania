@@ -7,7 +7,7 @@ const {randomUUID}=require('node:crypto');
 const {chromium}=require('playwright');
 test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both themes on desktop/mobile',async t=>{
  const {setupPrivateDatabase}=await import('./helpers/private-database.mjs');
- const {db,rpc,token,freeRate,bind}=await setupPrivateDatabase(t);
+ const {db,rpc,token,freeRate,bind,send}=await setupPrivateDatabase(t);
  const root=resolve(__dirname,'..');
  const server=createServer(async(req,res)=>{
   const name=new URL(req.url,'http://localhost').pathname.slice(1)||'index.html';
@@ -30,7 +30,7 @@ test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both
     let data;
     if(method==='rooms')data=await db.transaction(async tx=>{await tx.exec('set local role anon');return(await tx.query('select * from public.g19_rooms()')).rows;});
     else {
-     assert.match(method,/^[a-z_]+$/);
+     assert.match(method,/^[a-z_][a-z0-9_]*$/);
      const definitions=(await db.query("select proargnames from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname=$1",['g19_'+method])).rows;
      if(definitions.length!==1)throw Object.assign(new Error('Unknown RPC'),{code:'function_unavailable'});
      const names=definitions[0].proargnames||[];assert.ok(Object.keys(args).every(k=>names.includes(k)),method);
@@ -42,26 +42,111 @@ test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both
   });
   const page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));return page;
  }
+ async function submitPrivate(page){
+  const [request]=await Promise.all([
+   page.waitForRequest(r=>r.method()==='POST'&&new URL(r.url()).pathname==='/rest/v1/rpc/g19_private_send'),
+   page.locator('#private-send').click()
+  ]);
+  const {p_body,p_reply}=request.postDataJSON();
+  return {body:p_body,replyTo:p_reply};
+ }
  const a=await pageFor(token[1]),b=await pageFor(token[2]);
  await a.goto(base+'#dyskusje');await a.locator('#discussion-tabs').waitFor();
  await a.locator('#discussion-body').fill('Niedokończony tekst ogólny');
  await a.locator('#private-tab').click();await a.locator('#private-list a').nth(2).waitFor();
  assert.equal(await a.locator('#private-list a').count(),3);
  await a.locator('#private-list a').filter({hasText:'Pokój nr 2'}).click();
- await a.locator('#private-body').fill('Tylko pokoje 1 i 2');await a.locator('#private-send').click();
+ const originalBody='Tylko pokoje 1 i 2';
+ await a.locator('#private-body').fill(originalBody);
+ assert.deepEqual(await submitPrivate(a),{body:originalBody,replyTo:null});
  await a.locator('#private-status').filter({hasText:'Nie udało się odświeżyć rozmowy.'}).waitFor();
- assert.equal(await a.locator('#private-body').inputValue(),'Tylko pokoje 1 i 2');
- await a.locator('#private-send').click();
- await a.locator('.private-message p').getByText('Tylko pokoje 1 i 2',{exact:true}).waitFor();
+ assert.equal(await a.locator('#private-body').inputValue(),originalBody);
+ assert.deepEqual(await submitPrivate(a),{body:originalBody,replyTo:null});
+ await a.locator('.private-message p').getByText(originalBody,{exact:true}).waitFor();
  assert.equal((await db.query('select count(*)::int n from g19_private.private_messages')).rows[0].n,1);
  const conversation=new URL(a.url()).hash.split('/').at(-1);assert.match(conversation,/^[a-f0-9-]{36}$/);
+ await freeRate();
+ await rpc('send',[token[3],randomUUID(),'Historia ogólna po zmianie karty']);
  await a.locator('#general-tab').click();assert.equal(await a.locator('#discussion-body').inputValue(),'Niedokończony tekst ogólny');
+ const generalMessage=a.locator('#discussion-history p').getByText('Historia ogólna po zmianie karty',{exact:true});
+ await generalMessage.waitFor();
+ const generalRead='**/rest/v1/rpc/g19_read';
+ async function openGeneral() {
+  await Promise.all([
+   a.waitForResponse(r=>new URL(r.url()).pathname==='/rest/v1/rpc/g19_read'),
+   a.locator('#general-tab').click()
+  ]);
+  await generalMessage.waitFor();
+ }
+ for(let i=0;i<10;i++){
+  await a.locator('#private-tab').click();
+  await a.locator('#private-list-view').waitFor();
+  await openGeneral();
+  assert.equal(await a.locator('#discussion-status').textContent(),'');
+ }
+ let releaseRead;
+ const heldRead=new Promise(resolve=>{releaseRead=resolve;});
+ let readStarted;
+ const readInFlight=new Promise(resolve=>{readStarted=resolve;});
+ let delayed=true;
+ const delayRead=async route=>{
+  if(!delayed)return route.fallback();
+  delayed=false;
+  readStarted();
+  await heldRead;
+  await route.fulfill({status:503,json:{message:'synthetic_delayed_failure'}});
+ };
+ await a.route(generalRead,delayRead);
+ await a.locator('#private-tab').click();
+ await a.locator('#general-tab').click();
+ await readInFlight;
+ await a.locator('#private-tab').click();
+ await a.locator('#private-list-view').waitFor();
+ await openGeneral();
+ const lateResponse=a.waitForResponse(r=>r.status()===503&&new URL(r.url()).pathname==='/rest/v1/rpc/g19_read');
+ releaseRead();
+ await lateResponse;
+ await a.unroute(generalRead,delayRead);
+ assert.equal(await a.locator('#discussion-status').textContent(),'');
+ await a.route(generalRead,r=>r.fulfill({status:503,json:{message:'synthetic_retry_failure'}}),{times:1});
+ await a.locator('#private-tab').click();
+ await a.locator('#general-tab').click();
+ await a.locator('#discussion-status').filter({hasText:'Nie udało się odświeżyć rozmowy.'}).waitFor();
+ await a.locator('#discussion-retry').click();
+ await a.locator('#discussion-retry').waitFor({state:'hidden'});
+ await a.waitForFunction(()=>document.getElementById('discussion-status').textContent==='');
+ await generalMessage.waitFor();
  await b.goto(base+'#dyskusje');await b.locator('#private-tab-count:not([hidden])').waitFor();assert.equal(await b.locator('#private-tab-count').innerText(),'1');
+ // A separate history entry must stay out of the reply, too.
+ const historyBody='Wcześniejsza wiadomość\nDrugi wiersz historii';
+ await send(token[1],2,historyBody);
  await b.locator('#private-tab').click();await b.locator('#private-list a').filter({hasText:'Pokój nr 1'}).click();
- await b.locator('.private-message').waitFor();await b.waitForFunction(()=>document.getElementById('private-tab-count').hidden);
- await b.locator('.private-message [data-reply]').click();assert.equal(await b.locator('#private-reply-target').isVisible(),true);
- await b.locator('#private-body').fill('Odpowiedź prywatna');await freeRate();await b.locator('#private-send').click();
- await b.locator('.private-message').nth(1).waitFor();await b.locator('.private-message .message-quote').click();
+ await b.locator('.private-message').nth(1).waitFor();await b.waitForFunction(()=>document.getElementById('private-tab-count').hidden);
+ const firstCard=b.locator('.private-message').first();
+ const originalId=await firstCard.getAttribute('data-message');
+ assert.equal(await firstCard.locator('p').textContent(),originalBody);
+ assert.equal(await b.locator('.private-message p').nth(1).textContent(),historyBody);
+ const replyBody='Odpowiedź prywatna\nDrugi wiersz odpowiedzi';
+ await b.locator('#private-body').fill('  '+replyBody+'  ');
+ await firstCard.locator('[data-reply]').click();
+ assert.equal(await b.locator('#private-reply-target').isVisible(),true);
+ assert.equal(await b.locator('#private-body').inputValue(),'  '+replyBody+'  ');
+ await freeRate();
+ assert.deepEqual(await submitPrivate(b),{body:replyBody,replyTo:originalId});
+ const replyCard=b.locator('.private-message').nth(2);
+ await replyCard.waitFor();
+ const persisted=(await db.query(
+  'select body, reply_to from g19_private.private_messages where conversation_id=$1 order by seq',
+  [conversation]
+ )).rows;
+ assert.deepEqual(persisted,[
+  {body:originalBody,reply_to:null},
+  {body:historyBody,reply_to:null},
+  {body:replyBody,reply_to:originalId}
+ ]);
+ assert.equal(await replyCard.locator('p').textContent(),replyBody);
+ assert.equal(await replyCard.locator('.message-quote').getAttribute('data-original'),originalId);
+ await replyCard.locator('.message-quote').click();
  assert.equal(await b.locator('.private-message.message-highlight').count(),1);
  // The quote, body and reply action must belong to one row and stay inside its bounds.
  for(const width of [320,375,390,768,1280]){
@@ -76,10 +161,27 @@ test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both
     contained:children.every(child=>child.left>=box.left&&child.right<=box.right&&child.top>=box.top&&child.bottom<=box.bottom)
    };
   }));
-  assert.deepEqual(cards,[{nested:0,quote:null,contained:true},{nested:0,quote:'p',contained:true}]);
+  assert.deepEqual(cards,[
+   {nested:0,quote:null,contained:true},
+   {nested:0,quote:null,contained:true},
+   {nested:0,quote:'p',contained:true}
+  ]);
  }
 
- await b.reload();await b.locator('.private-message').nth(1).waitFor();
+ const plainBody='Nowa wiadomość bez cytatu\nDrugi wiersz';
+ await b.locator('#private-body').fill(plainBody);
+ await freeRate();
+ assert.deepEqual(await submitPrivate(b),{body:plainBody,replyTo:null});
+ const plainCard=b.locator('.private-message').nth(3);
+ await plainCard.waitFor();
+ await b.reload();
+ await plainCard.waitFor();
+ assert.equal(await plainCard.locator('p').textContent(),plainBody);
+ assert.equal(await plainCard.locator('.message-quote').count(),0);
+ const plainId=await plainCard.getAttribute('data-message');
+ assert.deepEqual((await db.query(
+  'select body, reply_to from g19_private.private_messages where id=$1',[plainId]
+ )).rows,[{body:plainBody,reply_to:null}]);
  await b.locator('#private-body').fill('Szkic dla pokoju 1');await b.locator('#private-back').click();
  await b.locator('#private-list a').filter({hasText:'Pokój nr 3'}).click();await b.locator('#private-body').fill('Inny szkic');
  await b.locator('#private-back').click();await b.locator('#private-list a').filter({hasText:'Pokój nr 1'}).click();

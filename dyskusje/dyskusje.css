@@ -51,10 +51,12 @@
   color: var(--chat-text);
 }
 .discussion-panel :focus-visible { outline: 2px solid var(--chat-line); outline-offset: 2px; }
+#discussion-title:focus { outline: none; }
 .discussion-history-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 .discussion-history {
-  height: clamp(180px, 46dvh, 520px);
+  max-height: clamp(180px, 46dvh, 520px);
   overflow-y: auto;
+  overscroll-behavior-y: auto;
   padding: 4px;
   margin: 8px 0;
   list-style: none;
@@ -80,17 +82,15 @@
   display: grid;
   grid-template-columns: 19px minmax(0, 1fr) auto;
   gap: 10px;
-  align-items: center;
-  padding: 10px;
+  align-items: start;
+  padding: 5px 8px;
   margin-top: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-alt);
 }
-:is(.discussion-compose, .private-compose):focus-within {
+:is(.discussion-compose, .private-compose):has(textarea:focus) {
   border-color: var(--chat-line);
-  outline: 2px solid var(--chat-line);
-  outline-offset: 1px;
 }
 .discussion-panel :is(.discussion-compose, .private-compose) textarea:not(:disabled) {
   display: block;
@@ -98,8 +98,10 @@
   min-width: 0;
   min-height: 38px;
   max-height: 24dvh;
-  padding: 5px 0;
-  resize: vertical;
+  padding: 7px 0;
+  box-sizing: border-box;
+  resize: none;
+  field-sizing: content;
   border: 0;
   border-radius: 0;
   outline: none;
@@ -109,9 +111,15 @@
   font: inherit;
   line-height: 1.5;
 }
-.discussion-compose-icon { display: flex; width: 19px; height: 19px; color: var(--muted); }
+.discussion-panel :is(.discussion-compose, .private-compose) textarea:placeholder-shown {
+  field-sizing: fixed;
+}
+.discussion-compose-icon { display: flex; width: 19px; height: 19px; margin-top: 9px; color: var(--muted); }
 .discussion-compose-icon svg { width: 100%; height: 100%; }
-.discussion-compose button { background: var(--accent-bg); color: var(--accent-text); font-weight: 650; }
+.discussion-compose button {
+  min-height: 38px; padding-block: 4px;
+  background: var(--accent-bg); color: var(--accent-text); font-weight: 650;
+}
 
 .discussion-rooms {
   display: grid;
@@ -459,6 +467,11 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 .push-feedback[data-enabled="true"] { color: #256c3e; }
 [data-theme="dark"] .push-feedback[data-enabled="false"] { color: #ffa4ae; }
 [data-theme="dark"] .push-feedback[data-enabled="true"] { color: #8ce4a7; }
+.push-switch[aria-checked="false"] .push-state { color: #a12a36; }
+.push-switch[aria-checked="true"] .push-state { color: #256c3e; }
+[data-theme="dark"] .push-switch[aria-checked="false"] .push-state { color: #ffa4ae; }
+[data-theme="dark"] .push-switch[aria-checked="true"] .push-state { color: #8ce4a7; }
+.push-control:has(.push-state) .push-feedback { color: var(--muted); }
 #announcements-panel > .push-control { margin-block: 0 12px; }
 .push-dot {
   position: absolute;
@@ -471,8 +484,7 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 }
 .push-dot[data-active="true"] { background: var(--push-on); }
 .header-unread-count { top: auto; bottom: -4px; }
-.discussion-heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 2px 12px; }
-.discussion-heading .push-control { max-width: 100%; }
+.discussion-push { margin-block: 0 8px; }
 #hidden-announcements-list { list-style: none; padding: 0; margin: 0; max-height: 42vh; overflow-y: auto; }
 #hidden-announcements-list li + li { border-top: 1px solid var(--border); }
 #hidden-announcements-list button, #announcements-panel form button {
@@ -745,6 +757,12 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 /* Extra presentation elements stay absent outside the dark desktop view. */
 .calendar-desktop-detail, .calendar-upcoming-icon, .notification-category-icon,
 .notification-unread-dot, .discussion-avatar, .discussion-send-icon, .announcement-list-icon { display: none; }
+@media (max-width: 360px) {
+  .discussion-compose { gap: 6px; }
+  .discussion-compose #discussion-send { display: grid; place-items: center; width: 44px; padding: 7px; }
+  .discussion-send-label { display: none; }
+  .discussion-send-icon { display: block; width: 18px; height: 18px; }
+}
 .notification-content, .notification-item-heading, .notification-toolbar, .announcement-list-content { display: contents; }
 #hidden-announcements-list .announcement-list-content { color: inherit; font-size: inherit; }
 
@@ -770,11 +788,8 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   [data-theme="dark"] #notification-list time { color: #8fb7bf; font-size: 14px; }
   [data-theme="dark"] #discussion-view { max-width: 736px; }
   [data-theme="dark"] .discussion-panel { padding: 12px; font-family: Arial, sans-serif; background: #082025; border-color: #335e65; border-radius: 16px; }
-  [data-theme="dark"] .discussion-heading { position: relative; padding-right: 0; }
-  [data-theme="dark"] .discussion-heading > .push-control { max-width: 330px; }
-  [data-theme="dark"] .discussion-heading .push-feedback { font-size: 11px; line-height: 1.35; }
   [data-theme="dark"] #discussion-title { font-size: 28px; margin: 0; }
-  [data-theme="dark"] .discussion-subtitle { margin: 4px 0 20px; color: #97bec5; font-size: 14px; }
+  [data-theme="dark"] .discussion-subtitle { margin: 4px 0 0; color: #97bec5; font-size: 14px; }
   [data-theme="dark"] .discussion-history { height: auto; min-height: 180px; max-height: min(55dvh, 520px); margin: 0; padding: 0; border-top: 1px solid #335e65; }
   [data-theme="dark"] .discussion-history-controls:not(:has(button:not([hidden]))) { margin: 0; }
   [data-theme="dark"] .discussion-message:last-child { border-bottom: 0; }
@@ -867,7 +882,7 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
   [data-theme="dark"] .discussion-reactions button[aria-pressed="true"] svg { color: var(--field-focus); }
   [data-theme="dark"] :is(.discussion-compose, .private-compose) { background: #14373f; }
   [data-theme="dark"] .discussion-compose #discussion-send {
-    display: grid; place-items: center; width: 32px; min-height: 32px; height: 32px; padding: 7px;
+    display: grid; place-items: center; width: 44px; min-height: 38px; height: 38px; padding: 7px;
     border: 0; border-radius: 8px; background: #247f88; color: #ffffff;
   }
   [data-theme="dark"] .discussion-compose #discussion-send:not(:disabled):hover { background: #2d919b; }
@@ -965,10 +980,10 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) #admin-link { col
 .reply-target:not([hidden]) { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 8px 0; padding: 8px 10px; border-left: 3px solid var(--accent); border-radius: 5px; background: var(--surface-alt); font-size: .85rem; }
 .reply-target span { overflow-wrap: anywhere; min-width: 0; }
 .reply-target button { flex: none; min-width: 36px; min-height: 36px; padding: 2px 8px; }
-.private-compose button { display: grid; place-items: center; width: 38px; height: 38px; min-height: 38px; padding: 8px; border: 0; border-radius: 8px; background: #247f88; color: white; }
+.private-compose button { display: grid; place-items: center; width: 44px; height: 38px; min-height: 38px; padding: 8px; border: 0; border-radius: 8px; background: #247f88; color: white; }
 .private-compose button:not(:disabled):hover { background: #2d919b; }
 .private-compose button:disabled { background: #31575c; color: #a7bfc2; }
-.private-compose svg { width: 20px; height: 20px; }
+.private-compose button svg { width: 20px; height: 20px; }
 #private-readonly { padding: 8px 0; color: var(--muted); font-size: .9rem; }
 .message-highlight { outline: 2px solid var(--accent); outline-offset: -2px; }
 @media (min-width: 760px) {

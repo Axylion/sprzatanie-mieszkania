@@ -7,6 +7,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+async function setTheme(page, theme) {
+  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-menu label:has(input[value="' + theme + '"])').click();
+}
+
 const mimeTypes = {
   '.js': 'text/javascript',
   '.css': 'text/css',
@@ -15,68 +20,298 @@ const mimeTypes = {
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp'
 };
+const publicRpc = '/rest/v1/rpc/g19_public_announcements';
+const testConfig = 'window.goleszanDiscussionsConfig = {url:location.origin,publishableKey:"sb_publishable_testing"};';
 const announcement = (id, body, extra = {}) => ({
   id, title: 'Informacja ' + id, body, publishedAt: '2026-01-01T12:00:00Z', ...extra
 });
 
-test('PWA v5 to v6 update under the GitHub Pages subpath', async () => {
+test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () => {
   let legacy = true;
   const prefix = '/sprzatanie-mieszkania/';
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://localhost').pathname;
-    if (!pathname.startsWith(prefix)) { res.writeHead(404); return res.end(); }
-    const name = pathname.slice(prefix.length) || 'index.html';
+    if (pathname === publicRpc) {
+      res.setHeader('Content-Type','application/json');
+      return res.end(JSON.stringify([{
+        ...announcement('postgres-microseconds','Dłuższa informacja o pracach. '.repeat(20)),
+        publishedAt:'2026-11-15T23:03:38.627737+00:00',
+        expiresAt:'2026-12-15T23:03:38.627737+00:00',
+        version:1
+      }, announcement('expired','Archiwalny tekst',{
+        publishedAt:'2026-11-13T11:00:00.50001+00:00', expiresAt:'2026-11-16T07:00:00.123456+00:00'
+      })]));
+    }
+    if ([prefix + 'dyskusje/config.js', '/dyskusje/config.js'].includes(pathname)) {
+      res.setHeader('Content-Type','text/javascript');
+      return res.end(testConfig);
+    }
+    const name = pathname.slice(pathname.startsWith(prefix) ? prefix.length : 1) || 'index.html';
     const target = path.join(root, name);
-    if (!fs.existsSync(target)) { res.writeHead(404); return res.end(); }
+    if (!fs.statSync(target, {throwIfNoEntry:false})?.isFile()) {
+      res.setHeader('Content-Type', 'text/html');
+      return res.end(fs.readFileSync(path.join(root, 'index.html')));
+    }
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v6', 'shell-v5')
+      ? contents.toString().replace('shell-v13-11-0-f1-ui8-r2', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
-  const context = await browser.newContext();
+  const context = await browser.newContext({viewport:{width:390,height:750}});
+  // Capture requests from the navigation start, before the canonical document loads.
+  for (const mount of ['/', prefix]) {
+    for (const route of ['administracja', 'dyskusje', 'poradnik', 'harmonogram', 'calendar-title']) {
+      const clean = await browser.newContext({serviceWorkers:'block'});
+      try {
+        const first = await clean.newPage();
+        const base = `http://127.0.0.1:${server.address().port}${mount}`;
+        const misplaced = [], errors = [];
+        first.on('request', request => {
+          const pathname = new URL(request.url()).pathname;
+          if (pathname.startsWith(mount + route + '/') &&
+              ['stylesheet','script','image','manifest'].includes(request.resourceType()) &&
+              !fs.statSync(path.join(root, pathname.slice(mount.length)), {throwIfNoEntry:false})?.isFile()) {
+            misplaced.push(request.url());
+          }
+        });
+        first.on('console', entry => { if (entry.type() === 'error' && entry.text().includes('MIME type')) errors.push(entry.text()); });
+        const hash = route === 'administracja' ? '#dyskusje' : '#' + route;
+        await first.goto(base + route + '/?utm_source=chatgpt.com' + (route === 'administracja' ? hash : ''));
+        await first.waitForURL(base + '?utm_source=chatgpt.com' + hash, {waitUntil:'load'});
+        assert.ok(await first.evaluate(() => [...document.querySelectorAll('head > link[rel=stylesheet]')].every(link => link.sheet?.cssRules.length)));
+        assert.equal(await first.locator('head > link[rel=stylesheet]').count(), 2);
+        assert.equal(await first.evaluate(() => Boolean(window.g19AnnouncementContent)), true);
+        assert.deepEqual(misplaced, []);
+        assert.deepEqual(errors, []);
+      } finally { await clean.close(); }
+    }
+
+  }
   const page = await context.newPage();
-  await page.clock.install({time:new Date('2026-11-04T12:00:00Z')});
+  await page.clock.install({time:new Date('2026-11-16T08:00:00Z')});
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}${prefix}`);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     await page.evaluate(async () => {
-      const cache = await caches.open('goleszan19-shell-v5');
+      const cache = await caches.open('goleszan19-shell-v13-10-2');
       await cache.put('./announcements.json', new Response('[{"stale":true}]'));
+      localStorage.setItem('goleszan19-hidden-announcements-v1', JSON.stringify([JSON.stringify(['old-hidden', 1])]));
+      localStorage.removeItem('goleszan19-hidden-announcements-v2');
     });
+    assert.equal(await page.evaluate(async () => Boolean(await (await caches.open('goleszan19-shell-v13-10-2')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href))),false);
     legacy = false;
     await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).update());
-    await page.waitForFunction(async () => {
-      const keys = await caches.keys();
-      return keys.includes('goleszan19-shell-v6') && !keys.includes('goleszan19-shell-v5');
-    });
-    await page.reload();
+    // Cache Storage is asynchronous. Poll its resolved result and activation,
+    // rather than treating an async predicate's pending Promise as readiness.
+    const deadline = Date.now() + 10000;
+    let cacheState;
+    do {
+      cacheState = await page.evaluate(async () => {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const keys = await caches.keys();
+        const hasShell = keys.includes('goleszan19-shell-v13-11-0-f1-ui8-r2');
+        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-f1-ui8-r2')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
+        return {ready:hasPrivate && !keys.includes('goleszan19-shell-v13-10-2') && registration.active?.state === 'activated' && !registration.installing && !registration.waiting,hasPrivate};
+      });
+      if (cacheState.ready) break;
+      await new Promise(resolve => setTimeout(resolve,50));
+    } while (Date.now() < deadline);
+    assert.equal(cacheState.ready,true,JSON.stringify(cacheState));
+    await page.reload({waitUntil:"domcontentloaded"});
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
+    assert.equal(await page.locator('#ogloszenie-postgres-microseconds').count(),1);
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('goleszan19-hidden-announcements-v2'))?.includes('old-hidden'));
+    assert.equal(await page.locator('#ogloszenie-expired').count(),0);
+    assert.equal(await page.evaluate(() => parseAnnouncementDate('2026-11-15T23:03:38.627737+00:00')),
+      Date.parse('2026-11-15T23:03:38.627Z'));
     assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), JSON.parse(fs.readFileSync(path.join(root,'announcements.json'),'utf8')));
+    const appUrl = `http://127.0.0.1:${server.address().port}${prefix}`;
+    await page.goto(appUrl + '#calendar-title');
+    await page.waitForFunction(() => {
+      const target = document.getElementById('calendar-title').getBoundingClientRect();
+      return location.hash === '#calendar-title' && scrollY > 0 && target.top >= 0 && target.bottom <= innerHeight;
+    });
+    const announcementId = await page.locator('.announcement-entry').first().getAttribute('id');
+    await page.goto(appUrl + '#' + announcementId);
+    await page.waitForFunction(id => {
+      const target = document.getElementById(id)?.getBoundingClientRect();
+      return location.hash === '#' + id && target && target.top >= 0 && target.top < innerHeight;
+    }, announcementId);
+    const mimeErrors = [];
+    page.on('console', entry => { if (entry.type() === 'error' && entry.text().includes('MIME type')) mimeErrors.push(entry.text()); });
+    for (const width of [390, 1280]) {
+      await page.setViewportSize({width,height:850});
+      // The intermediate HTML redirects synchronously; wait for the actual route below,
+      // rather than a load event from the document being discarded.
+      await page.goto(appUrl + 'administracja/?utm_source=chatgpt.com#dyskusje', {waitUntil:'commit'});
+      await page.waitForURL(appUrl + '?utm_source=chatgpt.com#dyskusje');
+      await page.locator('#discussion-view').waitFor();
+      for (const [route, selector] of [
+        ['administracja', '#admin-view'],
+        ['dyskusje', '#discussion-view'],
+        ['poradnik', '#poradnik-view'],
+        ['harmonogram', '#harmonogram']
+      ]) {
+        await page.goto(appUrl + route + '/?check=1', {waitUntil:'commit'});
+        await page.waitForURL(appUrl + '?check=1#' + route);
+        await page.locator(selector).waitFor();
+        assert.equal(await page.locator('.brand-icon svg').evaluate(icon=>icon.getBoundingClientRect().width),25);
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
+        assert.equal(await page.evaluate(()=>[...document.querySelectorAll('link[rel=stylesheet]')].every(link=>link.sheet?.cssRules.length > 0)),true);
+      }
+      assert.deepEqual(await page.locator('.dashboard-links svg').evaluateAll(icons=>icons.map(icon=>icon.getBoundingClientRect().width)),[24]);
+      assert.equal(await page.locator('#calendar-days').evaluate(element=>getComputedStyle(element).display),'grid');
+    }
+    const shadow = locator => locator.evaluate(element => getComputedStyle(element).boxShadow);
+    async function checkTextLink(selector) {
+      const link = page.locator(selector).first();
+      await link.hover();
+      assert.equal(await shadow(link), 'none', selector);
+      assert.match(await link.evaluate(element => getComputedStyle(element).textDecorationLine), /underline/);
+      await page.keyboard.press('Tab');
+      await link.focus();
+      assert.equal(await link.evaluate(element => element.matches(':focus-visible')), true, selector);
+      assert.notEqual(await link.evaluate(element => getComputedStyle(element).outlineStyle), 'none', selector);
+    }
+    async function checkControl(selector) {
+      const control = page.locator(selector).first();
+      await page.mouse.move(0,0);
+      const before = await shadow(control);
+      await control.hover();
+      if (await page.evaluate(()=>innerWidth>=760 && document.documentElement.dataset.theme==='dark')) {
+        assert.equal(await shadow(control), 'none', selector);
+        assert.equal(await control.evaluate(el=>getComputedStyle(el).filter), 'brightness(1.08)', selector);
+      } else assert.notEqual(await shadow(control), before, selector);
+    }
+    for (const width of [390,1280]) {
+      await page.setViewportSize({width,height:850});
+      for (const theme of ['light','dark']) {
+        await page.goto(appUrl + '#harmonogram');
+        await setTheme(page, theme);
+        await checkControl('.brand-icon');
+        await checkControl('#theme-toggle');
+        await checkControl('.dashboard-links .guide-entry');
+        assert.equal(await page.locator('#calendar-days button, #calendar-days [aria-pressed]').count(),0);
+        await checkTextLink('footer #admin-link');
+        await page.goto(appUrl + '#dyskusje');
+        await checkTextLink('#discussion-view .guide-home-link');
+        await page.goto(appUrl + '#poradnik');
+        await checkTextLink('#poradnik-view .guide-home-link');
+        await checkControl('#poradnik-view .guide-categories a[aria-current]');
+        await page.goto(appUrl + '#administracja');
+        await checkTextLink('#admin-view .guide-home-link');
+      }
+    }
+    await page.goto(appUrl + '#harmonogram');
+    assert.deepEqual(mimeErrors, []);
+    await page.locator('.announcement-entry').first().waitFor();
     await page.locator('.announcement-dismiss').click();
-    await page.reload();
-    await page.waitForFunction(() => !document.querySelector('#announcements-restore').hidden);
+    await page.reload({waitUntil:"domcontentloaded"});
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     await context.setOffline(true);
-    await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('#schedule .schedule-row').length === 12);
+    await page.goto(appUrl + 'administracja/#harmonogram');
+    await page.waitForURL(appUrl + '#harmonogram');
+    await page.reload({waitUntil:"domcontentloaded"});
+    await page.waitForFunction(() => document.querySelectorAll('#calendar-days .calendar-day').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
-    assert.equal(await page.locator('#announcements-restore').isVisible(), false);
-    await page.getByRole('button', {name:'Pokój 3',exact:true}).click();
-    await page.reload();
-    await page.waitForFunction(() => document.querySelector('#personal-result').textContent.includes('pokoju nr 3'));
+    assert.equal(await page.locator('#announcements-restore').count(), 0);
+    await page.getByRole('button', {name:'Pokój nr 3',exact:true}).click();
+    await page.getByRole('button', {name:'Potwierdź pokój'}).click();
+    await page.reload({waitUntil:"domcontentloaded"});
+    await page.waitForFunction(() => localStorage.getItem('cleaning-room') === '3' && document.querySelector('#room-setup').hidden);
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
-    await page.waitForFunction(() => !document.querySelector('#announcements-restore').hidden);
-    await page.locator('#announcements-restore').click();
+    await page.locator('#announcements-open').click();
+    await page.locator('#hidden-announcements-list button').first().click();
     assert.equal(await page.locator('.announcement-entry').count(), 1);
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('F1 PWA relaunch loads the new interface and retains local resident data', {timeout:45000}, async () => {
+  const previousCache = 'goleszan19-shell-v13-11-0-f1-push2';
+  const currentCache = 'goleszan19-shell-v13-11-0-f1-ui8-r2';
+  const currentDutyScript = './administracja/dyzury.js?v=ui8';
+  const previousDutyScript = './administracja/dyzury.js?v=f1-push2';
+  const localData = {
+    'cleaning-theme': 'dark',
+    'cleaning-room': '1',
+    'goleszan19-hidden-announcements-v2': '["previously-hidden"]',
+    'goleszan19-public-notifications-read': '{"previously-read":true}',
+    'goleszan19-guide-supplies-v1': '["glass","microfiber"]'
+  };
+  // Set F1_PREVIOUS_ROOT to serve an unpacked previous release verbatim.
+  const previousRoot = process.env.F1_PREVIOUS_ROOT;
+  let previous = true;
+  const server = http.createServer((req, res) => {
+    const name = new URL(req.url, 'http://localhost').pathname.slice(1) || 'index.html';
+    const target = path.join(previous && previousRoot ? previousRoot : root, name);
+    if (!fs.statSync(target, {throwIfNoEntry:false})?.isFile()) {
+      res.writeHead(404).end();
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', name.endsWith('.webmanifest') ? 'application/manifest+json' : mimeTypes[path.extname(name)] || 'text/html');
+    const contents = fs.readFileSync(target);
+    res.end(previous && !previousRoot && ['index.html', 'sw.js'].includes(name)
+      ? contents.toString().replace(currentCache, previousCache).replace(currentDutyScript, previousDutyScript)
+      : contents);
+  });
+  let browser;
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', resolve);
+    });
+    browser = await chromium.launch({headless:true, ...(process.env.CHROME_PATH ? {executablePath:process.env.CHROME_PATH} : {}), args:['--no-sandbox']});
+    const context = await browser.newContext();
+    // This regression exercises client storage and SW lifecycle without any backend calls.
+    await context.route('https://**/*', route => route.abort());
+    const origin = `http://127.0.0.1:${server.address().port}/`;
+    const installed = await context.newPage();
+    await installed.goto(origin);
+    await installed.waitForFunction(() => navigator.serviceWorker.controller);
+    assert.ok(await installed.evaluate(async ([cache, script]) =>
+      Boolean(await (await caches.open(cache)).match(script)), [previousCache, previousDutyScript]));
+    await installed.evaluate(data => {
+      for (const [key, value] of Object.entries(data)) localStorage.setItem(key, value);
+      localStorage.setItem('goleszan19-installed', 'true');
+    }, localData);
+    previous = false;
+    await installed.evaluate(async () => {
+      const registration = await navigator.serviceWorker.ready;
+      const changed = new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, {once:true}));
+      await registration.update();
+      await changed;
+    });
+    await installed.close();
+
+    const relaunched = await context.newPage();
+    await relaunched.goto(origin);
+    await relaunched.waitForFunction(() => navigator.serviceWorker.controller?.state === 'activated');
+    assert.ok(await relaunched.evaluate(async ([cache, oldCache, script]) => {
+      const keys = await caches.keys();
+      return keys.includes(cache) && !keys.includes(oldCache) && Boolean(await (await caches.open(cache)).match(script));
+    }, [currentCache, previousCache, currentDutyScript]));
+    assert.equal(await relaunched.locator(`script[src="${currentDutyScript}"]`).count(), 1);
+    assert.deepEqual(await relaunched.evaluate(keys => Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)])),
+      Object.keys(localData)), localData);
+    await relaunched.getByRole('link', {name: /Poradnik sprzątania/}).click();
+    assert.equal(await relaunched.locator('.guide-checklist input:checked').count(), 2);
+    await relaunched.getByRole('link', {name: '← Harmonogram'}).click();
+    await context.setOffline(true);
+    await relaunched.reload();
+    assert.equal(await relaunched.getByText('Harmonogram sprzątania', {exact:true}).first().isVisible(), true);
+  } finally {
+    await browser?.close();
+    if (server.listening) await new Promise(resolve => server.close(resolve));
   }
 });
 const long = 'Pierwszy wiersz\nDrugi wiersz\nTrzeci wiersz\nCzwarty wiersz\nPiąty wiersz';
@@ -85,7 +320,11 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
   let data = [], requests = [], fail = false;
   const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname;
-    if (file === '/announcements.json') {
+    if (file === '/dyskusje/config.js') {
+      res.setHeader('Content-Type','text/javascript');
+      return res.end(testConfig);
+    }
+    if (file === publicRpc) {
       requests.push(req.headers);
       res.writeHead(fail ? 503 : 200, {'Content-Type':'application/json', 'Cache-Control':'public, max-age=86400'});
       return res.end(JSON.stringify(data));
@@ -105,98 +344,177 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
   const url = `http://127.0.0.1:${server.address().port}/`;
   try {
     await page.goto(url);
-    await page.waitForFunction(() => document.querySelectorAll('#schedule .schedule-row').length === 12);
+    await page.waitForFunction(() => document.querySelectorAll('#calendar-days .calendar-day').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     assert.deepEqual(await page.evaluate(() => [roomFor(BASE),roomFor(BASE + WEEK),roomFor(BASE + 2*WEEK),roomFor(BASE - WEEK),roomFor(Date.UTC(2027,0,2))]), [3,4,1,2,4]);
-    data = [announcement('a', long), announcement('b', long), announcement('short','Krótki tekst.'),
+    const month = page.locator('#calendar-month');
+    const days = page.locator('#calendar-days .calendar-day');
+    const next = page.getByRole('button', { name: 'Następny miesiąc' });
+    const prev = page.getByRole('button', { name: 'Poprzedni miesiąc' });
+    assert.equal(await month.textContent(), 'listopad 2026');
+    assert.equal(await page.locator('#calendar-days span[aria-hidden="true"]').count(), 12);
+    assert.equal(await days.count(), 30);
+    assert.equal(await page.locator('#next-room').textContent(), 'Pokój nr 4');
+    assert.match(await page.locator('#next-date').textContent(), /7–8 listopada 2026/);
+    assert.match(await page.locator('#calendar-next-room').textContent(), /Podłącz urządzenie/);
+    await next.click();
+    assert.equal(await month.textContent(), 'grudzień 2026');
+    assert.ok(await days.getByText('26', { exact: true }).evaluate(el => el.classList.contains('calendar-weekend')));
+    await next.click();
+    assert.equal(await month.textContent(), 'styczeń 2027');
+    assert.ok(await days.getByText('2', { exact: true }).evaluate(el => el.classList.contains('calendar-weekend')));
+    await days.getByText('4', { exact: true }).click();
+    assert.equal(await page.locator('#calendar-days [aria-pressed]').count(),0);
+    await next.click();
+    assert.equal(await days.count(), 28);
+    await page.clock.setFixedTime(new Date('2028-02-10T12:00:00Z'));
+    await page.reload();
+    assert.equal(await month.textContent(), 'luty 2028');
+    assert.equal(await days.count(), 29);
+    await prev.click();
+    assert.equal(await month.textContent(), 'styczeń 2028');
+    await page.clock.setFixedTime(new Date('2026-11-04T12:00:00Z'));
+    await page.reload();
+
+    data = [announcement('b', long, {legacyHideKey:'shared'}), announcement('short','Krótki tekst.'),
+      announcement('a', long, {publishedAt:'2026-01-02T12:00:00Z',legacyHideKey:'shared'}),
       announcement('future',long,{publishedAt:'2099-01-01'}), announcement('expired',long,{expiresAt:'2026-01-02'}), {id:'invalid'}];
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+    const slide = page.locator('.announcement-entry');
+    const position = page.locator('#announcement-position');
+    const nextSlide = page.getByRole('button', {name:'Następne ogłoszenie'});
+    const previousSlide = page.getByRole('button', {name:'Poprzednie ogłoszenie'});
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.equal(await slide.count(),1);
+    assert.equal(await position.textContent(),'1 / 3');
+    assert.equal(await previousSlide.isDisabled(),true);
+    await nextSlide.click();
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
+    await nextSlide.press('ArrowRight');
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-short');
+    assert.equal(await slide.locator('.announcement-toggle').isVisible(),false);
+    assert.equal(await nextSlide.isDisabled(),true);
+    await previousSlide.click();
+    await previousSlide.click();
+    const swipe = dx => slide.locator('.announcement-body').evaluate((element, dx) => {
+      const init = {pointerId:4, pointerType:'touch', isPrimary:true, bubbles:true, clientY:100};
+      element.dispatchEvent(new PointerEvent('pointerdown', {...init,clientX:120}));
+      element.dispatchEvent(new PointerEvent('pointerup', {...init,clientX:120+dx}));
+    }, dx);
+    await swipe(-90);
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
+    await swipe(90);
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-a');
     for (const width of [320, 360, 390, 430, 768, 1280]) {
       await page.setViewportSize({width,height:844});
       for (const theme of ['light','dark']) {
-        await page.selectOption('#theme-select', theme);
+        await setTheme(page, theme);
         await page.waitForTimeout(50);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-        assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(47, 136, 66)');
+        assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(8, 109, 114)');
         assert.equal(await page.locator('#shortcut-open').evaluate(e => getComputedStyle(e).color), 'rgb(255, 255, 255)');
         assert.equal(await page.locator('#announcements-card').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(255, 246, 175)');
         assert.equal(await page.locator('#announcements-heading').evaluate(e => getComputedStyle(e).fontWeight), '700');
-        assert.equal(await page.locator('.announcement-entry').nth(2).locator('.announcement-toggle').isVisible(), false);
         const first = page.locator('.announcement-entry').nth(0);
         assert.equal(await first.locator('.announcement-toggle').isVisible(), true);
         assert.ok(await first.locator('p').evaluate(e => Math.abs(e.clientHeight - parseFloat(getComputedStyle(e).lineHeight)*3) < 2));
         await first.locator('.announcement-toggle').click();
         assert.equal(await first.locator('.announcement-toggle').textContent(), 'Zwiń ↑');
-        assert.equal(await page.locator('.announcement-entry').nth(1).locator('.announcement-toggle').getAttribute('aria-expanded'), 'false');
+        await nextSlide.click();
+        assert.equal(await slide.locator('.announcement-toggle').getAttribute('aria-expanded'), 'false');
+        await previousSlide.click();
+        assert.equal(await slide.locator('.announcement-toggle').getAttribute('aria-expanded'), 'true');
         await first.locator('.announcement-toggle').click();
         assert.equal(await first.locator('.announcement-toggle').textContent(), 'Więcej ↓');
         if (process.env.SCREENSHOT_DIR) await page.screenshot({path:path.join(process.env.SCREENSHOT_DIR,`mobile-${width}-${theme}.png`),fullPage:true});
       }
     }
     assert.ok(await page.locator('#announcements-card').evaluate(e => e.compareDocumentPosition(document.querySelector('.intro')) & Node.DOCUMENT_POSITION_FOLLOWING));
-    assert.equal(await page.locator('.announcement-date').first().textContent(), 'Opublikowano: 1 sty 2026');
+    assert.equal(await page.locator('.announcement-date').first().textContent(), 'Opublikowano: 2 sty 2026');
     // Icon, 26px transparent circle, 44px hit target and keyboard operation.
     assert.equal(await page.locator('#shortcut-open svg').count(), 1);
     assert.equal(await page.locator('#shortcut-open svg').evaluate(e => getComputedStyle(e).stroke), 'rgb(255, 255, 255)');
     const dismiss = page.locator('.announcement-dismiss').first();
     assert.match(await dismiss.getAttribute('aria-label'), /na tym urządzeniu/);
-    assert.deepEqual(await dismiss.evaluate(e => ({width:e.offsetWidth,height:e.offsetHeight,bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,svg:e.querySelector('svg').getBoundingClientRect().width})), {width:44,height:44,bg:'rgba(0, 0, 0, 0)',color:'rgb(51, 51, 51)',svg:26});
-    assert.equal(await page.locator('#announcements-restore').isVisible(), false);
+    assert.deepEqual(await dismiss.evaluate(e => ({width:e.offsetWidth,height:e.offsetHeight,bg:getComputedStyle(e).backgroundColor,color:getComputedStyle(e).color,svg:e.querySelector('svg').getBoundingClientRect().width})), {width:44,height:44,bg:'rgba(0, 0, 0, 0)',color:'rgb(119, 102, 60)',svg:26});
+    await page.locator('#announcements-open').click();
+    assert.equal(await page.locator('#hidden-announcements-list button').count(),3);
+    await page.getByRole('button', { name: 'Zamknij ogłoszenia' }).click();
     await dismiss.focus();
     await page.keyboard.press('Enter');
-    assert.equal(await page.locator('.announcement-entry').count(), 2);
-    assert.equal(await page.locator('#announcements-restore').isVisible(), true);
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
+    assert.equal(await position.textContent(),'1 / 2');
     assert.equal(await page.locator('.announcement-dismiss').first().evaluate(e => e === document.activeElement), true);
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 2);
+    await page.locator('#ogloszenie-b').waitFor();
+    await page.goto(url + '#ogloszenie-a');
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('goleszan19-hidden-announcements-v2'))),['a']);
+    await nextSlide.click();
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-b');
     // Separate device/browser context still sees all announcements; JSON is unchanged.
     const other = await browser.newContext();
     const otherPage = await other.newPage();
     await otherPage.goto(url);
-    await otherPage.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+    await otherPage.locator('#ogloszenie-a').waitFor();
     await other.close();
     assert.equal(data.length, 6);
     await page.locator('.announcement-dismiss').first().click();
     await page.locator('.announcement-dismiss').first().click();
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
     assert.equal(await page.locator('#announcements-card').evaluate(e => e.getBoundingClientRect().height), 0);
-    const restore = page.getByRole('button', {name:'Pokaż ukryte ogłoszenia',exact:true});
-    assert.equal(await restore.isVisible(), true);
-    if (process.env.AXE_PATH) {
-      await page.addScriptTag({path:process.env.AXE_PATH});
-      const violations = await page.evaluate(async () => (await axe.run({include:['#announcements-restore']})).violations);
-      assert.deepEqual(violations.map(v => v.id), []);
-    }
+    const restore = page.locator('#announcements-open');
     assert.equal(await restore.evaluate(e => e === document.activeElement), true);
     await page.reload();
-    await page.waitForFunction(() => !document.querySelector('#announcements-restore').hidden);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
-    await restore.focus();
-    await page.keyboard.press('Space');
-    assert.equal(await page.locator('.announcement-entry').count(), 3);
-    assert.equal(await restore.isVisible(), false);
-    assert.equal(await page.locator('.announcement-dismiss').first().evaluate(e => e === document.activeElement), true);
-    // Reused IDs with new publication dates/title/body/version must not inherit hiding.
-    await page.locator('.announcement-dismiss').first().click();
-    const original = {...data[0]};
-    for (const change of [{title:'Zmieniony tytuł'}, {body:'Zmieniona treść'}, {publishedAt:'2026-02-01T12:00:00Z'}, {updatedAt:'2026-02-01T12:00:00Z'}, {id:'new-id'}]) {
-      data[0] = {...original, ...change};
-      await page.reload();
-      await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
-    }
-    // Corrupt storage and storage quota/permission errors do not break announcements.
-    await page.evaluate(() => localStorage.setItem('goleszan19-hidden-announcements-v1', '{bad json'));
-    await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
-    await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); }; });
-    await page.locator('.announcement-dismiss').first().click();
-    assert.equal(await page.locator('.announcement-entry').count(), 2);
     await restore.click();
-    assert.equal(await page.locator('.announcement-entry').count(), 3);
+    const hidden = page.locator('#hidden-announcements-list button');
+    await hidden.first().waitFor();
+    assert.equal(await hidden.count(), 3);
+    if (process.env.AXE_PATH) {
+      await page.addScriptTag({path:process.env.AXE_PATH});
+      const violations = await page.evaluate(async () => (await axe.run({include:['#announcements-panel']})).violations);
+      assert.deepEqual(violations.map(v => v.id), []);
+    }
+    const homeUrl = page.url();
+    await hidden.filter({hasText:'Informacja a'}).click();
+    assert.equal(page.url(), homeUrl);
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(), ['Informacja a']);
+    await page.reload();
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.equal(await page.locator('.announcement-entry').count(), 1);
+    await page.locator('#chat-open').click();
+    await page.locator('#discussion-view').waitFor();
+    for (const title of ['Informacja b', 'Informacja short']) {
+      await restore.click();
+      await hidden.filter({hasText:title}).click();
+      await page.locator('#harmonogram').waitFor();
+      assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(), [title]);
+      await page.waitForFunction(() => scrollY === 0);
+    }
+    // Editing keeps the same ID hidden; a different ID does not inherit its state.
+    await dismiss.click();
+    data[1] = {...data[1], title:'Zmieniony tytuł', version:2};
+    await page.reload();
+    await page.locator('#ogloszenie-a').waitFor();
+    assert.equal(await position.textContent(),'1 / 2');
+    data[1] = {...data[1], id:'new-id', publishedAt:'2026-02-01T12:00:00Z'};
+    await page.reload();
+    await page.locator('#ogloszenie-new-id').waitFor();
+    assert.equal(await position.textContent(),'1 / 3');
+    await page.evaluate(() => localStorage.setItem('goleszan19-hidden-announcements-v2', '{bad json'));
+    await page.reload();
+    await page.locator('#ogloszenie-new-id').waitFor();
+    await page.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); }; });
+    await dismiss.click();
+    assert.equal(await position.textContent(),'1 / 2');
+    await restore.click();
+    await hidden.filter({hasText:'Zmieniony tytuł'}).click();
+    assert.equal(await slide.getAttribute('id'),'ogloszenie-new-id');
+    assert.equal(await position.textContent(),'1 / 3');
     // System theme follows OS changes.
     await page.reload();
-    await page.selectOption('#theme-select', 'system');
+    await setTheme(page, 'system');
     await page.emulateMedia({colorScheme:'dark'});
     await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
     assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
@@ -210,20 +528,18 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     assert.match(data[0].body, /TO JEST OGŁOSZENIE TESTOWE/);
     await page.reload();
     await page.waitForFunction(() => document.querySelector('.announcement-toggle')?.hidden === false);
-    assert.ok(await page.locator('.announcement-body').evaluate(e => Math.abs(e.clientHeight - parseFloat(getComputedStyle(e).lineHeight)*3) < 2));
+    assert.ok(await page.locator('#announcements-card .announcement-body').evaluate(e => Math.abs(e.clientHeight - parseFloat(getComputedStyle(e).lineHeight)*3) < 2));
     if (process.env.SCREENSHOT_DIR) {
       for (const width of [360,1280]) {
         await page.setViewportSize({width,height:900});
         for (const theme of ['light','dark']) {
-          await page.selectOption('#theme-select',theme);
+          await setTheme(page, theme);
           await page.waitForTimeout(250); // Poczekaj na przejście kolorów motywu przed zrzutem.
           await page.screenshot({path:path.join(process.env.SCREENSHOT_DIR,`sample-${width}-${theme}.png`),fullPage:true});
           if (process.env.AXE_PATH) {
             await page.addScriptTag({path:process.env.AXE_PATH});
             const audit = await page.evaluate(async () => (await axe.run({include:['#announcements-card','#shortcut-open']}, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa','best-practice']}})).violations);
-            // Zatwierdzone kolory przycisku #2f8842 / white mają kontrast 4.45:1 (< 4.5:1).
-            // Tylko ten istniejący wyjątek jest dopuszczony; pozostałe elementy muszą przejść audyt.
-            assert.deepEqual(audit.flatMap(v => v.nodes.filter(n => !(v.id === 'color-contrast' && n.target.length === 1 && n.target[0] === '#shortcut-open')).map(n => ({id:v.id,target:n.target}))), []);
+            assert.deepEqual(audit.flatMap(v => v.nodes.map(n => ({id:v.id,target:n.target}))), []);
           }
         }
       }
@@ -246,22 +562,25 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v6');
+      const c = await caches.open('goleszan19-shell-v13-11-0-f1-ui8-r2');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
-    assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()), data);
+    assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);
     assert.ok(requests.some(headers => headers['cache-control']?.includes('no-cache')));
     await page.locator('#shortcut-open').click();
     assert.equal(await page.locator('#shortcut-help').isVisible(), true);
     await page.locator('#shortcut-close').click();
     await context.setOffline(true);
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('#schedule .schedule-row').length === 12);
+    await page.waitForFunction(() => document.querySelectorAll('#calendar-days .calendar-day').length >= 28);
     assert.equal(await page.locator('#announcements-card').isVisible(), false);
-    await page.getByRole('button',{name:'Pokój 2',exact:true}).click();
-    assert.match(await page.locator('#personal-result').textContent(), /pokoju nr 2/);
-    await page.locator('#toggle-schedule').click();
-    assert.equal(await page.locator('#schedule .schedule-row:visible').count(), 12);
+    await page.getByRole('button',{name:'Pokój nr 2',exact:true}).click();
+    await page.getByRole('button', {name:'Potwierdź pokój'}).click();
+    assert.equal(await page.evaluate(() => localStorage.getItem('cleaning-room')), '2');
+    assert.equal(await page.locator('#room-setup').isVisible(), false);
+    assert.ok(await page.locator('#calendar-days .calendar-own').count() >= 2);
+    await page.locator('#calendar-next-month').click();
+    assert.ok(await page.locator('#calendar-days .calendar-day').count() >= 28);
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
     await page.waitForFunction(() => !document.querySelector('#announcements-card').hidden);
@@ -284,7 +603,11 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
   ];
   const server = http.createServer((req, res) => {
     const file = new URL(req.url, 'http://localhost').pathname;
-    if (file === '/announcements.json') {
+    if (file === '/dyskusje/config.js') {
+      res.setHeader('Content-Type','text/javascript');
+      return res.end(testConfig);
+    }
+    if (file === publicRpc) {
       res.setHeader('Content-Type','application/json');
       return res.end(JSON.stringify(data));
     }
@@ -305,7 +628,7 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
       await page.clock.install({time:new Date('2026-11-04T22:59:58Z')});
       await page.clock.pauseAt(new Date('2026-11-04T22:59:59Z'));
       await page.goto(`http://127.0.0.1:${server.address().port}/`);
-      await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
+      await page.locator('#ogloszenie-permanent').waitFor();
       pages.push(page);
       const parsed = await page.evaluate(() => [
         parseAnnouncementDate('2026-11-04T12:30:00'),
@@ -334,40 +657,50 @@ test('Warsaw expiry, live timers and local restore on devices in other timezones
     const [page, other] = pages;
     const hide = id => page.getByRole('button',{name:'Ukryj ogłoszenie na tym urządzeniu: Informacja '+id,exact:true}).click();
     await hide('permanent');
+    await page.getByRole('button',{name:'Następne ogłoszenie'}).click();
     await hide('instant');
     assert.equal(await page.locator('.announcement-entry').count(),1);
-    assert.equal(await other.locator('.announcement-entry').count(),3);
+    assert.equal(await other.locator('#announcement-position').textContent(),'1 / 3');
     // Dokładnie o północy w Warszawie ogłoszenie z samą datą znika na obu urządzeniach.
     for (const p of pages) await p.clock.runFor(1000);
     assert.equal(await page.locator('#announcements-card').isVisible(),false);
     assert.equal(await page.locator('#announcements-card').evaluate(e => e.getBoundingClientRect().height),0);
-    assert.equal(await other.locator('.announcement-entry').count(),2);
-    await page.locator('#announcements-restore').click();
-    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent','Informacja instant']);
+    assert.equal(await other.locator('#announcement-position').textContent(),'1 / 2');
+    for (const id of ['permanent','instant']) {
+      await page.locator('#announcements-open').click();
+      await page.locator('#hidden-announcements-list button').filter({hasText:'Informacja '+id}).click();
+    }
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja instant']);
     await hide('instant');
     for (const p of pages) await p.clock.runFor(2000);
-    assert.equal(await page.locator('#announcements-restore').isVisible(),false);
+    await page.locator('#announcements-open').click();
+    assert.equal(await page.locator('#hidden-announcements-list button').count(),1);
+    await page.getByRole('button', {name:'Zamknij ogłoszenia'}).click();
     assert.deepEqual(await other.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
     // Termin nie usuwa wpisu z JSON i nie można go przywrócić lokalną funkcją.
     await hide('permanent');
-    await page.locator('#announcements-restore').click();
+    await page.locator('#announcements-open').click();
+    await page.locator('#hidden-announcements-list button').first().click();
     assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
-    assert.deepEqual(await page.evaluate(async () => (await fetch('./announcements.json')).json()),data);
+    assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()),data);
     // Zaplanowana publikacja również uwzględnia Warsaw i działa bez przeładowania.
     for (const p of pages) await p.clock.runFor(1000);
-    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
-    assert.equal(await page.locator('#announcements-restore').isVisible(),false);
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
+    await page.locator('#announcements-open').click();
+    assert.equal(await page.locator('#hidden-announcements-list button').count(),2);
+    await page.getByRole('button', {name:'Zamknij ogłoszenia'}).click();
     // Wpisy bez expiresAt pozostają aktywne także po miesiącu.
     for (const p of pages) {
       await p.clock.fastForward(16 * 86400000);
       await p.clock.fastForward(16 * 86400000);
     }
-    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja future','Informacja permanent']);
-    // Przedłużony termin jest nową wersją, nie dziedziczy wcześniejszego ukrycia.
+    assert.deepEqual(await page.locator('.announcement-entry h3').allTextContents(),['Informacja permanent']);
+    // Zmiana terminu nie zmienia trwałego ID ani lokalnego ukrycia.
     data[2].expiresAt = '2099-12-31';
+    await page.goto(new URL(page.url()).origin + '/');
     await page.reload();
-    await page.waitForFunction(() => document.querySelectorAll('.announcement-entry').length === 3);
-    assert.equal(await page.locator('.announcement-entry h3').allTextContents().then(t => t.includes('Informacja instant')),true);
+    await page.locator('#ogloszenie-future').waitFor();
+    assert.equal(await page.locator('#announcement-position').textContent(),'1 / 2');
     assert.deepEqual(errors,[]);
   } finally {
     await browser.close();

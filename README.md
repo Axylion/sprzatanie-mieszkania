@@ -96,3 +96,121 @@ w katalogu projektu i otwórz `http://localhost:8000/`. Po pierwszym wczytaniu
 i aktywacji service workera można przełączyć przeglądarkę w tryb offline
 i odświeżyć bezpośredni link do karty. Test w Playwright uruchamia polecenie
 `node --test tests/poradnik.test.cjs`.
+
+## Dyskusje
+
+Goleszan 19 udostępnia harmonogram, zasady, poradnik i ogłoszenia wszystkim
+odwiedzającym. Dyskusje wymagają aktywnego powiązania urządzenia. Wcześniejszy
+wybór pokoju do kalendarza (`cleaning-room`) jest zachowany. Pokój potwierdzony
+w Dyskusjach uzupełnia wybór kalendarza, jeśli urządzenie nie ma go jeszcze ustawionego.
+
+W Dyskusjach wybierz wolny pokój i użyj „Połącz pokój”. Aby podłączyć kolejne
+urządzenie, wybierz zajęty pokój i „Połącz kolejne urządzenie”. Odczytaj sześciocyfrowy kod.
+Na połączonym urządzeniu otwórz „Podłącz kolejne urządzenie”, wpisz sześć cyfr i potwierdź.
+Nowe urządzenie uzyska dostęp automatycznie. Kod jest ważny dwie minuty.
+Ekran pokazuje pozostały czas i umożliwia anulowanie lub odnowienie kodu.
+Zwykła karta przeglądarki i zainstalowana PWA mogą wymagać osobnych powiązań.
+Każdy mieszkaniec ma jedną reakcję na wiadomość, wspólną dla wszystkich jego urządzeń.
+
+### Uruchomienie na Supabase
+
+1. Utwórz dedykowany projekt Supabase na planie Free. Włącz Data API dla
+   standardowego schematu `public`. Schemat `g19_private` zostaw poza API.
+2. Zastosuj brakujące migracje z katalogu `supabase/migrations/` w kolejności
+   numerów. Migracja 001 jest przeznaczona dla pustej bazy. Jeśli podgląd v10
+   ma już migracje 001–006, zastosuj tylko 007 i 008. Następnie przygotuj
+   konfigurację testową i wgraj ZIP v11 do projektu podglądu.
+3. W `dyskusje/config.js` wpisz URL `https://<project-ref>.supabase.co` oraz
+   klucz **publishable** `sb_publishable_…` z ustawień projektu. Nie wpisuj
+   klucza `sb_secret_…`, service role ani danych połączenia do bazy.
+4. Na podglądzie połącz dwa niezależne profile przeglądarki, wyślij wiadomość,
+   sprawdź reakcję i odwołanie testowego urządzenia. Po akceptacji właściciela
+   opublikuj zmiany. Jeśli konfiguracja zmienia się już po pierwszym wdrożeniu
+   Dyskusji, zmień też wersję powłoki w `sw.js`, aby zaktualizować PWA.
+
+GitHub Pages nadal serwuje stronę statyczną. Plan Free Supabase ma 500 MB bazy
+i 5 GB transferu, co odpowiada małemu czatowi tekstowemu. Po tygodniu małej
+aktywności projekt może zostać wstrzymany i wtedy właściciel wznawia go z
+Dashboardu. Firebase ma darmowe odczyty i subskrypcje Firestore, ale typowa
+implementacja wymagałaby osobnego przepływu Firebase Auth i reguł Firestore.
+Tu powiązania, reakcje, odwołania i kontrola częstotliwości działają w
+transakcjach Postgresa. [Supabase Free](https://supabase.com/pricing) ·
+[Firebase](https://firebase.google.com/pricing)
+
+Czat sprawdza zmiany mniej więcej co pięć sekund w widocznym oknie. Zapytanie
+ze znaną wersją bez zmian zwraca tylko krótkie potwierdzenie. Strony historii
+mają po 40 wiadomości. Po powrocie do aplikacji historia odświeża się od razu.
+Wymiana wiadomości wymaga internetu. Historia i powiązania są zapisane w bazie.
+
+### Uprawnienia i „Zmień mieszkańca”
+
+Identyfikator urządzenia jest losowym kluczem wydanym przez serwer. Przeglądarka
+przechowuje go lokalnie i przesyła przez HTTPS w treści żądania. Baza przechowuje
+skrót SHA-256. Klucz jest dostępny dla skryptów z tego samego origin, więc na
+tym origin powinien działać wyłącznie zaufany kod. Treść wiadomości jest
+renderowana jako tekst. RLS i uprawnienia SQL blokują bezpośredni dostęp do
+tabel, a RPC weryfikuje klucz i generację pokoju. Wysłanie ma klucz
+idempotencji, limit 1500 znaków i limit częstotliwości. Reakcje też mają limit.
+
+Osoba z dostępem do strony może zająć wolny pokój. Zajęty pokój wymaga
+potwierdzenia z połączonego urządzenia tego mieszkańca. Model nie sprawdza
+tożsamości. Wyczyszczenie danych witryny pozwala zgłosić nowe urządzenie.
+Kod widoczny na ekranie pozwala jedynie wskazać prośbę do potwierdzenia.
+Pokój ma do 12 nowych próśb i do 6 prób potwierdzenia na minutę.
+Osobny sekret nowego urządzenia służy do odebrania wyniku. Powtórne odebranie
+w okresie ważności zwraca to samo powiązanie po utracie odpowiedzi sieciowej.
+
+Właściciel zarządza pokojami w zabezpieczonym Supabase Dashboard. W SQL Editor
+zapisz zapytanie pod nazwą **Zmień mieszkańca**. Najpierw odczytaj stan:
+
+```sql
+select * from public.g19_admin_rooms();
+```
+
+Po sprawdzeniu numeru pokoju, generacji i liczby urządzeń uruchom funkcję z tymi
+wartościami. Przykład zmiany mieszkańca pokoju 2 w generacji 1 przy dwóch
+aktywnych urządzeniach:
+
+```sql
+select public.g19_admin_change_resident(2, 1, 2) as odwolane_urzadzenia;
+```
+
+Zmiana liczby urządzeń lub generacji od momentu odczytu powoduje przerwanie
+operacji. Reset odwołuje wszystkie aktywne klucze tego pokoju, anuluje oczekujące
+i zatwierdzone prośby, otwiera nową generację i zwalnia pokój. Stare wpisy oraz reakcje pozostają w historii. Wiadomości z
+wcześniejszych generacji mają oznaczenie „poprzedni mieszkaniec”. Nowy
+mieszkaniec może połączyć swoje urządzenie. Odwołany profil pokazuje „Dostęp do
+dyskusji został zakończony.”. Funkcje administracyjne nie mają
+uprawnień wykonania dla przeglądarki ani publicznego API.
+
+### Powiadomienia
+
+Trzy kategorie w ustawieniach obejmują centrum i dostawę w tle. Ustawienia
+połączonych urządzeń są wspólne w obrębie aktualnej generacji pokoju.
+Przeglądarka pyta o zgodę na dostawę w tle po użyciu przycisku w ustawieniach.
+Przypomnienie dla dyżurnego pokoju przypada w piątek o 14:00 w Europe/Warsaw.
+
+[Konfiguracja podglądu, Web Push i dostępu administracyjnego](supabase/functions/g19-deliver/README.md).
+
+### Testy Dyskusji
+
+Po zainstalowaniu Playwright i `@electric-sql/pglite` uruchom
+`node --test tests/dyskusje.test.mjs`. Test przeglądarkowy łączy niezależne konteksty
+z rzeczywistą migracją PostgreSQL w PGlite przez lokalny odpowiednik RPC.
+`CHROME_PATH` może wskazać zainstalowane Chromium. Przed publikacją pozostaje
+test połączenia z konkretnym projektem Supabase.
+
+Test regresji `pg-safeupdate` uruchom przez `psql -X -d <pusta_baza_testowa> -f
+tests/dyskusje-safeupdate.sql`. Wymaga odizolowanej bazy PostgreSQL z rolami
+`anon`, `authenticated`, `service_role` i użytkownika uprawnionego do załadowania
+modułu. Ustaw `G19_SAFEUPDATE_LIBRARY` na nazwę lub ścieżkę biblioteki
+`safeupdate`. Test odtwarza błąd 21000 z wcześniejszą funkcją, stosuje poprawkę
+i sprawdza czat z dwoma urządzeniami oraz zachowanie uprawnień.
+
+### Powiadomienia w podglądzie
+
+Po migracjach 001–004 zastosuj kolejno 005 i 006. Dzwonek pokazuje stan odczytu
+bieżącego urządzenia. Kategorie w aplikacji i push mają osobne ustawienia.
+Przypomnienie o dyżurze przypada w piątek o 14:00 czasu Europe/Warsaw.
+
+[Instrukcja wdrożenia zadania i konfiguracji VAPID](supabase/functions/g19-deliver/README.md).

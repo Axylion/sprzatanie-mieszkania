@@ -7,13 +7,18 @@
     szafki: '<rect x="3" y="2" width="18" height="20" rx="2"/><path d="M12 2v20m-3-11v3m6-3v3"/>',
     okap: '<path d="M9 3h6v7l7 5v3H2v-3l7-5V3Zm0 7h6M2 15h20M7 20c-1 1 1 2 0 3m5-3c-1 1 1 2 0 3m5-3c-1 1 1 2 0 3"/>',
     blysk: '<path d="M9 3c1.3 4.7 2.3 5.7 7 7-4.7 1.3-5.7 2.3-7 7-1.3-4.7-2.3-5.7-7-7 4.7-1.3 5.7-2.3 7-7Zm10 10c.6 2 1.4 2.8 3.5 3.5-2.1.7-2.9 1.5-3.5 3.5-.7-2-1.5-2.8-3.5-3.5 2-.7 2.8-1.5 3.5-3.5Z"/>',
+    spray: '<path d="M10 8h5l2 4v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1v-5l3-4V8Zm0 0V4h7l3 2v2h-5M6 4H3m3 3H4"/>',
+    sponge: '<path d="m3 12 13-7 5 3v5L8 20l-5-3v-5Zm0 0 5 3 13-7M8 15v5m1-8h.01m4-2h.01m4-2h.01"/>',
+    reset: '<path d="M20 8v4h-4M4 16v-4h4m11-2A7 7 0 0 0 6 7L4 9m16 6-2 2a7 7 0 0 1-13-3"/>',
     warstwy: '<path d="m12 3 10 5-10 5L2 8l10-5Zm-10 9 10 5 10-5M2 16l10 5 10-5"/>',
     informacja: '<circle cx="12" cy="12" r="10"/><path d="M12 11v6m0-10v.1"/>'
   };
 
   const home = document.querySelector("#harmonogram");
-  const homeEntry = document.querySelector(".guide-entry");
+  const homeEntry = home.querySelector('a[href="#poradnik"]');
   const guide = document.querySelector("#poradnik-view");
+  const discussion = document.querySelector("#discussion-view");
+  const discussionEntry = document.querySelector("#chat-open");
   const footer = document.querySelector("footer");
   const gallery = document.querySelector("#poradnik-gallery");
   const galleryImage = gallery.querySelector("img");
@@ -26,6 +31,50 @@
   let cardIndex = 0;
   let currentHash;
   let homeScroll = 0;
+  const supplyKey = "goleszan19-guide-supplies-v1";
+  const supplies = [
+    ["degreaser", "Odtłuszczacz"], ["oven", "Środek do piekarnika"],
+    ["glass", "Płyn do szyb"], ["mould", "Środek na pleśń"],
+    ["shower", "Środek do kabin prysznicowych"], ["limescale", "Odkamieniacz"],
+    ["wc", "Środek do WC"]
+  ];
+  const accessories = [
+    ["sponge", "Gąbka"], ["microfiber", "Ściereczka z mikrofibry"],
+    ["paper", "Ręcznik papierowy"], ["gloves", "Rękawice ochronne"]
+  ];
+  const checkedSupplies = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(supplyKey) || "[]");
+    if (Array.isArray(saved)) {
+      for (const [id] of [...supplies, ...accessories]) if (saved.includes(id)) checkedSupplies.add(id);
+    }
+  } catch { /* The checklist remains usable without local storage. */ }
+
+  function saveSupplies() {
+    try { localStorage.setItem(supplyKey, JSON.stringify([...checkedSupplies])); }
+    catch { /* A blocked write should not undo the current page state. */ }
+  }
+
+  function checklist() {
+    const rows = items => items.map(([id, label]) =>
+      `<li><label><input type="checkbox" data-supply="${id}"${checkedSupplies.has(id) ? " checked" : ""}><span>${label}</span></label></li>`
+    ).join("");
+    return `<section class="guide-panel guide-checklist" aria-labelledby="guide-checklist-title">
+      <h2 id="guide-checklist-title">${icon("warstwy")} <span>Lista środków do sprzątania</span></h2>
+      <div class="guide-checklist-columns">
+        <section aria-labelledby="guide-supplies-heading">
+          <h3 id="guide-supplies-heading">${icon("spray")} Środki czystości</h3>
+          <ul>${rows(supplies)}</ul>
+        </section>
+        <section aria-labelledby="guide-accessories-heading">
+          <h3 id="guide-accessories-heading">${icon("sponge")} Akcesoria</h3>
+          <ul>${rows(accessories)}</ul>
+        </section>
+      </div>
+      <button type="button" class="guide-checklist-clear">${icon("reset")} Wyczyść zaznaczenia</button>
+    </section>`;
+  }
+
 
   function icon(id) {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${icons[id]}</svg>`;
@@ -65,8 +114,10 @@
 
   function illustration(card, index) {
     if (index === undefined) return "";
+    const image = `./poradnik/media/${card.id}-ikony`;
     return `<span class="guide-illustration" aria-hidden="true" style="--tile: ${index}">
-      <img src="./poradnik/media/${card.id}-ikony.webp" alt="" decoding="async">
+      <img class="guide-illustration-dark" src="${image}.webp" alt="" decoding="async">
+      <img class="guide-illustration-light" src="${image}-light.webp" alt="" decoding="async">
     </span>`;
   }
 
@@ -116,6 +167,7 @@
       </article>
       ${cardNavigation()}
       ${categoryNav(card.section)}
+      ${checklist()}
     `;
   }
 
@@ -123,21 +175,40 @@
     const hash = location.hash;
     if (hash === currentHash) return;
     const wasGuide = !guide.hidden;
+    const wasDiscussion = !discussion.hidden;
+    const admin = document.getElementById("admin-view");
+    const showAdmin = hash === "#administracja";
+    const wasAdmin = !admin.hidden;
+    admin.hidden = !showAdmin;
+    const showDiscussion = hash === "#dyskusje" || hash.startsWith("#dyskusje/prywatne");
     const showGuide = hash === "#poradnik" || hash.startsWith("#poradnik/");
     currentHash = hash;
     if (gallery.open) gallery.close();
+    if ((showGuide || showDiscussion || showAdmin) && !wasGuide && !wasDiscussion && !wasAdmin) homeScroll = window.scrollY;
+    discussion.hidden = !showDiscussion;
     if (!showGuide) {
-      home.hidden = footer.hidden = false;
+      home.hidden = showDiscussion || showAdmin;
       guide.hidden = true;
       document.title = homeTitle;
-      if (wasGuide) {
-        homeEntry.focus({ preventScroll: true });
-        window.scrollTo({ top: homeScroll, behavior: "instant" });
+      if (showDiscussion) {
+        document.title = "Dyskusje · Goleszan 19";
+        if (!wasDiscussion) {
+          discussion.querySelector("h1").focus({ preventScroll: true });
+          window.scrollTo({ top: 0, behavior: "instant" });
+        }
+      } else if (showAdmin) {
+        document.title = "Administracja — Zarządzanie pokojami · Goleszan 19";
+        window.scrollTo({ top: 0, behavior: "instant" });
+      } else if (hash === "#ustawienia") {
+        document.getElementById("settings-title").focus({ preventScroll: true });
+        document.getElementById("ustawienia").scrollIntoView({ behavior: "instant" });
+      } else if (wasGuide || wasDiscussion || wasAdmin) {
+        (wasAdmin ? footer.querySelector('a[href="#administracja"]') : wasGuide ? homeEntry : discussionEntry).focus({ preventScroll: true });
+        if (!hash.startsWith("#ogloszenie-")) window.scrollTo({ top: homeScroll, behavior: "instant" });
       }
       return;
     }
 
-    if (!wasGuide) homeScroll = window.scrollY;
     cardIndex = Math.max(0, guideCards.findIndex(card => cardLink(card) === hash));
     const currentCard = guideCards[cardIndex];
     photos = [...currentCard.photos, ...currentCard.steps.filter(step => step.photo).map(step => step.photo)]
@@ -146,12 +217,12 @@
     guide.innerHTML = `
       <div class="guide-frame">
         <div class="guide-top">
-          <a href="#harmonogram">← Harmonogram</a>
+          <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
         </div>
         ${cardContent(currentCard)}
       </div>
     `;
-    home.hidden = footer.hidden = true;
+    home.hidden = true;
     guide.hidden = false;
     document.title = `${currentCard.title} · Poradnik sprzątania`;
     guide.querySelector("h1").focus({ preventScroll: true });
@@ -166,7 +237,20 @@
     galleryCaption.textContent = `${photoIndex + 1} / ${photos.length} · ${alt}`;
   }
 
+  guide.addEventListener("change", event => {
+    const field = event.target;
+    if (!field.dataset.supply) return;
+    if (field.checked) checkedSupplies.add(field.dataset.supply);
+    else checkedSupplies.delete(field.dataset.supply);
+    saveSupplies();
+  });
   guide.addEventListener("click", event => {
+    if (event.target.closest(".guide-checklist-clear")) {
+      checkedSupplies.clear();
+      guide.querySelectorAll("[data-supply]").forEach(input => { input.checked = false; });
+      saveSupplies();
+      return;
+    }
     const control = event.target.closest("[data-card-step]");
     if (control) {
       changeCard(Number(control.dataset.cardStep));

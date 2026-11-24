@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 WARSAW = ZoneInfo('Europe/Warsaw')
 UTC = timezone.utc
-ISO = re.compile(r'\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?)?\Z')
+ISO = re.compile(r'\d{4}-\d{2}-\d{2}(?:T(?:[01][0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9](?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?)?\Z')
 LOG = logging.getLogger(__name__)
 
 

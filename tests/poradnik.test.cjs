@@ -6,6 +6,11 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
+async function setTheme(page, theme) {
+  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-menu label:has(input[value="' + theme + '"])').click();
+}
+
 const prefix = '/sprzatanie-mieszkania/';
 const types = {
   '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript',
@@ -55,9 +60,9 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.goto(url);
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.waitForFunction(() => navigator.serviceWorker.controller);
-    assert.ok(await page.locator('.hero + .guide-entry').isVisible());
-    await page.locator('#theme-select').selectOption('dark');
-    await page.locator('.guide-entry').tap();
+    assert.ok(await page.locator('.dashboard-links a[href="#poradnik"]').isVisible());
+    await setTheme(page, 'dark');
+    await page.getByRole('link', { name: /Poradnik sprzątania/ }).tap();
     const title = page.locator('#guide-title');
     await title.waitFor();
     assert.equal(await title.innerText(), 'Szafki kuchenne i ściana robocza');
@@ -114,11 +119,6 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
       await page.waitForFunction(number => document.querySelector('.guide-card-position')?.textContent === `${number} / 8`, index + 1);
     }
 
-    // A vertical drag scrolls the page, and a diagonal drag leaves the same card open.
-    await swipe(240, 400, 0, -190);
-    await page.waitForFunction(() => scrollY > 60);
-    await swipe(250, 400, -100, -110);
-    assert.equal(await position.innerText(), '1 / 8');
     await page.getByRole('navigation', { name: 'Działy poradnika' }).getByRole('link', { name: 'Toalety' }).click();
     await page.waitForURL('**/#poradnik/toaleta');
     await page.waitForFunction(() => document.querySelector('.guide-categories [aria-current]')?.textContent === 'Toalety' && scrollY === 0);
@@ -166,12 +166,36 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     await page.waitForURL('**/#poradnik/toaleta');
     await page.goForward();
     await page.locator('.hero').waitFor();
-    assert.equal(await page.locator('#theme-select').inputValue(), 'dark');
+    assert.equal(await page.locator('#theme-menu input:checked').inputValue(), 'dark');
 
+    await page.goto(`${url}#poradnik/szafki`);
+    const checklist = page.getByRole('region', { name: 'Lista środków do sprzątania' });
+    assert.equal(await checklist.getByRole('checkbox').count(), 11);
+    assert.equal(await checklist.getByRole('heading', { name: 'Akcesoria' }).isVisible(), true);
+    await checklist.getByRole('checkbox', { name: 'Płyn do szyb' }).check();
+    assert.equal(await checklist.getByRole('checkbox').count(), 11);
+    await checklist.getByRole('checkbox', { name: 'Rękawice ochronne' }).check();
+    await setTheme(page, 'light');
+    assert.equal(await checklist.locator(':checked').count(), 2);
+    await setTheme(page, 'dark');
+    await page.reload();
+    assert.equal(await checklist.getByRole('checkbox', { name: 'Płyn do szyb' }).isChecked(), true);
+    assert.equal(await checklist.getByRole('checkbox', { name: 'Rękawice ochronne' }).isChecked(), true);
+    await checklist.getByRole('button', { name: 'Wyczyść zaznaczenia' }).click();
+    assert.equal(await checklist.locator(':checked').count(), 0);
+
+    await page.getByRole('link', { name: '← Harmonogram' }).click();
     // All photos must be usable on their first offline visit, including photos in the steps.
     await context.setOffline(true);
     for (const width of [320, 390, 1280]) {
       await page.setViewportSize({ width, height: 844 });
+      await page.goto(`${url}#poradnik/szafki`);
+      const cols = await page.locator('.guide-checklist-columns > section').evaluateAll(items => items.map(item => {
+        const rect = item.getBoundingClientRect();
+        return { x: rect.x, y: rect.y };
+      }));
+      assert.equal(cols[0].y === cols[1].y, width === 1280);
+      assert.equal(cols[0].x === cols[1].x, width !== 1280);
       for (const [index, [id, section]] of cards.entries()) {
         await page.goto(`${url}#poradnik/${id}`);
         await page.waitForFunction(number => document.querySelector('.guide-card-position')?.textContent === `${number} / 8`, index + 1);
@@ -181,6 +205,21 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
           return images.length === expected && illustrations.length > 0 &&
             [...images, ...illustrations].every(img => img.complete && img.naturalWidth > 0);
         }, id === 'zlewozmywak' ? 7 : 3);
+        const readIllustrations = () => page.locator('.guide-illustration').evaluateAll(tiles =>
+          tiles.map(tile => {
+            const active = [...tile.querySelectorAll('img')].filter(img => getComputedStyle(img).display !== 'none');
+            const { width, height } = tile.getBoundingClientRect();
+            return { sources: active.map(img => new URL(img.currentSrc).pathname), width, height };
+          })
+        );
+        assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+        const dark = await readIllustrations();
+        assert.ok(dark.every(tile => tile.sources.length === 1 && tile.sources[0].endsWith(`/${id}-ikony.webp`)));
+        await setTheme(page, 'light');
+        const light = await readIllustrations();
+        assert.deepEqual(light, dark.map(tile => ({ ...tile, sources: tile.sources.map(src => src.replace('.webp', '-light.webp')) })));
+        await setTheme(page, 'dark');
+        assert.deepEqual(await readIllustrations(), dark);
         assert.equal(await page.locator('.guide-categories [aria-current]').innerText(), section);
         assert.equal(await position.innerText(), `${index + 1} / 8`);
         assert.equal(await previous.isDisabled(), index === 0);
@@ -198,7 +237,16 @@ test('guide routes, accessible gallery, responsive layout and offline links unde
     }
     await page.getByRole('link', { name: '← Harmonogram' }).click();
     await page.locator('#next-room').waitFor();
-    assert.equal(await page.locator('#schedule .schedule-row').count(), 12);
+    assert.ok(await page.locator('#calendar-days .calendar-day').count() >= 28);
+    // Leave scrolling gestures last so native inertial scrolling does not affect later clicks.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('link', { name: /Poradnik sprzątania/ }).click();
+    await page.waitForFunction(() => document.querySelector('.guide-card-position')?.textContent === '1 / 8' && scrollY === 0);
+    // A vertical drag scrolls the page, and a diagonal drag leaves the same card open.
+    await swipe(240, 400, 0, -190);
+    await page.waitForFunction(() => scrollY > 60);
+    await swipe(250, 400, -100, -110);
+    assert.equal(await position.innerText(), '1 / 8');
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();

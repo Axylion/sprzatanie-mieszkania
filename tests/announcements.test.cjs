@@ -56,7 +56,7 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
     res.setHeader('Content-Type', mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(name === 'sw.js' && legacy
-      ? contents.toString().replace('shell-v13-11-0-f1', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
+      ? contents.toString().replace('shell-v13-11-0-f1-push1', 'shell-v13-10-2').replace(', "./dyskusje/private-chat.js?v=ui4"', '')
       : contents);
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -114,8 +114,8 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
       cacheState = await page.evaluate(async () => {
         const registration = await navigator.serviceWorker.getRegistration();
         const keys = await caches.keys();
-        const hasShell = keys.includes('goleszan19-shell-v13-11-0-f1');
-        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-f1')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
+        const hasShell = keys.includes('goleszan19-shell-v13-11-0-f1-push1');
+        const hasPrivate = hasShell && Boolean(await (await caches.open('goleszan19-shell-v13-11-0-f1-push1')).match(new URL('./dyskusje/private-chat.js?v=ui4',location.href).href));
         return {ready:hasPrivate && !keys.includes('goleszan19-shell-v13-10-2') && registration.active?.state === 'activated' && !registration.installing && !registration.waiting,hasPrivate};
       });
       if (cacheState.ready) break;
@@ -482,7 +482,7 @@ test('mobile announcements, refresh, themes and offline PWA', async () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller);
     // Even a deliberately seeded stale PWA response must never be used for news.
     await page.evaluate(async () => {
-      const c = await caches.open('goleszan19-shell-v13-11-0-f1');
+      const c = await caches.open('goleszan19-shell-v13-11-0-f1-push1');
       await c.put('./announcements.json',new Response('[{"stale":true}]'));
     });
     assert.deepEqual(await page.evaluate(async () => (await fetch('/rest/v1/rpc/g19_public_announcements', {method:'POST'})).json()), data);

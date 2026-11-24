@@ -50,6 +50,11 @@ test('Manual push is scoped to active duty subscribers, records real outcomes an
   const [start, next] = await roomPeriods(db);
   const send = (room, period, id = randomUUID()) => admin('web_admin_send_duty', [room, period, id]);
   const result = () => admin('web_admin_duty_push_result', [1,start]);
+  const exact = id => admin('web_admin_duty_push_request', [id]);
+  const summary = ({ expiresAt, ...value }) => {
+    assert.ok(Number.isFinite(Date.parse(expiresAt)));
+    return value;
+  };
   await assert.rejects(rpc('web_admin_send_duty', [1,start,randomUUID()], 'authenticated'), { code:'PT403' });
   assert.equal((await send(1,next)).status, 'none');
   const subscribe = (key, path, categories) => rpc('push_subscription', [key, 'https://fcm.googleapis.com/fcm/send/' + path, 'A'.repeat(87), 'B'.repeat(22), categories]);
@@ -58,9 +63,12 @@ test('Manual push is scoped to active duty subscribers, records real outcomes an
   await subscribe(token[3], 'room-3-no-duty-push', ['messages']);
   await subscribe(token[2], 'room-2-a', ['duties']);
   const id = randomUUID();
-  assert.deepEqual(await send(1,start,id), { requestId:id, status:'pending', total:2, sent:0 });
+  assert.deepEqual(summary(await send(1,start,id)), { requestId:id, status:'pending', total:2, sent:0 });
   assert.equal((await send(1,start,id)).requestId,id);
-  assert.equal((await send(1,start)).requestId,id);
+  const coalesced = randomUUID();
+  assert.equal((await send(1,start,coalesced)).requestId,id);
+  assert.equal((await exact(coalesced)).requestId,id);
+  await assert.rejects(rpc('web_admin_duty_push_request', [id], 'authenticated'), { code:'PT403' });
   assert.equal((await result()).status,'pending');
   assert.deepEqual(await rpc('missed_duties'), []);
   const batch = await rpc('push_take', [], 'service_role');
@@ -74,11 +82,14 @@ test('Manual push is scoped to active duty subscribers, records real outcomes an
   assert.equal(await rpc('manual_duty_delivery_active',[first.id],'service_role'),true);
   await rpc('push_finish',[first.id, first.lease, 'sent'],'service_role');
   await rpc('push_finish',[second.id, second.lease, 'retry'],'service_role');
-  assert.deepEqual(await result(), { requestId:id, status:'partial', total:2, sent:1 });
+  assert.deepEqual(summary(await result()), { requestId:id, status:'partial', total:2, sent:1 });
+  assert.deepEqual(await rpc('push_take', [], 'service_role'), []);
+  assert.equal((await send(1,start,coalesced)).status,'partial');
   assert.deepEqual(await rpc('push_take', [], 'service_role'), []);
   await admin('web_admin_save_duty', [1,start,true]);
   const again = await send(1,start);
   assert.notEqual(again.requestId,id);
+  assert.equal((await exact(coalesced)).status,'partial');
   const repeated = await rpc('push_take', [], 'service_role');
   assert.equal(repeated.length, 2);
   assert.match(pushPayload(repeated[0]).title, /niewykonanym/);
@@ -89,7 +100,11 @@ test('Manual push is scoped to active duty subscribers, records real outcomes an
   for (const item of await rpc('push_take', [], 'service_role')) {
     await rpc('push_finish',[item.id,item.lease,'sent'],'service_role');
   }
-  assert.deepEqual(await result(), { requestId:complete.requestId, status:'sent', total:2, sent:2 });
+  assert.deepEqual(summary(await result()), { requestId:complete.requestId, status:'sent', total:2, sent:2 });
+  const expired = await send(1,start);
+  await db.query("update g19_private.manual_duty_push set created_at=now()-interval '5 minutes' where request_id=$1", [expired.requestId]);
+  assert.equal((await exact(expired.requestId)).status,'failed');
+  assert.deepEqual(await rpc('push_take', [], 'service_role'), []);
   const interrupted = await send(1,start);
   assert.equal(interrupted.status,'pending');
   await db.exec(await readFile(new URL('../supabase/maintenance/rollback-f1.sql', import.meta.url), 'utf8'));

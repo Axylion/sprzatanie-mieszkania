@@ -1,8 +1,8 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v13-11-0-f1";
+const CACHE_NAME = "goleszan19-shell-v13-11-0-f1-push1";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
-  "./dyskusje/notifications.js?v=ui4", "./administracja/admin.js?v=f1", "./administracja/dyzury.js?v=f1", "./administracja/announcements.js?v=f1", "./ogloszenia/content.js",
+  "./dyskusje/notifications.js?v=ui4", "./administracja/admin.js?v=f1", "./administracja/dyzury.js?v=f1-push1", "./administracja/announcements.js?v=f1", "./ogloszenia/content.js",
   "./dyskusje/dyskusje.css?v=ui6-r2", "./dyskusje/config.js", "./dyskusje/dyskusje.js?v=ui4", "./dyskusje/private-chat.js?v=ui4",
   "./kalendarz/kalendarz.js?v=f1", "./kalendarz/kalendarz.css?v=f1",
   "./poradnik/poradnik.css?v=f1", "./poradnik/dane.js", "./poradnik/poradnik.js?v=f1",

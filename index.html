@@ -411,7 +411,7 @@
   <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
   <script defer src="./dyskusje/notifications.js?v=ui4"></script>
   <script defer src="./ogloszenia/content.js"></script>
-  <script defer src="./administracja/dyzury.js?v=f1"></script>
+  <script defer src="./administracja/dyzury.js?v=f1-push1"></script>
   <script defer src="./administracja/announcements.js?v=f1"></script>
   <script defer src="./administracja/admin.js?v=f1"></script>
   </template>
@@ -791,6 +791,7 @@
             <p>Wyślij przypomnienie o dyżurze do wybranego pokoju.</p>
             <p class="admin-duty-note">Powiadomienie otrzymają tylko urządzenia z aktywną subskrypcją push dla dyżurów.</p>
             <button type="button" id="admin-duty-send">Wyślij przypomnienie</button>
+            <p id="admin-duty-push-feedback" role="status" hidden></p>
           </section>
           <p id="admin-duty-feedback" role="status"></p>
         </div>

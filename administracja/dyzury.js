@@ -8,35 +8,65 @@
   const send = byId("send");
   const dialog = byId("confirm");
   const feedback = byId("feedback");
+  const pushFeedback = byId("push-feedback");
   const pending = new Map();
+  const waitLimit = 4 * 60 * 1000;
+  const storageKey = "g19-manual-duty:";
+  const finalStatuses = ["none", "sent", "partial", "failed"];
   const messages = {
     pending: "Oczekuje na wynik wysyłki.",
     none: "Brak aktywnych subskrypcji dla dyżurów w wybranym pokoju.",
     sent: "Usługa push przyjęła wszystkie powiadomienia.",
     partial: "Usługa push przyjęła część powiadomień.",
-    failed: "Nie udało się wysłać powiadomienia."
+    failed: "Nie udało się wysłać powiadomienia.",
+    unknown: "Nie udało się potwierdzić wyniku wysyłki. Odśwież wynik przed ponownym wysłaniem.",
+    unconfirmed: "Nie potwierdzono zlecenia. Możesz ponowić ten sam wniosek lub odświeżyć wynik."
   };
   let rpc, unauthorized;
   let periods, currentRoom, currentDate;
   let saved = false, ready = false, busy = false;
   let result;
   let generation = 0;
-  let pollTimer;
+  let pollTimer, expiryTimer;
+  let receipt;
+  let retryAfter = 4000;
   const toISO = timestamp => new Date(timestamp).toISOString().slice(0, 10);
   const asTimestamp = value => Date.parse(value + "T00:00:00Z");
   const selectionKey = () => currentRoom + ":" + currentDate;
   const args = () => ({ p_room: Number(currentRoom), p_starts_on: currentDate });
+  function readReceipt(key) {
+    if (pending.has(key)) return pending.get(key);
+    try { return JSON.parse(sessionStorage.getItem(storageKey + key)); }
+    catch { return null; }
+  }
+  function remember(key, value) {
+    pending.set(key, value);
+    try {
+      if (value) sessionStorage.setItem(storageKey + key, JSON.stringify(value));
+      else sessionStorage.removeItem(storageKey + key);
+    } catch { /* Retain the key in memory when storage is unavailable. */ }
+  }
+  function finishPolling() {
+    clearTimeout(pollTimer);
+    clearTimeout(expiryTimer);
+  }
+  const fetchResult = () => receipt
+    ? rpc("duty_push_request", { p_request_id: receipt.id })
+    : rpc("duty_push_result", args());
   const dirty = () => ready && missed.checked !== saved;
   const future = () => asTimestamp(currentDate) > todayInPoland();
   const showResult = () => {
     const counts = result && ["sent", "partial"].includes(result.status) ? ` (${result.sent}/${result.total})` : "";
-    byId("preview-push").textContent = result ? messages[result.status] + counts : "Nie wysłano";
+    const message = result ? messages[result.status] + counts : "";
+    byId("preview-push").textContent = message || "Nie wysłano";
+    if (pushFeedback.textContent !== message) pushFeedback.textContent = message;
+    pushFeedback.hidden = !message;
   };
   function controls() {
     room.disabled = date.disabled = busy;
     missed.disabled = !ready || busy || Boolean(future());
     save.disabled = !dirty() || busy;
-    send.disabled = !currentDate || busy || result?.status === "pending";
+    send.disabled = !currentDate || busy || result?.status === "pending" || result?.status === "unknown";
     showResult();
   }
   function populate(roomNumber) {
@@ -95,32 +125,67 @@
     if ([401, 403].includes(err.status)) unauthorized();
     else feedback.textContent = message;
   }
-  function track(next) {
-    result = next;
+  function waitExpired() {
+    finishPolling();
+    result = { status: receipt?.accepted ? "unknown" : "unconfirmed" };
     controls();
-    clearTimeout(pollTimer);
-    if (next?.status === "pending" && !section.hidden) pollTimer = setTimeout(poll, 4000);
+  }
+  function schedulePoll() {
+    finishPolling();
+    const remaining = receipt.deadline - Date.now();
+    if (remaining <= 0) return waitExpired();
+    if (section.hidden) return;
+    expiryTimer = setTimeout(waitExpired, remaining);
+    pollTimer = setTimeout(poll, Math.min(retryAfter, remaining));
+  }
+  function track(next) {
+    retryAfter = 4000;
+    finishPolling();
+    if (next && finalStatuses.includes(next.status)) {
+      receipt = null;
+      remember(selectionKey(), null);
+      result = next;
+    } else if (next?.status === "pending" && next.requestId) {
+      const deadline = Date.parse(next.expiresAt);
+      receipt = {
+        id: receipt?.id || next.requestId,
+        deadline: Math.min(receipt?.deadline ?? Infinity,
+          Number.isFinite(deadline) ? deadline + 8000 : Date.now() + waitLimit),
+        accepted: true
+      };
+      remember(selectionKey(), receipt);
+      result = next;
+      schedulePoll();
+    } else if (receipt) {
+      waitExpired();
+    } else {
+      result = null;
+    }
+    controls();
   }
   async function poll() {
+    if (result?.status !== "pending" || !receipt || section.hidden) return;
+    if (Date.now() >= receipt.deadline) return waitExpired();
     const request = generation;
     try {
-      const next = await rpc("duty_push_result", args());
-      if (request === generation && !section.hidden) track(next);
+      const next = await fetchResult();
+      if (request === generation && !section.hidden && result?.status === "pending") track(next);
     } catch (err) {
-      if (request !== generation || section.hidden) return;
-      error(err, "Nie udało się odczytać wyniku wysyłki.");
-      if (result?.status === "pending") pollTimer = setTimeout(poll, 10000);
+      if (request !== generation || section.hidden || result?.status !== "pending") return;
+      if ([401, 403].includes(err.status)) return unauthorized();
+      retryAfter = 10000;
+      schedulePoll();
     }
   }
   async function refresh() {
     if (busy || !currentDate) return false;
     const request = ++generation;
-    clearTimeout(pollTimer);
+    finishPolling();
     const keepDraft = dirty();
     busy = true;
     if (!keepDraft) ready = false;
     controls();
-    const outcomes = await Promise.allSettled([g19CalendarDetails.missedDuties(), rpc("duty_push_result", args())]);
+    const outcomes = await Promise.allSettled([g19CalendarDetails.missedDuties(), fetchResult()]);
     if (request !== generation) return false;
     busy = false;
     if (outcomes[0].status === "fulfilled") {
@@ -130,7 +195,13 @@
     } else feedback.textContent = "Nie udało się pobrać statusu dyżuru.";
     preview();
     if (outcomes[1].status === "fulfilled") track(outcomes[1].value);
-    else error(outcomes[1].reason, "Nie udało się odczytać wyniku wysyłki.");
+    else {
+      error(outcomes[1].reason, "Nie udało się odczytać wyniku wysyłki.");
+      if (request === generation && receipt) {
+        if (result?.status === "pending") schedulePoll();
+        else waitExpired();
+      }
+    }
     return outcomes.every(item => item.status === "fulfilled");
   }
   function pick(roomNumber, period) {
@@ -139,6 +210,7 @@
     currentRoom = room.value = roomNumber;
     currentDate = date.value;
     ready = saved = missed.checked = false;
+    receipt = readReceipt(selectionKey());
     result = null;
     feedback.textContent = "";
     preview();
@@ -182,21 +254,26 @@
     if (!await confirmAction("Wyślij przypomnienie?", "Pokój nr " + currentRoom + " — dyżur " + periods.get(currentDate) + ".", "Wyślij")) return;
     if (section.hidden || key !== selectionKey() || send.disabled) return;
     const request = ++generation;
-    const id = pending.get(key) || crypto.randomUUID();
-    pending.set(key, id);
+    const id = receipt?.id || crypto.randomUUID();
+    receipt = { id, deadline: Date.now() + waitLimit, accepted: false };
+    remember(key, receipt);
     busy = true;
     feedback.textContent = "";
     controls();
     try {
       const next = await rpc("send_duty", { ...args(), p_request_id: id });
       if (request !== generation) return;
-      pending.delete(key);
       track(next);
-      feedback.textContent = messages[next.status];
     } catch (err) {
       if (request !== generation) return;
-      if (err.status && err.status < 500) pending.delete(key);
-      error(err, "Nie potwierdzono zlecenia. Ponów próbę lub odśwież wynik.");
+      if (err.status && err.status < 500 && err.status !== 408 && err.status !== 429) {
+        receipt = null;
+        remember(key, null);
+        result = null;
+        error(err, "Nie udało się zlecić wysyłki powiadomienia.");
+      } else {
+        waitExpired();
+      }
     } finally {
       if (request === generation) {
         busy = false;
@@ -224,7 +301,7 @@
     setOpen(open) {
       const changed = open === section.hidden;
       section.hidden = !open;
-      clearTimeout(pollTimer);
+      finishPolling();
       if (open && changed) pick(currentRoom || room.value, currentDate);
     },
     canLeave,
@@ -233,8 +310,8 @@
       ++generation;
       busy = ready = false;
       currentRoom = currentDate = result = null;
-      clearTimeout(pollTimer);
-      pending.clear();
+      finishPolling();
+      receipt = null;
       if (dialog.open) dialog.close();
     }
   };

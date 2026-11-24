@@ -19,3 +19,7 @@ Przycisk potwierdza kolejkę, a panel odczytuje jej wynik co 4 sekundy. Wybieran
 1. Zablokuj zapis i nowe zlecenia F1 skryptem `maintenance/rollback-f1.sql`. Skrypt zachowuje wpisy statusów i historię prób. Oznacza niewysłane zadania jako zakończone bez sukcesu i wyklucza je z dotychczasowej kolejki.
 2. Poczekaj na zakończenie wywołania funkcji dostawy, jeśli jest aktywne. Przywróć wcześniejszą funkcję Edge i wdrożenie Pages UI7. Ponieważ stare karty PWA mogą nadal działać, sprawdź, czy UI7 przejął cache po zmianie wdrożenia.
 3. Przed kolejnym wdrożeniem F1 uruchom ponownie migracje 022–023, aby przywrócić dostęp. Nie usuwaj tabel ani wpisów. Nie zmieniaj harmonogramu automatycznych powiadomień.
+
+## Korekta statusu wysyłki F1
+
+W testowym SQL Editor uruchom skrypt odczytu `maintenance/inspect-manual-duty-push.sql`, dobierając pokój i przedział czasu. Wynik pokazuje kolejkę, dzierżawę i wynik dostawcy bez danych subskrypcji. Następnie zastosuj migrację 024 przed wdrożeniem aktualizacji Pages. Aktualizacja nie wymaga ponownego wdrożenia funkcji Edge ani zmiany Cron. Starszy klient nadal może odpytywać ostatnie zlecenie dla pokoju i daty.

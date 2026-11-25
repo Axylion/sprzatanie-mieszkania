@@ -1,0 +1,10 @@
+{
+  "name": "Goleszan 19",
+  "version": "example",
+  "source_sha": "REPLACE_WITH_FULL_40_CHARACTER_SHA",
+  "build_command": "bash scripts/build-pages-ui8.sh",
+  "output_directory": "dist",
+  "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co",
+  "service_worker_version": "REPLACE_WITH_EXPECTED_SERVICE_WORKER_VERSION",
+  "expected_file_count": null
+}

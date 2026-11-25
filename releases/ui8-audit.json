@@ -1,0 +1,10 @@
+{
+  "name": "Goleszan 19 UI8",
+  "version": "ui8-audit",
+  "source_sha": "e8b0bf30b5cb8b14b5600502fb973ac6b8fb2de3",
+  "build_command": "bash scripts/build-pages-ui8.sh",
+  "output_directory": "dist",
+  "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co",
+  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui8-r2",
+  "expected_file_count": 67
+}

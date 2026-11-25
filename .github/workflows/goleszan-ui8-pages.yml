@@ -1,0 +1,151 @@
+name: Goleszan UI8 test Pages release
+run-name: Goleszan UI8 / ${{ github.ref_name }}
+
+on:
+  push:
+    tags:
+      - 'g19-ui8-api-*'
+      - 'g19-ui8-preview-*'
+      - 'g19-ui8-production-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: goleszan-19-preview-pages-release
+  cancel-in-progress: false
+
+env:
+  PAGES_PROJECT: goleszan-19-preview
+  PAGES_DOMAIN: goleszan-19-preview.pages.dev
+  EXPECTED_ACCOUNT_ID: 6c1ff8f43cd435c244a2f03a7650fe4e
+  ROLLBACK_ID: bce11002-c20d-4c37-88d8-8178dd3c1f9d
+  UI8_SHA: e8b0bf30b5cb8b14b5600502fb973ac6b8fb2de3
+  PREVIEW_BRANCH: ui8-wrangler-review
+
+jobs:
+  release:
+    if: >-
+      github.repository == 'Axylion/sprzatanie-mieszkania' &&
+      github.actor == 'Axylion' &&
+      github.event.created && !github.event.deleted
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Identify explicitly requested stage
+        id: stage
+        shell: bash
+        run: |
+          case "$GITHUB_REF_NAME" in
+            g19-ui8-api-*) stage=api ;;
+            g19-ui8-preview-*) stage=preview ;;
+            g19-ui8-production-*)
+              stage=production
+              preview_id=${GITHUB_REF_NAME#g19-ui8-production-}
+              [[ "$preview_id" =~ ^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$ ]]
+              echo "preview_id=$preview_id" >> "$GITHUB_OUTPUT"
+              ;;
+            *) exit 1 ;;
+          esac
+          if [[ "$stage" != api && "$GITHUB_RUN_ATTEMPT" != 1 ]]; then
+            echo 'A deployment requires a new, explicitly approved run.' >&2
+            exit 1
+          fi
+          echo "stage=$stage" >> "$GITHUB_OUTPUT"
+
+      - name: Check out exact verified UI8 commit
+        if: steps.stage.outputs.stage != 'api'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.UI8_SHA }}
+          persist-credentials: false
+
+      - name: Build static assets
+        if: steps.stage.outputs.stage != 'api'
+        shell: bash
+        run: |
+          [[ "$(git rev-parse HEAD)" == "$UI8_SHA" ]]
+          bash scripts/build-pages-ui8.sh
+          [[ "$(find dist -type f -printf '.' | wc -c)" -eq 67 ]]
+          [[ "$(jq -c . dist/announcements.json)" == '[]' ]]
+          grep -Fq 'https://pbsubdmuupwmtgzncxmh.supabase.co' dist/dyskusje/config.js
+          grep -Fq 'goleszan19-shell-v13-11-0-f1-ui8-r2' dist/sw.js
+
+      - name: Install pinned Wrangler
+        if: steps.stage.outputs.stage != 'api'
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/g19-wrangler" --no-save --no-audit --no-fund wrangler@4.168.0
+
+      - name: Check project and rollback target using GET only
+        id: preflight
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          APPROVED_PREVIEW_ID: ${{ steps.stage.outputs.preview_id }}
+        run: |
+          [[ -n "$CLOUDFLARE_API_TOKEN" && "$CLOUDFLARE_ACCOUNT_ID" == "$EXPECTED_ACCOUNT_ID" ]]
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT"
+
+          get_result() {
+            printf 'Authorization: Bearer %s\n' "$CLOUDFLARE_API_TOKEN" |
+              curl --silent --show-error --fail --max-time 30 --header @- --request GET -- "$api$1" |
+              jq -ce 'select(.success == true) | .result | select(type == "object")'
+          }
+
+          project=$(get_result '')
+          jq -e --arg project "$PAGES_PROJECT" --arg domain "$PAGES_DOMAIN" --arg id "$ROLLBACK_ID" '
+            .name == $project and .subdomain == $domain and
+            ((.domains // []) | all(. == $domain)) and
+            .source == null and .canonical_deployment.id == $id and
+            .canonical_deployment.environment == "production"
+          ' <<< "$project" >/dev/null || {
+            echo 'Project, domains, Git source, or active production deployment differs from expectations.' >&2
+            exit 1
+          }
+
+          rollback=$(get_result "/deployments/$ROLLBACK_ID")
+          jq -e --arg id "$ROLLBACK_ID" '
+            .id == $id and .environment == "production" and
+            .latest_stage.name == "deploy" and .latest_stage.status == "success"
+          ' <<< "$rollback" >/dev/null || {
+            echo 'Expected rollback deployment is missing or is not a successful Production deployment.' >&2
+            exit 1
+          }
+
+          production_branch=$(jq -er '.production_branch | select(type == "string")' <<< "$project")
+          git check-ref-format --branch "$production_branch" >/dev/null
+          [[ "$production_branch" != "$PREVIEW_BRANCH" ]]
+          echo "production_branch=$production_branch" >> "$GITHUB_OUTPUT"
+          printf 'Verified %s, active Production %s, successful rollback candidate.\n' "$PAGES_PROJECT" "$ROLLBACK_ID"
+
+          if [[ -n "$APPROVED_PREVIEW_ID" ]]; then
+            preview=$(get_result "/deployments/$APPROVED_PREVIEW_ID")
+            jq -e --arg id "$APPROVED_PREVIEW_ID" --arg sha "$UI8_SHA" --arg branch "$PREVIEW_BRANCH" '
+              .id == $id and .environment == "preview" and
+              .latest_stage.name == "deploy" and .latest_stage.status == "success" and
+              .deployment_trigger.metadata.branch == $branch and
+              .deployment_trigger.metadata.commit_hash == $sha
+            ' <<< "$preview" >/dev/null || {
+              echo 'Approved Preview does not match the verified UI8 build.' >&2
+              exit 1
+            }
+          fi
+
+      - name: Deploy only the requested environment
+        if: steps.stage.outputs.stage == 'preview' || steps.stage.outputs.stage == 'production'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_STAGE: ${{ steps.stage.outputs.stage }}
+          PRODUCTION_BRANCH: ${{ steps.preflight.outputs.production_branch }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          branch="$PREVIEW_BRANCH"
+          if [[ "$RELEASE_STAGE" == production ]]; then
+            branch="$PRODUCTION_BRANCH"
+          fi
+          "$RUNNER_TEMP/g19-wrangler/node_modules/.bin/wrangler" pages deploy dist \
+            --project-name="$PAGES_PROJECT" --branch="$branch" \
+            --commit-hash="$UI8_SHA" --commit-dirty=false

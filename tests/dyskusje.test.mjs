@@ -368,7 +368,8 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
       const method = route.request().url().split('g19_').at(-1);
       try {
         if (method === 'public_announcements') {
-          return route.fulfill({ json: JSON.parse(await readFile(resolve(root, 'announcements.json'), 'utf8')),
+          return route.fulfill({ json: [{id:'e2e-announcement',title:'Ogłoszenie testowe',body:'Treść testowa',
+            publishedAt:'2026-11-01T12:00:00Z'}],
             headers: { 'Access-Control-Allow-Origin': '*' } });
         }
         if (method === 'pair_claim' && losePairResponse) {
@@ -440,15 +441,19 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   const c = await device(390);
   const d = await device(768);
   async function joinRoom(page, room) {
-    await page.locator(`#discussion-rooms [data-room="${room}"]`).click();
-    await page.getByRole('button', { name: 'Połącz pokój', exact: true }).click();
+    if (await page.locator('#discussion-join').isVisible()) {
+      await page.locator('#discussion-connect').click();
+    }
+    await page.locator(`#room-buttons [data-room="${room}"]`).click();
+    await page.getByRole('button', { name: 'Podłącz urządzenie', exact: true }).click();
     await page.locator('#discussion-compose').waitFor();
   }
   async function pairDevice(newPage) {
     await newPage.setViewportSize({ width: 1280, height: 900 });
     await newPage.goto(base + '#dyskusje');
+    await newPage.locator('#discussion-connect').click();
     await newPage.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
-    await newPage.getByRole('button', { name: 'Połącz kolejne urządzenie' }).click();
+    await newPage.getByRole('button', { name: 'Podłącz kolejne urządzenie' }).click();
     await newPage.getByText('Oczekiwanie na potwierdzenie na połączonym urządzeniu.').waitFor();
     assert.equal(await newPage.locator('#discussion-compose').isVisible(), false);
     await screenshot(newPage, 'dyskusje-pair-desktop');
@@ -473,11 +478,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     assert.equal(await field.inputValue(), code.replace(' ', ''));
     await screenshot(a, 'dyskusje-approve-mobile');
     await approve.click();
-    await a.getByText('Urządzenie zostało pomyślnie połączone.').waitFor();
+    await a.locator('#discussion-approve').waitFor({state:'hidden'});
     assert.equal(await a.locator('#discussion-approve').getAttribute('open'), null);
     assert.equal(await field.inputValue(), '');
     await newPage.locator('#discussion-compose').waitFor();
-    await a.getByText('Urządzenie zostało pomyślnie połączone.').waitFor({ state: 'hidden' });
   }
   await a.clock.setFixedTime(new Date('2026-11-13T14:00:00Z'));
   await a.goto(base);
@@ -511,10 +515,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
     await setTheme(page, 'dark');
   }
   assert.match(await a.locator('.brand').innerText(), /Goleszan 19/);
-  assert.equal(await a.locator('#room-setup').isVisible(), false);
+  assert.equal(await a.locator('#room-setup').isVisible(), true);
   assert.ok(await a.getByRole('heading', { name: 'Moje urządzenia' }).isVisible());
   await a.getByRole('link', { name: /Dyskusje/ }).click();
-  await a.getByRole('heading', { name: 'Dołącz do dyskusji' }).waitFor();
+  await a.getByRole('heading', { name: 'Dołącz do dyskusji mieszkańców' }).waitFor();
   assert.equal(await a.locator('#discussion-compose').isVisible(), false);
   assert.equal(await a.evaluate(() => localStorage.getItem('goleszan19-discussion-device')), null);
   await joinRoom(a, 1);
@@ -575,9 +579,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   assert.match(await b.locator('#push-duties-status').innerText(), /Powiadomienia wyłączone/);
   assert.equal(await b.evaluate(() => window.pushRequests), 1);
   await c.goto(base + '#dyskusje');
+  await c.locator('#discussion-connect').click();
   await c.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
   losePairResponse = true;
-  await c.getByRole('button', { name: 'Połącz kolejne urządzenie' }).click();
+  await c.getByRole('button', { name: 'Podłącz kolejne urządzenie' }).click();
   const retry = c.getByRole('button', { name: 'Sprawdź ponownie' });
   await retry.waitFor();
   await retry.click();
@@ -598,9 +603,10 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await a.locator('#discussion-approve').waitFor({ state: 'hidden' });
   await c.locator('#discussion-approve').waitFor({ state: 'hidden' });
   await d.goto(base + '#dyskusje');
+  await d.locator('#discussion-connect').click();
   await d.getByRole('button', { name: /Pokój nr 1 Zajęty/ }).click();
-  await d.getByRole('button', { name: 'Połącz kolejne urządzenie' }).click();
-  await d.getByText(/Pokój ma już dwa urządzenia/).waitFor();
+  await d.getByRole('button', { name: 'Podłącz kolejne urządzenie' }).click();
+  await d.getByText('Osiągnięto limit urządzeń.').waitFor();
   assert.equal(new Set(await Promise.all([a, b, c].map(page =>
     page.evaluate(() => localStorage.getItem('goleszan19-discussion-device'))))).size, 3);
   await a.locator('#discussion-body').fill('   ');
@@ -684,15 +690,16 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await pairDevice(d);
   await db.query('select public.g19_admin_change_resident(1,1,2)');
   for (const page of [a, d]) {
-    await page.getByText('Dostęp do dyskusji został zakończony.').waitFor();
+    const revokedText = page === a ? 'To urządzenie zostało odłączone.' : 'Dostęp do dyskusji został zakończony.';
+    await page.getByText(revokedText, {exact:true}).waitFor();
     assert.equal(await page.locator('#discussion-compose').isVisible(), false);
   }
-  await a.reload();
+  await a.goto(base + '#ustawienia');
   await a.getByRole('button', { name: /Pokój nr 1 Wolny/ }).click();
-  await a.getByRole('button', { name: 'Połącz pokój', exact: true }).click();
+  await a.getByRole('button', { name: 'Podłącz urządzenie', exact: true }).click();
   await a.getByText('Administrator zablokował ponowne podłączenie tego urządzenia do pokoju.').waitFor();
   assert.equal(await a.locator('#discussion-compose').isVisible(), false);
-  await a.getByRole('link', { name: '← Harmonogram' }).click();
+  await a.getByRole('link', { name: 'Strona główna' }).click();
   await a.locator('#next-room').waitFor();
   await b.getByText('Pokój nr 1 · poprzedni mieszkaniec', { exact: true }).first().waitFor();
   const newcomer = await device(360);
@@ -703,7 +710,8 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await newcomer.getByRole('button', { name: 'Odłącz: to urządzenie' }).click();
   await newcomer.getByRole('button', { name: 'Odłącz urządzenie', exact: true }).click();
   await newcomer.getByText('To urządzenie zostało odłączone.', { exact: true }).waitFor();
-  await newcomer.getByRole('link', {name: 'Podłącz urządzenie w Dyskusjach'}).click();
+  await newcomer.locator('#chat-open').click();
+  await newcomer.locator('#discussion-connect').waitFor();
   await joinRoom(newcomer, 1);
   await newcomer.getByRole('link', {name: 'Strona główna'}).click();
   await newcomer.getByText('To urządzenie', {exact:true}).waitFor();

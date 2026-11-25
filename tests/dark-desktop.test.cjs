@@ -99,23 +99,13 @@ test('Dark desktop presentation preserves notification reading, field focus and 
     assert.equal(await control.evaluate(el=>getComputedStyle(el).boxShadow),'none',selector);
   }
   await page.locator('#device-list [data-kind="phone"][data-connected]').waitFor();
-  const phonePath=await page.locator('#device-list [data-kind="phone"] path').getAttribute('d');
-  const computerPath=await page.locator('#device-list [data-kind="computer"] path').getAttribute('d');
-  devices=devices.filter(d=>d.kind==='computer');
+  assert.deepEqual(await page.locator('#device-list strong').allTextContents(), ['Komputer','Telefon']);
+  devices=devices.filter(d=>d.kind==='computer').map(d=>({...d,current:true}));
   await page.evaluate(()=>dispatchEvent(new Event('online')));
-  await page.locator('#device-list [data-kind="phone"]:not([data-connected])').waitFor();
-  assert.equal(await page.locator('#device-list [data-kind="phone"] path').getAttribute('d'),phonePath);
-  assert.equal(await page.locator('#device-list [data-kind="phone"] svg').evaluate(el=>getComputedStyle(el).color),'rgb(142, 174, 181)');
+  await page.locator('#device-list [data-kind="slot"]:not([data-connected])').waitFor();
+  assert.equal(await page.locator('#device-list [data-kind="slot"] strong').innerText(),'Drugie urządzenie');
   await page.reload();
-  await page.locator('#device-list [data-kind="phone"]:not([data-connected])').waitFor();
-  assert.equal(await page.locator('#device-list [data-kind="phone"] path').getAttribute('d'),phonePath);
-  devices=[{id:'fixture-pc',kind:'computer',current:false,createdAt:'2026-11-21T12:00:00Z'},{id:'fixture-phone',kind:'phone',current:true,createdAt:'2026-11-21T12:00:00Z'}];
-  await page.evaluate(()=>dispatchEvent(new Event('online')));
-  await page.locator('#device-list [data-kind="phone"][data-connected]').waitFor();
-  devices=devices.filter(d=>d.kind==='phone');
-  await page.evaluate(()=>dispatchEvent(new Event('online')));
-  await page.locator('#device-list [data-kind="computer"]:not([data-connected])').waitFor();
-  assert.equal(await page.locator('#device-list [data-kind="computer"] path').getAttribute('d'),computerPath);
+  await page.locator('#device-list [data-kind="slot"]:not([data-connected])').waitFor();
   if(output) await page.locator('#device-list').screenshot({path:join(output,'devices-dark-desktop.png')});
   await page.locator('#announcements-open').click();
   await page.locator('#hidden-announcements-list button').waitFor();

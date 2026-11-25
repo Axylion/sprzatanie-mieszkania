@@ -6,9 +6,24 @@
   const status = document.getElementById("discussion-status");
   const retryHistory = document.getElementById("discussion-retry");
   const loadingHistory = "Wczytywanie rozmowy…";
+  const checkingRegistration = "Sprawdzanie połączenia urządzenia…";
   const join = document.getElementById("discussion-join");
-  const rooms = document.getElementById("discussion-rooms");
-  const joinAction = document.getElementById("discussion-join-action");
+  const home = document.getElementById("harmonogram");
+  const roomSetup = document.getElementById("room-setup");
+  const rooms = document.getElementById("room-buttons");
+  const joinAction = document.getElementById("room-confirm");
+  const roomRetry = document.getElementById("room-retry");
+  const roomHint = document.getElementById("room-hint");
+  const deviceLimit = document.getElementById("device-limit");
+  const deviceRoom = document.getElementById("device-room");
+  const deviceLimitNote = document.getElementById("device-limit-note");
+  const connectFromDiscussion = document.getElementById("discussion-connect");
+  const returnKey = "goleszan19-return-to-discussion";
+  connectFromDiscussion.addEventListener("click", () => sessionStorage.setItem(returnKey, "1"));
+  document.getElementById("device-limit-dismiss").addEventListener("click", () => {
+    deviceLimit.hidden = true;
+    joinAction.focus();
+  });
   const pairPanel = document.getElementById("discussion-pair");
   const pairCode = document.getElementById("discussion-pair-code");
   const pairTime = document.getElementById("discussion-pair-time");
@@ -17,14 +32,33 @@
   const pairBack = document.getElementById("discussion-pair-back");
   const approvalDetails = document.getElementById("discussion-approve");
   const deviceToggle = document.getElementById("discussion-device-toggle");
+  const approvalStatus = document.getElementById("device-approval-status");
   function showApproval(open) {
-    approvalDetails.open = open;
-    approvalDetails.hidden = !open;
-    deviceToggle.setAttribute("aria-expanded", String(open));
+    if (open) {
+      if (!token || !boundRoom || deviceCount !== 1 || approvalDetails.open) return;
+      document.getElementById("device-approval-room").textContent = "pokój nr " + boundRoom;
+      approvalStatus.textContent = "";
+      approvalDetails.showModal();
+      deviceToggle.setAttribute("aria-expanded", "true");
+      approvalCode.focus();
+    } else if (approvalDetails.open) {
+      approvalDetails.close();
+      deviceToggle.setAttribute("aria-expanded", "false");
+      approvalCode.value = "";
+      updateApproval();
+    }
   }
-  deviceToggle.addEventListener("click", () => showApproval(!approvalDetails.open));
+  deviceToggle.addEventListener("click", () => showApproval(true));
+  approvalDetails.addEventListener("cancel", event => {
+    event.preventDefault();
+    if (!approval.dataset.busy) showApproval(false);
+  });
+  for (const id of ["device-approval-close", "device-approval-cancel"]) {
+    document.getElementById(id).addEventListener("click", () => {
+      if (!approval.dataset.busy) showApproval(false);
+    });
+  }
   const connectionStatus = document.getElementById("device-connection-status");
-  const deviceConnect = document.getElementById("device-connect");
   const deviceSettings = document.getElementById("device-settings");
   const deviceList = document.getElementById("device-list");
   const deviceStatus = document.getElementById("device-settings-status");
@@ -93,11 +127,12 @@
   let refreshError = false;
   let deviceCount;
   let deviceToRevoke;
-  let openApproval = false;
-  let approvalNoticeTimer;
 
   let availableRooms = [];
-  let chosenRoom = null;
+  const savedRoom = Number(localStorage.getItem("cleaning-room"));
+  let chosenRoom = [1, 2, 3, 4].includes(savedRoom) ? savedRoom : null;
+  let roomsLoading = false;
+  let roomRequest = 0;
   let pairing = storedPairing();
   let expiredRoom;
   let pairTimer;
@@ -128,7 +163,7 @@
   function rememberRoom(room) {
     const number = Number(room);
     if ([1, 2, 3, 4].includes(number)) setBoundRoom(number);
-    if (!/^[1-4]$/.test(localStorage.getItem("cleaning-room"))) {
+    if ([1, 2, 3, 4].includes(number) && String(number) !== localStorage.getItem("cleaning-room")) {
       window.dispatchEvent(new CustomEvent("g19-room-linked", { detail: room }));
     }
   }
@@ -171,10 +206,13 @@
     connectionStatus.textContent = "To urządzenie zostało odłączone.";
     connectionStatus.hidden = false;
     deviceList.replaceChildren();
+    delete deviceList.dataset.signature;
     deviceConfirm.hidden = true;
-    deviceConnect.hidden = !configured;
+    deviceRoom.hidden = true;
+    showApproval(false);
     status.textContent = "Dostęp do dyskusji został zakończony.";
-    if (!view.hidden) showRooms().then(schedulePoll);
+    join.hidden = view.hidden;
+    if (!home.hidden) showRooms().then(schedulePoll);
   }
 
   function showRequestError(error, usedToken, fallback) {
@@ -191,7 +229,7 @@
     before = version = null;
     messages = [];
     history.replaceChildren();
-    if (refreshError || status.textContent === loadingHistory) status.textContent = "";
+    if (refreshError || [loadingHistory, checkingRegistration].includes(status.textContent)) status.textContent = "";
     refreshError = false;
     retryHistory.hidden = true;
   }
@@ -303,8 +341,8 @@
     const usedToken = token;
     const current = () => id === loadId && usedToken === token && !view.hidden && general === generalMode();
     loading = true;
-    if (general && (chat.hidden || version === null && !messages.length || refreshError)) {
-      status.textContent = loadingHistory;
+    if (chat.hidden || general && (version === null && !messages.length || refreshError)) {
+      status.textContent = chat.hidden ? checkingRegistration : loadingHistory;
       retryHistory.hidden = true;
     }
     try {
@@ -312,7 +350,7 @@
       if (!current()) return;
       if (!data || (!data.unchanged && !Array.isArray(data.messages))) throw new Error("Invalid history response");
       pollDelay = 5000;
-      if (refreshError || status.textContent === loadingHistory) status.textContent = "";
+      if (refreshError || [loadingHistory, checkingRegistration].includes(status.textContent)) status.textContent = "";
       refreshError = false;
       retryHistory.hidden = true;
       chat.hidden = false;
@@ -320,11 +358,6 @@
       join.hidden = pairPanel.hidden = true;
       if (data.room) rememberRoom(data.room);
       updateDeviceCount(data.deviceCount);
-      if (openApproval && !deviceToggle.hidden) {
-        openApproval = false;
-        showApproval(true);
-        approvalCode.focus();
-      }
       if (!general) return;
       if (data.unchanged) return;
 
@@ -355,7 +388,7 @@
       pollDelay = Math.min(pollDelay * 2, 30000);
       showRequestError(error, usedToken, "Nie udało się odświeżyć rozmowy. Sprawdź połączenie z internetem.");
       refreshError = error.code !== "device_invalid";
-      retryHistory.hidden = !general || !refreshError;
+      retryHistory.hidden = !refreshError;
     } finally {
       if (id === loadId) loading = false;
       updateSend();
@@ -366,21 +399,46 @@
     loadHistory({ reset: !messages.length, bottom: !messages.length }).then(schedulePoll);
   });
 
-  function updateJoinAction() {
-    const selected = availableRooms.find(room => room.room === chosenRoom);
-    joinAction.disabled = joining || !selected;
-    joinAction.textContent = selected?.occupied ? "Połącz kolejne urządzenie" : "Połącz pokój";
+  function registrationFeedback(message, limit = false) {
+    connectionStatus.textContent = limit ? "" : message;
+    connectionStatus.hidden = limit || !message;
+    deviceLimit.hidden = !limit;
+    if (limit && !home.hidden) document.getElementById("device-limit-title").focus();
   }
 
-  async function showRooms() {
-    if (view.hidden || token || pairing || expiredRoom) return;
+  const homeRegistration = () => configured && !home.hidden && !token && !pairing && !expiredRoom;
+
+  function updateJoinAction() {
+    const selected = availableRooms.find(room => room.room === chosenRoom);
+    joinAction.disabled = joining || roomsLoading || !selected;
+    joinAction.textContent = selected?.occupied && !storedObject(enrollmentKey)
+      ? "Podłącz kolejne urządzenie" : "Podłącz urządzenie";
+    roomHint.hidden = !selected?.occupied;
+    roomHint.textContent = selected?.occupied
+      ? "Podłączenie wymaga potwierdzenia na urządzeniu już połączonym z tym pokojem." : "";
+  }
+
+  async function showRooms({ foreground = false } = {}) {
+    if (!homeRegistration() || roomsLoading) return;
+    const request = ++roomRequest;
+    roomsLoading = true;
+    roomSetup.hidden = false;
+    roomRetry.hidden = true;
+    if (foreground && !availableRooms.length) registrationFeedback("Sprawdzanie dostępności pokoi…");
+    updateJoinAction();
     try {
       const result = await rpc("rooms", {});
-      if (view.hidden || token || pairing || expiredRoom) return;
+      if (request !== roomRequest || !homeRegistration()) return;
+      if (!Array.isArray(result) || result.length !== 4 ||
+          new Set(result.map(room => room.room)).size !== 4 ||
+          result.some(room => ![1, 2, 3, 4].includes(room.room) || typeof room.occupied !== "boolean")) {
+        throw new Error("Invalid room response");
+      }
       availableRooms = result;
-      const buttons = availableRooms.map(({ room, occupied }) => {
+      const buttons = result.map(({ room, occupied }) => {
         const button = document.createElement("button");
         button.type = "button";
+        button.className = "room-button";
         button.dataset.room = String(room);
         button.setAttribute("aria-pressed", String(chosenRoom === room));
         const state = document.createElement("span");
@@ -388,14 +446,28 @@
         button.append("Pokój nr " + room, state);
         return button;
       });
-      if (rooms.textContent !== buttons.map(button => button.textContent).join("")) rooms.replaceChildren(...buttons);
-      join.hidden = false;
-      updateJoinAction();
-    } catch (error) {
-      showRequestError(error, null, "Nie udało się pobrać listy pokoi. Sprawdź połączenie z internetem.");
+      if (rooms.textContent !== buttons.map(button => button.textContent).join("")) {
+        const focused = rooms.contains(document.activeElement) && document.activeElement.dataset.room;
+        rooms.replaceChildren(...buttons);
+        if (focused) rooms.querySelector('[data-room="' + focused + '"]')?.focus();
+      }
+      if (connectionStatus.textContent.startsWith("Sprawdzanie") ||
+          connectionStatus.textContent.startsWith("Nie udało się pobrać listy")) registrationFeedback("");
+      return result;
+    } catch {
+      if (request !== roomRequest || !homeRegistration()) return;
+      availableRooms = [];
+      rooms.replaceChildren();
+      registrationFeedback("Nie udało się pobrać listy pokoi. Sprawdź połączenie z internetem.");
+      roomRetry.hidden = false;
+    } finally {
+      if (request === roomRequest) {
+        roomsLoading = false;
+        updateJoinAction();
+      }
     }
   }
-
+  roomRetry.addEventListener("click", () => showRooms({foreground: true}));
   function finishPairing() {
     pairing = null;
     localStorage.removeItem(pairingKey);
@@ -405,8 +477,9 @@
 
   function renderPairing() {
     clearInterval(pairTimer);
-    join.hidden = true;
+    roomSetup.hidden = true;
     pairPanel.hidden = false;
+    document.getElementById("discussion-pair-room").textContent = "Pokój nr " + pairing.room;
     pairCode.hidden = false;
     pairRetry.hidden = pairRenew.hidden = true;
     pairCode.textContent = pairing.code.slice(0, 3) + " " + pairing.code.slice(3);
@@ -421,14 +494,23 @@
 
   async function startPairing(room) {
     const data = await rpc("pair_start", { p_room: room, p_browser: browserProof });
-    pairing = { ...data, deadline: Date.now() + Date.parse(data.expiresAt) - Date.parse(data.serverNow) };
+    const remaining = Date.parse(data?.expiresAt) - Date.parse(data?.serverNow);
+    if (!/^[0-9]{6}$/.test(data?.code) || typeof data.secret !== "string" || !data.secret ||
+        data.room !== room || !Number.isFinite(remaining)) throw new Error("Invalid pairing response");
+    pairing = { ...data, deadline: Date.now() + remaining };
     localStorage.setItem(pairingKey, JSON.stringify(pairing));
     expiredRoom = null;
-    status.textContent = "Oczekiwanie na potwierdzenie na połączonym urządzeniu.";
-    if (!view.hidden) renderPairing();
+    registrationFeedback("Oczekiwanie na potwierdzenie na połączonym urządzeniu.");
+    if (!home.hidden) {
+      renderPairing();
+      document.getElementById("discussion-pair-title").focus();
+    }
   }
 
   async function useDevice(data) {
+    if (typeof data?.token !== "string" || !data.token || ![1, 2, 3, 4].includes(Number(data.room))) {
+      throw new Error("Invalid registration response");
+    }
     localStorage.setItem(tokenKey, data.token);
     localStorage.removeItem(enrollmentKey);
     finishPairing();
@@ -436,11 +518,18 @@
     connectionStatus.textContent = "";
     connectionStatus.hidden = true;
     window.dispatchEvent(new Event("g19-device-changed"));
-    rpc("my_devices", { p_token: token, p_kind: deviceKind(), p_browser: browserProof }).catch(() => {});
     rememberRoom(data.room);
     join.hidden = true;
-    status.textContent = "Urządzenie zostało podłączone.";
-    await loadHistory({ reset: true, bottom: true });
+    roomSetup.hidden = true;
+    registrationFeedback("Urządzenie zostało podłączone.");
+    const returnToDiscussion = sessionStorage.getItem(returnKey) && location.hash === "#ustawienia";
+    sessionStorage.removeItem(returnKey);
+    if (returnToDiscussion) location.hash = "#dyskusje";
+    else {
+      if (!home.hidden) document.getElementById("settings-title").focus({ preventScroll: true });
+      await loadDevices();
+      await loadHistory({ reset: true, bottom: true });
+    }
   }
 
   async function checkPairing() {
@@ -455,7 +544,7 @@
         expiredRoom = null;
         await useDevice(data);
       } else if (data.state === "pending") {
-        status.textContent = "Oczekiwanie na potwierdzenie na połączonym urządzeniu.";
+        registrationFeedback("Oczekiwanie na potwierdzenie na połączonym urządzeniu.");
       } else if (data.state === "expired") {
         finishPairing();
         expiredRoom = pending.room;
@@ -463,20 +552,22 @@
         pairCode.hidden = true;
         pairTime.textContent = "Kod wygasł.";
         pairRenew.hidden = false;
-        status.textContent = "";
+        registrationFeedback("");
+        if (!home.hidden) pairRenew.focus();
       } else {
         finishPairing();
-        status.textContent = {
+        sessionStorage.removeItem(returnKey);
+        registrationFeedback({
           rejected: "Prośba o podłączenie została odrzucona.",
           cancelled: "Prośba o podłączenie została anulowana.",
           device_limit: "Pokój ma już dwa połączone urządzenia.",
-        }[data.state] || "Prośba o podłączenie jest niedostępna.";
+        }[data.state] || "Prośba o podłączenie jest niedostępna.", data.state === "device_limit");
         await showRooms();
       }
     } catch (error) {
       if (pairing === pending && !cancellingPair) {
         pairRetry.hidden = false;
-        showRequestError(error, null, "Nie udało się sprawdzić prośby. Sprawdź połączenie z internetem.");
+        registrationFeedback("Nie udało się sprawdzić prośby. Sprawdź połączenie z internetem.");
       }
     } finally {
       checkingPair = false;
@@ -485,44 +576,44 @@
 
   function schedulePoll() {
     clearTimeout(pollTimer);
-    if (!configured || view.hidden || document.hidden) return;
+    if (!configured || (view.hidden && home.hidden) || document.hidden) return;
     pollTimer = setTimeout(async () => {
       if (!loading && !joining && !document.hidden) {
-        if (token) await loadHistory();
-        else if (pairing) await checkPairing();
-        else if (!expiredRoom) await showRooms();
+        if (!view.hidden && token) await loadHistory();
+        else if (!home.hidden) {
+          if (token) await loadDevices();
+          else if (pairing) await checkPairing();
+          else if (!expiredRoom) await showRooms();
+        }
       }
       schedulePoll();
-    }, token ? pollDelay : pairing ? 2000 : 5000);
+    }, !view.hidden && token ? pollDelay : pairing && !home.hidden ? 2000 : 5000);
   }
 
   async function openDiscussion() {
     if (view.hidden) {
-      clearTimeout(pollTimer);
-      clearInterval(pairTimer);
       clearHistory();
       chat.hidden = true;
-      showApproval(false);
+      join.hidden = true;
+      return;
+    }
+    join.hidden = Boolean(token);
+    if (!token) {
+      chat.hidden = true;
+      status.textContent = "";
+      retryHistory.hidden = true;
       return;
     }
     if (!configured) {
-      status.textContent = "Dyskusje będą dostępne po połączeniu z serwerem.";
+      status.textContent = "Nie można sprawdzić rejestracji. Brak połączenia z serwerem.";
       return;
     }
-    if (token) {
-      if (!generalMode()) {
-        if (refreshError || status.textContent === loadingHistory) status.textContent = "";
-        refreshError = false;
-        retryHistory.hidden = true;
-      }
-      await loadHistory({ reset: messages.length === 0, bottom: messages.length === 0 });
-    } else if (pairing) {
-      renderPairing();
-      await checkPairing();
-    } else if (!expiredRoom) {
-      await showRooms();
+    if (!generalMode()) {
+      refreshError = false;
+      retryHistory.hidden = true;
+      if (chat.hidden) status.textContent = checkingRegistration;
     }
-    schedulePoll();
+    await loadHistory({ reset: messages.length === 0, bottom: messages.length === 0 });
   }
 
   rooms.addEventListener("click", event => {
@@ -537,20 +628,30 @@
     const selected = availableRooms.find(room => room.room === chosenRoom);
     if (!selected || joining || token) return;
     joining = true;
+    registrationFeedback("Łączenie urządzenia…");
     updateJoinAction();
     try {
       async function joinDevice() {
         const stored = localStorage.getItem(tokenKey);
         if (stored) {
           token = stored;
-          await openDiscussion();
+          await loadDevices();
           return;
         }
         // Retain the proof until a successful response, so a dropped reply cannot strand a room.
         let enrollment = storedObject(enrollmentKey);
         if (enrollment && enrollment.room !== selected.room) {
-          status.textContent = "Najpierw dokończ łączenie wcześniej wybranego pokoju.";
+          registrationFeedback("Najpierw dokończ łączenie wcześniej wybranego pokoju.");
           return;
+        }
+        if (!enrollment) {
+          const fresh = await showRooms();
+          if (!fresh) return;
+          const currentRoom = fresh.find(room => room.room === selected.room);
+          if (currentRoom.occupied !== selected.occupied) {
+            registrationFeedback("Dostępność pokoju się zmieniła. Sprawdź status i spróbuj ponownie.");
+            return;
+          }
         }
         if (!selected.occupied || enrollment) {
           enrollment ||= { room: selected.room, proof: randomProof() };
@@ -558,7 +659,7 @@
           await useDevice(await rpc("bind", { p_room: selected.room, p_proof: enrollment.proof, p_browser: browserProof }));
         } else {
           pairing = storedPairing();
-          if (pairing) await openDiscussion();
+          if (pairing) { renderPairing(); await checkPairing(); }
           else await startPairing(selected.room);
         }
       }
@@ -572,7 +673,8 @@
         room_free: "Pokój jest już wolny. Wybierz go, aby dołączyć.",
         device_limit: "Pokój ma już dwa urządzenia. Odłącz jedno w ustawieniach."
       }[error.code];
-      showRequestError(error, token, message || "Nie udało się połączyć urządzenia. Spróbuj ponownie.");
+      registrationFeedback(error.status === 429 ? "Odczekaj chwilę i spróbuj ponownie."
+        : message || "Nie udało się połączyć urządzenia. Spróbuj ponownie.", error.code === "device_limit");
       await showRooms();
     } finally {
       joining = false;
@@ -589,17 +691,18 @@
     try {
       const room = expiredRoom;
       async function renew() {
-            const stored = localStorage.getItem(tokenKey);
+        const stored = localStorage.getItem(tokenKey);
         if (stored) {
           token = stored;
           expiredRoom = null;
-          await openDiscussion();
+          await loadDevices();
           return;
         }
         pairing = storedPairing();
         if (pairing) {
           expiredRoom = null;
-          await openDiscussion();
+          renderPairing();
+          await checkPairing();
         } else {
           await startPairing(room);
         }
@@ -607,7 +710,7 @@
       if (navigator.locks) await navigator.locks.request(tokenKey, renew);
       else await renew();
     } catch (error) {
-      showRequestError(error, null, "Nie udało się wygenerować kodu. Spróbuj ponownie.");
+      registrationFeedback("Nie udało się wygenerować kodu. Spróbuj ponownie.", error.code === "device_limit");
       if (error.code === "room_free") {
         expiredRoom = null;
         finishPairing();
@@ -637,10 +740,12 @@
       }
       expiredRoom = null;
       finishPairing();
-      status.textContent = "Prośba o podłączenie została anulowana.";
+      sessionStorage.removeItem(returnKey);
+      registrationFeedback("Prośba o podłączenie została anulowana.");
       await showRooms();
+      if (!home.hidden) document.getElementById("settings-title").focus();
     } catch {
-      status.textContent = "Nie udało się anulować prośby. Spróbuj ponownie.";
+      registrationFeedback("Nie udało się anulować prośby. Spróbuj ponownie.");
     } finally {
       cancellingPair = false;
       pairBack.disabled = false;
@@ -676,13 +781,14 @@
     const approve = event.submitter?.value !== "reject";
     approval.dataset.busy = "true";
     updateApproval();
+    approvalStatus.textContent = "Sprawdzanie kodu…";
     try {
       const result = await rpc("pair_decide", { p_token: usedToken, p_code: value, p_approve: approve });
       if (token !== usedToken) return;
       if (result.state === "approved" || result.state === "rejected") {
         approvalCode.value = "";
       }
-      status.textContent = {
+      approvalStatus.textContent = {
         approved: "Urządzenie zostało pomyślnie połączone.",
         rejected: "Prośba została odrzucona.",
         unavailable: "Kod jest nieprawidłowy, wygasł lub został już użyty.",
@@ -691,14 +797,16 @@
       }[result.state] || "Nie udało się sprawdzić kodu.";
       if (result.state === "approved") {
         showApproval(false);
-        clearTimeout(approvalNoticeTimer);
-        approvalNoticeTimer = setTimeout(() => {
-          if (status.textContent === "Urządzenie zostało pomyślnie połączone.") status.textContent = "";
-        }, 2500);
-        await loadHistory();
+        if (home.hidden) status.textContent = approvalStatus.textContent;
+        else deviceStatus.textContent = approvalStatus.textContent;
+        await loadDevices();
+        if (!view.hidden) await loadHistory();
       }
     } catch (error) {
-      showRequestError(error, usedToken, "Nie udało się sprawdzić kodu. Spróbuj ponownie.");
+      if (token !== usedToken) return;
+      if (error.code === "device_invalid") showRevoked();
+      else approvalStatus.textContent = error.status === 429 ? "Odczekaj chwilę i spróbuj ponownie."
+        : "Nie udało się sprawdzić kodu. Spróbuj ponownie.";
     } finally {
       delete approval.dataset.busy;
       updateApproval();
@@ -805,7 +913,8 @@
     const paths = {
       phone: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm2 17h4",
       computer: "M3 4h18v12H3zM12 16v4m-4 0h8",
-      other: "M4 5h16v14H4zM10 16h4"
+      other: "M4 5h16v14H4zM10 16h4",
+      slot: "M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0ZM12 8v8m-4-4h8"
     };
     const row = document.createElement("li");
     row.dataset.kind = kind;
@@ -823,45 +932,60 @@
     path.setAttribute("d", paths[kind] || paths.other);
     icon.append(path);
     const status = document.createElement("span");
-    status.textContent = connected ? "Urządzenie podłączone" : "Urządzenie niepodłączone";
+    const name = document.createElement("strong");
+    name.textContent = connected ? ({ phone: "Telefon", computer: "Komputer" }[kind] || "Urządzenie")
+      : "Drugie urządzenie";
+    const label = document.createElement("small");
+    label.textContent = !connected ? "Niepodłączone"
+      : kind === "phone" || kind === "computer" ? "Podłączony" : "Podłączone";
     if (current) {
-      const label = document.createElement("small");
-      label.textContent = "To urządzenie";
-      status.append(label);
+      label.append(" · ");
+      const currentLabel = document.createElement("span");
+      currentLabel.textContent = "To urządzenie";
+      label.append(currentLabel);
     }
+    status.append(name, label);
     row.append(icon, status);
     return row;
   }
 
+  let deviceRequest = 0;
+  let loadingDevices = false;
   async function loadDevices() {
-    deviceConnect.hidden = !configured || Boolean(token);
-    deviceSettings.hidden = !configured || !token;
-    if (!deviceConnect.hidden && connectionStatus.hidden) {
-      connectionStatus.textContent = "To urządzenie nie jest połączone.";
-      connectionStatus.hidden = false;
+    if (home.hidden) return;
+    if (!configured) {
+      registrationFeedback("Podłączenie urządzeń jest chwilowo niedostępne.");
+      return;
     }
-    if (deviceSettings.hidden || document.getElementById("harmonogram").hidden) return;
+    if (!token) {
+      deviceSettings.hidden = deviceRoom.hidden = true;
+      if (pairing) {
+        if (pairPanel.hidden || !pairTimer) renderPairing();
+        return;
+      }
+      if (!expiredRoom && !joining) await showRooms({foreground: true});
+      return;
+    }
+    roomSetup.hidden = pairPanel.hidden = true;
+    if (loadingDevices) return;
     const usedToken = token;
+    const request = ++deviceRequest;
+    loadingDevices = true;
     try {
       const devices = await rpc("my_devices", { p_token: usedToken, p_kind: deviceKind(), p_browser: browserProof });
-      if (token !== usedToken || document.getElementById("harmonogram").hidden) return;
+      if (request !== deviceRequest || token !== usedToken || home.hidden) return;
+      if (!Array.isArray(devices) || !devices.some(device => device.current)) throw new Error("Unverified device");
+      if (!boundRoom) {
+        // Read only the verified room, without requesting a page of messages.
+        const data = await rpc("read", {p_token: usedToken, p_before: 0, p_version: null});
+        if (request !== deviceRequest || token !== usedToken || home.hidden) return;
+        if (![1, 2, 3, 4].includes(Number(data?.room))) throw new Error("Unverified room");
+        rememberRoom(data.room);
+      }
       updateDeviceCount(devices.length);
-      if (devices.some(device => device.current)) {
-        connectionStatus.textContent = "";
-        connectionStatus.hidden = true;
-        // An empty history page still reports the verified room, without loading messages.
-        if (!boundRoom) {
-          const data = await rpc("read", {p_token: usedToken, p_before: 0, p_version: null});
-          if (token !== usedToken || document.getElementById("harmonogram").hidden) return;
-          if (data.room) rememberRoom(data.room);
-        }
-      }
-      let previousDevices = [];
-      try { previousDevices = JSON.parse(localStorage.getItem("goleszan19-device-icons:" + usedToken) || "[]"); } catch { /* Optional local presentation state. */ }
-      if (!Array.isArray(previousDevices)) previousDevices = [];
-      if (devices.length > 1) {
-        try { localStorage.setItem("goleszan19-device-icons:" + usedToken, JSON.stringify(devices.map(({id,kind}) => ({id,kind})))); } catch { /* Keep functioning without storage. */ }
-      }
+      deviceRoom.textContent = "Pokój nr " + boundRoom;
+      deviceSettings.hidden = deviceRoom.hidden = false;
+      registrationFeedback("");
       const rows = devices.map(device => {
         const row = deviceRow(device.kind, true, device.current);
         const button = document.createElement("button");
@@ -883,26 +1007,30 @@
         return row;
       });
       if (devices.length === 1) {
-        const missing = previousDevices.find(device => device && !devices.some(current => current.id === device.id));
-        const vacantKind = ["phone", "computer"].includes(missing?.kind) ? missing.kind
-          : devices[0].kind === "phone" ? "computer" : "phone";
-        const row = deviceRow(vacantKind, false);
+        const row = deviceRow("slot", false);
         const button = document.createElement("button");
         button.type = "button";
+        button.className = "device-primary";
         button.textContent = "Podłącz";
-        button.addEventListener("click", () => {
-          openApproval = true;
-          location.hash = "#dyskusje";
-        });
+        button.addEventListener("click", () => showApproval(true));
         row.append(button);
         rows.push(row);
       }
-      deviceList.replaceChildren(...rows);
-      deviceStatus.textContent = "";
+      deviceLimitNote.textContent = devices.length >= 2 ? "Osiągnięto limit dwóch urządzeń."
+        : "Do pokoju możesz podłączyć maksymalnie dwa urządzenia.";
+      const signature = JSON.stringify(devices.map(({id, current, kind}) => [id, current, kind]));
+      if (deviceList.dataset.signature !== signature) {
+        deviceList.replaceChildren(...rows);
+        deviceList.dataset.signature = signature;
+      }
+      deviceStatus.textContent = "Podłączone urządzenia: " + devices.length + " z 2";
     } catch (error) {
       if (token !== usedToken) return;
       if (error.code === "device_invalid") showRevoked();
+      else if (deviceSettings.hidden) registrationFeedback("Nie udało się sprawdzić rejestracji. Sprawdź połączenie z internetem.");
       else deviceStatus.textContent = "Nie udało się odczytać urządzeń. Sprawdź połączenie z internetem.";
+    } finally {
+      if (request === deviceRequest) loadingDevices = false;
     }
   }
 
@@ -940,39 +1068,46 @@
     }
   });
 
-  function resume() {
-    if (!view.hidden && !document.hidden) {
-      if (token) loadHistory().then(schedulePoll);
-      else if (pairing) checkPairing().then(schedulePoll);
-      else schedulePoll();
-    } else schedulePoll();
+  async function resume() {
+    if (document.hidden) return;
+    await Promise.all([openDiscussion(), loadDevices()]);
+    schedulePoll();
   }
   window.addEventListener("hashchange", () => {
-    openDiscussion();
-    loadDevices();
+    if (location.hash !== "#ustawienia") sessionStorage.removeItem(returnKey);
+    if (view.hidden && home.hidden) showApproval(false);
+    resume();
   });
   window.addEventListener("g19-device-revoked", () => { if (token) showRevoked(); });
-  window.addEventListener("online", () => { resume(); loadDevices(); });
-  window.addEventListener("focus", loadDevices);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadDevices(); });
+  window.addEventListener("online", resume);
+  window.addEventListener("focus", () => { if (!home.hidden) loadDevices(); });
   window.addEventListener("pageshow", event => { if (event.persisted) resume(); });
   document.addEventListener("visibilitychange", resume);
   window.addEventListener("storage", event => {
     if (event.key === tokenKey || event.key === pairingKey || event.key === null) {
       const stored = localStorage.getItem(tokenKey);
-      if (token !== stored) setBoundRoom(null);
+      if (token !== stored) {
+        setBoundRoom(null);
+        chat.hidden = deviceSettings.hidden = deviceRoom.hidden = true;
+        showApproval(false);
+        deviceList.replaceChildren();
+        delete deviceList.dataset.signature;
+        deviceRequest++;
+        loadingDevices = false;
+      }
       token = stored;
       pairing = storedPairing();
-      if (!pairing && !expiredRoom) {
+      if (pairing && !home.hidden) renderPairing();
+      else if (!expiredRoom) {
         pairPanel.hidden = true;
         clearInterval(pairTimer);
       }
       clearHistory();
-      openDiscussion();
-      loadDevices();
+      resume();
     }
   });
-  if (configured && token) rpc("my_devices", { p_token: token, p_kind: deviceKind(), p_browser: browserProof }).catch(() => {});
-  openDiscussion();
-  loadDevices();
+  if (configured && token && home.hidden) {
+    rpc("my_devices", { p_token: token, p_kind: deviceKind(), p_browser: browserProof }).catch(() => {});
+  }
+  resume();
 })();

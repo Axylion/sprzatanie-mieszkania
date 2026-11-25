@@ -404,10 +404,10 @@
   <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui8">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js?v=ui8"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui8">
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui9">
   <link rel="stylesheet" href="./kalendarz/kalendarz.css?v=ui8-r2">
   <script defer src="./dyskusje/config.js"></script>
-  <script defer src="./dyskusje/dyskusje.js?v=ui4"></script>
+  <script defer src="./dyskusje/dyskusje.js?v=ui9"></script>
   <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
   <script defer src="./dyskusje/notifications.js?v=ui4"></script>
   <script defer src="./ogloszenia/content.js"></script>
@@ -585,29 +585,37 @@
     </div>
   </div>
   <section class="card" id="ustawienia" aria-labelledby="settings-title">
-    <h2 id="settings-title" tabindex="-1">Moje urządzenia</h2>
-    <fieldset id="room-setup">
-      <legend>Wybierz swój pokój</legend>
-      <p class="muted">Potwierdzony pokój zostanie przypisany do tego urządzenia.</p>
-      <div class="room-buttons" id="room-buttons">
-        <button class="room-button" type="button" data-room="1" aria-pressed="false">Pokój nr 1</button>
-        <button class="room-button" type="button" data-room="2" aria-pressed="false">Pokój nr 2</button>
-        <button class="room-button" type="button" data-room="3" aria-pressed="false">Pokój nr 3</button>
-        <button class="room-button" type="button" data-room="4" aria-pressed="false">Pokój nr 4</button>
-      </div>
-      <button class="room-confirm" id="room-confirm" type="button" disabled>Potwierdź pokój</button>
-    </fieldset>
-    <p id="device-connection-status" role="status" hidden></p>
-    <div id="device-connect">
-      <a class="device-connect-button" href="#dyskusje">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-2 2m2 5a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l2-2"/></svg>
-        Podłącz urządzenie <span aria-hidden="true">→</span>
-      </a>
-      <p class="muted">Przejdź do Dyskusji, aby połączyć urządzenie.</p>
+    <div class="device-heading">
+      <h2 id="settings-title" tabindex="-1">Moje urządzenia</h2>
+      <span id="device-room" class="device-room" hidden></span>
     </div>
+    <fieldset id="room-setup" hidden>
+      <legend>Wybierz swój pokój, aby podłączyć urządzenie.</legend>
+      <div class="room-buttons" id="room-buttons"></div>
+      <p id="room-hint" class="muted" hidden></p>
+      <button class="room-confirm" id="room-confirm" type="button" disabled>Podłącz urządzenie</button>
+      <button type="button" id="room-retry" hidden>Spróbuj ponownie</button>
+    </fieldset>
+    <p id="device-connection-status" role="status">Sprawdzanie połączenia urządzenia…</p>
+    <section id="device-limit" class="device-limit" hidden aria-labelledby="device-limit-title">
+      <h3 id="device-limit-title" tabindex="-1">Osiągnięto limit urządzeń.</h3>
+      <p>Do tego pokoju są już podłączone dwa urządzenia. Aby podłączyć nowe urządzenie, najpierw odłącz jedno z dotychczasowych urządzeń.</p>
+      <button type="button" id="device-limit-dismiss">Rozumiem</button>
+    </section>
+    <section id="discussion-pair" hidden aria-labelledby="discussion-pair-title">
+      <h3 id="discussion-pair-title" tabindex="-1">Podłącz kolejne urządzenie</h3>
+      <p id="discussion-pair-room"></p>
+      <p>Na urządzeniu połączonym z pokojem otwórz Moje urządzenia, naciśnij Podłącz i wpisz poniższy kod.</p>
+      <p id="discussion-pair-code" class="discussion-pair-code" aria-label="Kod podłączenia"></p>
+      <p id="discussion-pair-time" class="discussion-pair-time" role="timer"></p>
+      <button type="button" id="discussion-pair-retry" hidden>Sprawdź ponownie</button>
+      <button type="button" id="discussion-pair-renew" hidden>Wygeneruj nowy kod</button>
+      <button type="button" id="discussion-pair-back">Anuluj</button>
+    </section>
     <div id="device-settings" hidden>
       <p id="device-settings-status" role="status"></p>
       <ul id="device-list" class="device-list"></ul>
+      <p id="device-limit-note" class="muted"></p>
       <div id="device-confirm" hidden>
         <p id="device-confirm-text"></p>
         <button type="button" id="device-revoke">Odłącz urządzenie</button>
@@ -616,6 +624,27 @@
     </div>
   </section>
 </main>
+
+<dialog id="discussion-approve" class="device-approval-dialog" aria-labelledby="device-approval-title">
+  <div class="device-heading">
+    <h2 id="device-approval-title">Podłącz kolejne urządzenie</h2>
+    <button type="button" id="device-approval-close" aria-label="Zamknij">×</button>
+  </div>
+  <ol>
+    <li>Otwórz stronę Goleszan 19 na nowym urządzeniu.</li>
+    <li>W sekcji Moje urządzenia wybierz <span id="device-approval-room">swój pokój</span>.</li>
+    <li>Naciśnij „Podłącz kolejne urządzenie”.</li>
+    <li>Wpisz tutaj kod wyświetlony na nowym urządzeniu.</li>
+  </ol>
+  <form id="discussion-approve-form" class="discussion-approval">
+    <label for="discussion-approve-code">Kod z nowego urządzenia</label>
+    <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="off" spellcheck="false" placeholder="000 000">
+    <p id="device-approval-status" role="status"></p>
+    <button class="device-primary" type="submit" value="approve" disabled>Potwierdź podłączenie</button>
+    <button type="submit" value="reject" disabled>Odrzuć prośbę</button>
+  </form>
+  <button type="button" id="device-approval-cancel">Anuluj</button>
+</dialog>
 
 <main class="container" id="poradnik-view" hidden></main>
 
@@ -629,20 +658,26 @@
     </div>
     <p id="discussion-status" class="discussion-status" role="status"></p>
     <button type="button" id="discussion-retry" hidden>Spróbuj ponownie</button>
-    <section id="discussion-join" hidden aria-labelledby="discussion-join-title">
-      <h2 id="discussion-join-title">Dołącz do dyskusji</h2>
-      <p>Wybierz swój pokój, aby uczestniczyć w dyskusjach mieszkańców.</p>
-      <div id="discussion-rooms" class="discussion-rooms"></div>
-      <button type="button" id="discussion-join-action" disabled>Połącz pokój</button>
-    </section>
-    <section id="discussion-pair" hidden aria-labelledby="discussion-pair-title">
-      <h2 id="discussion-pair-title">To urządzenie oczekuje na podłączenie.</h2>
-      <p>Wpisz wyświetlony kod na urządzeniu, które jest już połączone z pokojem.</p>
-      <p id="discussion-pair-code" class="discussion-pair-code" aria-label="Kod podłączenia"></p>
-      <p id="discussion-pair-time" class="discussion-pair-time" role="timer"></p>
-      <button type="button" id="discussion-pair-retry" hidden>Sprawdź ponownie</button>
-      <button type="button" id="discussion-pair-renew" hidden>Wygeneruj nowy kod</button>
-      <button type="button" id="discussion-pair-back">Anuluj</button>
+    <section id="discussion-join" class="discussion-welcome" hidden aria-labelledby="discussion-join-title">
+      <div class="discussion-welcome-intro">
+        <span class="discussion-welcome-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><use href="#g19-chat-icon"/></svg>
+          <svg class="discussion-welcome-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="11" width="12" height="9" rx="2"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
+        </span>
+        <h2 id="discussion-join-title">Dołącz do dyskusji mieszkańców</h2>
+        <p>Aby korzystać z dyskusji, podłącz urządzenie do swojego pokoju.</p>
+      </div>
+      <div class="discussion-welcome-benefits">
+        <p>Po podłączeniu urządzenia możesz:</p>
+        <ul>
+          <li>Uczestniczyć w ogólnych dyskusjach.</li>
+          <li>Prowadzić prywatne rozmowy.</li>
+          <li>Otrzymywać powiadomienia.</li>
+          <li>Sprawdzać terminy swoich dyżurów.</li>
+        </ul>
+      </div>
+      <a class="device-primary" id="discussion-connect" href="#ustawienia">Podłącz urządzenie <span aria-hidden="true">→</span></a>
+      <p class="discussion-welcome-hint">Do jednego pokoju możesz podłączyć maksymalnie dwa urządzenia.</p>
     </section>
     <div id="discussion-chat" hidden>
       <div class="discussion-toolbar">
@@ -652,21 +687,6 @@
         </nav>
         <button type="button" class="discussion-device-toggle" id="discussion-device-toggle" aria-controls="discussion-approve" aria-expanded="false" aria-label="Podłącz kolejne urządzenie" hidden><span aria-hidden="true">⊕</span> Urządzenie</button>
       </div>
-      <details id="discussion-approve" hidden>
-        <summary class="sr-only" tabindex="-1" aria-hidden="true">Podłącz kolejne urządzenie</summary>
-        <div class="device-roles">
-          <div><strong><span aria-hidden="true">✓ </span>To urządzenie jest połączone</strong>
-            <p>Możesz tutaj zatwierdzić podłączenie kolejnego urządzenia. Otrzyma ono dostęp do historii bieżącego okresu pokoju. Przy zmianie mieszkańca administrator powinien najpierw zwolnić pokój.</p></div>
-          <div><strong><span aria-hidden="true">＋ </span>Nowe urządzenie</strong>
-            <p>Otwórz Dyskusje na nowym urządzeniu, wybierz numer pokoju i odczytaj wyświetlony sześciocyfrowy kod.</p></div>
-        </div>
-        <form id="discussion-approve-form" class="discussion-approval">
-          <label for="discussion-approve-code">Kod z nowego urządzenia</label>
-          <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" spellcheck="false">
-          <button type="submit" value="approve" disabled>Potwierdź podłączenie</button>
-          <button type="submit" value="reject" disabled>Odrzuć</button>
-        </form>
-      </details>
       <div id="discussion-general">
       <div class="discussion-history-controls">
         <button type="button" id="discussion-older" hidden>Starsze wiadomości</button>
@@ -1099,7 +1119,7 @@
       if (timestamp === today) cell.setAttribute("aria-current", "date");
       if (duty) cell.classList.add("calendar-weekend");
       const own = duty === (boundRoom || Number(selectedRoom));
-      if (isMissed ? own : duty === Number(selectedRoom)) cell.classList.add("calendar-own");
+      if (own) cell.classList.add("calendar-own");
       if (isMissed) cell.classList.add(own ? "calendar-missed-own" : "calendar-missed-other");
       cells.push(cell);
     }
@@ -1138,45 +1158,19 @@
   });
   let selectedRoom = localStorage.getItem("cleaning-room");
   if (!["1", "2", "3", "4"].includes(selectedRoom)) selectedRoom = "";
-  const roomSetup = document.getElementById("room-setup");
-  const roomConfirm = document.getElementById("room-confirm");
-  const roomButtons = [...document.querySelectorAll("#room-buttons [data-room]")];
-  let pendingRoom = "";
-
-  roomButtons.forEach(button => button.addEventListener("click", () => {
-    if (selectedRoom) return;
-    pendingRoom = button.dataset.room;
-    roomButtons.forEach(choice => choice.setAttribute("aria-pressed", String(choice === button)));
-    roomConfirm.disabled = false;
-  }));
-  roomConfirm.addEventListener("click", () => {
-    // A second open tab may have saved its choice while this one was on the form.
-    const saved = localStorage.getItem("cleaning-room");
-    if (!selectedRoom && pendingRoom) {
-      selectedRoom = ["1", "2", "3", "4"].includes(saved) ? saved : pendingRoom;
-      localStorage.setItem("cleaning-room", selectedRoom);
-      showRoomSelection();
-      document.getElementById("settings-title").focus({ preventScroll: true });
-    }
-  });
   window.addEventListener("g19-room-linked", event => {
     const room = String(event.detail);
-    if (selectedRoom || !["1", "2", "3", "4"].includes(room)) return;
+    if (!["1", "2", "3", "4"].includes(room) || selectedRoom === room) return;
     selectedRoom = room;
     localStorage.setItem("cleaning-room", room);
-    showRoomSelection();
+    renderCalendar();
   });
   window.addEventListener("storage", event => {
     if (event.key === "cleaning-room" && ["1", "2", "3", "4"].includes(event.newValue)) {
       selectedRoom = event.newValue;
-      showRoomSelection();
+      renderCalendar();
     }
   });
-
-  function showRoomSelection() {
-    roomSetup.hidden = Boolean(selectedRoom);
-    renderCalendar();
-  }
 
   const themeToggle = document.getElementById("theme-toggle");
   const themeMenu = document.getElementById("theme-menu");
@@ -1229,7 +1223,7 @@
     if (themeMode === "system") applyTheme(themeMode);
   });
   applyTheme(themeMode);
-  showRoomSelection();
+  renderCalendar();
   // Ogłoszenia są publiczne. Nie umieszczaj tu danych poufnych.
   const announcementCard = document.getElementById("announcements-card");
   const announcementList = document.getElementById("announcements-list");

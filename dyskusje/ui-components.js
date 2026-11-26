@@ -19,3 +19,19 @@ for (const disclosure of document.querySelectorAll(".private-privacy")) {
   disclosure.addEventListener("toggle", sync);
   sync();
 }
+
+const g19AdminStatusTimers = new WeakMap();
+
+function g19AdminStatus(element, message, brief = false) {
+  clearTimeout(g19AdminStatusTimers.get(element));
+  g19AdminStatusTimers.delete(element);
+  element.classList.toggle("admin-status-brief", brief);
+  element.classList.remove("admin-status-fading");
+  element.textContent = message;
+  if (!brief) return;
+  g19AdminStatusTimers.set(element, setTimeout(() => {
+    element.classList.add("admin-status-fading");
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    g19AdminStatusTimers.set(element, setTimeout(() => g19AdminStatus(element, ""), reducedMotion ? 0 : 200));
+  }, 3000));
+}

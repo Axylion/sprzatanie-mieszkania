@@ -237,8 +237,8 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
 
 test('F1 PWA relaunch loads the new interface and retains local resident data', {timeout:45000}, async () => {
   const previousCache = 'goleszan19-shell-v13-11-0-f1-ui9';
-  const currentCache = 'goleszan19-shell-v13-11-0-f1-ui10';
-  const currentDiscussionScript = './dyskusje/dyskusje.js?v=ui10';
+  const currentCache = 'goleszan19-shell-v13-11-0-f1-ui10-r2-no-ornament';
+  const currentDiscussionScript = './dyskusje/dyskusje.js?v=ui10-r2';
   const previousDiscussionScript = './dyskusje/dyskusje.js?v=ui9';
   const localData = {
     'cleaning-theme': 'dark',

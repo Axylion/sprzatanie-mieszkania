@@ -51,6 +51,7 @@ function setup(handler, storage = new Map(), missedDuties = async () => new Map(
     Event: class {},
     document: { getElementById: element, createElement: () => new Element() },
     window,
+    g19AdminStatus: (element, message) => { element.textContent = message; },
     sessionStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
     Date: MockDate,
     Option: class { constructor(text, value) { this.value = value; } },

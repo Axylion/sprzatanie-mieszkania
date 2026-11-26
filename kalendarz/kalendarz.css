@@ -77,22 +77,17 @@
 }
 #calendar-days .calendar-missed-own.calendar-adjacent:not(.calendar-holiday) .calendar-number { color: white; }
 
-#admin-view:has(#admin-duties:not([hidden])) { --page-width: 1440px; }
-#admin-panel:has(#admin-duties:not([hidden])) .admin-toolbar { margin-bottom: clamp(12px, 2vw, 24px); }
-#admin-panel:has(#admin-duties:not([hidden])) .admin-toolbar h1 { margin: 0; }
+#admin-panel:has(#admin-duties:not([hidden])) { margin-block-start: 32px; }
 #admin-duties {
   --duty-ink: #10242e;
   --duty-line: #729d9e;
   --duty-info: #e1f2f1;
   --duty-tint: #eff8f8;
-  --duty-own: #087b79;
   --duty-mark: #b92330;
-  --duty-missed-bg: #fff0f2;
-  --duty-missed-line: #f4bfc5;
   margin-block-start: 16px;
   border: 1px solid var(--duty-line);
-  border-radius: 22px;
-  padding: clamp(14px, 2vw, 27px);
+  border-radius: 16px;
+  padding: 12px;
   background: var(--surface);
   color: var(--duty-ink);
 }
@@ -101,10 +96,7 @@
   --duty-line: #3d747d;
   --duty-info: #133f48;
   --duty-tint: #0c303a;
-  --duty-own: #207e83;
   --duty-mark: #ff9da7;
-  --duty-missed-bg: #352832;
-  --duty-missed-line: #8b4a58;
 }
 .duty-icon-library { position: absolute; }
 .duty-icon {
@@ -117,109 +109,103 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-#admin-duties .duty-icon { color: var(--accent); }
+#admin-duties .duty-icon { color: var(--accent-text); }
 #admin-duties :is(h2, h3, p) { margin: 0; }
-#admin-duties h2 { font-size: clamp(1.45rem, 2.6vw, 2.3rem); line-height: 1.12; }
-#admin-duties h3 { font-size: clamp(1.18rem, 2vw, 1.7rem); line-height: 1.15; }
+#admin-duties #admin-duty-title { font-size: 18px; line-height: 1.2; }
+#admin-duties h3 { font-size: 16px; line-height: 1.2; }
 #admin-duties p { line-height: 1.35; }
-.admin-duty-heading, .admin-duty-card-heading { display: flex; min-width: 0; align-items: flex-start; gap: clamp(10px, 1.7vw, 22px); }
-.admin-duty-heading { margin-bottom: clamp(18px, 2vw, 28px); }
+.admin-duty-heading, .admin-duty-card-heading { display: flex; min-width: 0; align-items: flex-start; gap: 8px; }
+.admin-duty-heading { margin-bottom: 12px; }
 .admin-duty-heading-icon {
   display: grid;
   flex: none;
   place-items: center;
-  width: clamp(44px, 5vw, 68px);
+  width: 36px;
   aspect-ratio: 1;
-  color: var(--accent);
   background: var(--accent-bg);
   border: 1px solid var(--accent);
-  border-radius: 15px;
-  font-size: clamp(25px, 3vw, 40px);
+  border-radius: 10px;
+  font-size: 18px;
 }
-#admin-duties :is(.admin-duty-heading, .admin-duty-card-heading) p { margin-top: 5px; color: var(--muted); }
-.admin-duty-layout { display: grid; gap: clamp(14px, 1.6vw, 25px); grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
-.admin-duty-controls { display: grid; align-content: start; gap: 14px; padding-inline-end: clamp(14px, 1.6vw, 25px); border-inline-end: 1px solid var(--duty-line); }
+#admin-duties :is(.admin-duty-heading, .admin-duty-card-heading) p { margin-top: 4px; color: var(--muted); }
+.admin-duty-layout { display: grid; align-items: start; gap: 12px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+.admin-duty-controls { display: grid; align-content: start; gap: 8px; }
 .admin-duty-controls > label { display: grid; grid-template-columns: minmax(5.5rem, 24%) minmax(0, 1fr); align-items: center; gap: 10px; font-weight: 700; }
 .admin-duty-controls > label > span, #admin-duty-preview dt { display: flex; align-items: center; gap: .55em; }
-.admin-duty-controls > label > span { padding-inline-start: 8px; font-size: clamp(1rem, 1.7vw, 1.35rem); }
 #admin-duties select {
   width: 100%;
   min-width: 0;
   max-width: none;
-  min-height: 50px;
+  min-height: 40px;
   color: var(--duty-ink);
   background: var(--duty-tint);
   border: 1px solid var(--duty-line);
-  border-radius: 11px;
-  padding: 8px clamp(8px, 1.45vw, 18px);
+  border-radius: 8px;
+  padding: 6px 12px;
   font: inherit;
 }
 .admin-duty-box {
   min-width: 0;
-  padding: clamp(12px, 1.5vw, 21px);
+  padding: 12px;
   border: 1px solid var(--duty-line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--duty-tint);
 }
-.admin-duty-status-box { margin-top: 6px; }
-.admin-duty-status-box:has(#admin-duty-missed:checked) { background: var(--duty-missed-bg); border-color: var(--duty-missed-line); }
 .admin-duty-status-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.admin-duty-card-heading > .duty-icon { font-size: clamp(23px, 3vw, 34px); }
 #admin-panel .admin-duty-box > button {
   display: flex;
   width: 100%;
-  min-height: 50px;
-  margin-top: 16px;
+  min-height: 44px;
+  margin-top: 8px;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 11px;
-  font-size: clamp(1rem, 1.8vw, 1.35rem);
+  border-radius: 8px;
+  font-size: 14px;
   font-weight: 750;
 }
 #admin-duties .admin-duty-box > button .duty-icon { color: currentColor; }
 .admin-duty-switch { display: flex; flex-direction: column; align-items: end; gap: 4px; font-weight: 700; }
 .admin-duty-note {
   display: flex;
-  gap: 10px;
-  padding: 10px 13px;
-  border-radius: 11px;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
   background: var(--duty-info);
   color: var(--duty-ink);
 }
-.admin-duty-push-box > .admin-duty-note { margin-top: 12px; }
+.admin-duty-push-box > .admin-duty-note { margin-top: 8px; }
 #admin-duties #admin-duty-push-feedback { margin-top: 8px; overflow-wrap: anywhere; }
-#admin-duty-preview { padding: 0; box-shadow: 0 2px 0 var(--accent); }
-#admin-duty-preview-heading { display: flex; align-items: center; gap: 8px; padding: 12px clamp(12px, 1.5vw, 20px); }
-.admin-duty-preview-content { padding: clamp(12px, 1.5vw, 20px); border-radius: 15px; background: var(--surface); }
-#admin-duty-preview dl { display: grid; gap: 9px; margin: 0 0 14px; padding: 0 0 14px; border-bottom: 1px solid var(--duty-line); }
+#admin-duty-preview { padding: 0; background: var(--surface); }
+#admin-duty-preview-heading { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 11px 11px 0 0; background: var(--duty-tint); }
+.admin-duty-preview-content { padding: 12px; }
+#admin-duty-preview dl { display: grid; gap: 8px; margin: 0 0 8px; padding: 0 0 8px; border-bottom: 1px solid var(--duty-line); }
 #admin-duty-preview dl > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
 #admin-duty-preview dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 #admin-duty-preview dd.duty-preview-missed,
-#admin-duty-preview dl > div:has(.duty-preview-missed) svg { color: var(--duty-mark); }
-.admin-duty-note strong { display: block; margin-bottom: 5px; font-size: 1.15em; }
-#admin-duty-preview-calendar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; text-align: center; }
-#admin-duty-preview-calendar > div { padding-inline: clamp(6px, 1vw, 14px); }
+#admin-duty-preview dl > div:has(.duty-preview-missed) .duty-icon { color: var(--duty-mark); }
+.admin-duty-note strong { display: block; margin-bottom: 4px; }
+#admin-duty-preview-calendar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; text-align: center; }
+#admin-duty-preview-calendar > div { padding-inline: 6px; }
 #admin-duty-preview-calendar > div + div { border-inline-start: 1px solid var(--duty-line); }
 .admin-duty-view-label { display: block; font-size: .9em; }
-.admin-duty-preview-days { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(4px, 1vw, 12px); margin-block-start: 12px; }
+.admin-duty-preview-days { grid-template-columns: repeat(2, 40px); justify-content: center; gap: 5px; margin-block-start: 6px; }
 #admin-duty-preview-calendar .calendar-day {
-  min-height: 48px;
-  aspect-ratio: 1.16;
-  border-radius: 12px;
-  font-size: clamp(1.25rem, 3vw, 2.3rem);
+  min-height: 40px;
+  border-radius: 8px;
+  font-size: 1rem;
   font-weight: 750;
 }
-#admin-duty-preview .calendar-own { background: var(--duty-own); color: #fff; }
+#admin-duty-preview .calendar-own { background: var(--accent-fill); color: #fff; }
 #admin-duty-preview .calendar-missed-own { background: var(--missed-duty-bg); }
-#admin-duty-preview .calendar-missed-other::before { inset: 4px 4px auto auto; width: clamp(8px, 1.25vw, 16px); height: clamp(8px, 1.25vw, 16px); background: #f12a34; }
+#admin-duty-preview .calendar-missed-other::before { inset: 4px 4px auto auto; width: 7px; height: 7px; background: #f12a34; }
 #admin-duty-feedback:empty { display: none; }
 @media (max-width: 740px) {
-  .admin-duty-layout { grid-template-columns: minmax(0, 1fr); }
-  .admin-duty-controls { padding-inline-end: 0; border-inline-end: 0; }
+  .admin-duty-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
 }
-@media (max-width: 390px) {
-  .admin-duty-card-heading { gap: 7px; }
+@media (max-width: 480px) {
+  .admin-duty-controls > label:has(#admin-duty-date) { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .admin-duty-controls > label:has(#admin-duty-room) { grid-template-columns: minmax(5.5rem, 27%) minmax(0, 1fr); }
   .admin-duty-status-top .admin-duty-card-heading > .duty-icon { display: none; }
 }
 #admin-duty-confirm button {
@@ -233,7 +219,6 @@
 #admin-duty-confirm .announcement-primary { color: #fff; background: var(--accent-fill); }
 #admin-duty-confirm button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-#admin-panel #admin-sections [data-section="duties"][aria-pressed="true"],
 #admin-panel #admin-duty-save:not(:disabled) {
   color: #fff;
   background: var(--accent-fill);
@@ -245,9 +230,9 @@
 #admin-panel #admin-duty-missed {
   appearance: none;
   position: relative;
-  width: 52px;
-  height: 29px;
-  min-height: 29px;
+  width: 40px;
+  height: 22px;
+  min-height: 22px;
   padding: 0;
   margin: 0;
   border-radius: 999px;
@@ -257,14 +242,14 @@
 #admin-panel #admin-duty-missed::after {
   content: "";
   display: block;
-  width: 21px;
-  height: 21px;
+  width: 15px;
+  height: 15px;
   position: absolute;
-  inset: 3px auto auto 4px;
+  inset: 2px auto auto 3px;
   border-radius: 50%;
   background: var(--muted);
 }
 #admin-panel #admin-duty-missed:checked { background: #c22431; border-color: #c22431; }
-#admin-panel #admin-duty-missed:checked::after { transform: translateX(22px); background: #fff; }
+#admin-panel #admin-duty-missed:checked::after { transform: translateX(17px); background: #fff; }
 #admin-panel #admin-duty-missed:checked + span { color: var(--push-off-text); }
 #admin-panel #admin-duty-missed:disabled { opacity: .55; cursor: default; }

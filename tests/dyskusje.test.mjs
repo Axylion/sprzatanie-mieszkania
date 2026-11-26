@@ -762,8 +762,9 @@ test('Dyskusje across devices uses real SQL, survives reload and handles a lost 
   await setTheme(operator, 'dark');
   await login.waitFor();
   assert.equal(await login.locator('#admin-username').inputValue(), 'Admin');
-  assert.ok(await login.locator('#admin-username').isDisabled());
-  assert.ok(await login.getByRole('button', { name: 'Zaloguj się' }).isDisabled());
+  assert.equal(await login.locator('#admin-username').getAttribute('autocomplete'), 'username');
+  assert.equal(await login.locator('#admin-username').getAttribute('readonly'), '');
+  assert.ok(await login.getByRole('button', { name: 'Zaloguj się' }).isEnabled());
   for (const width of [770, 360]) {
     await operator.setViewportSize({ width, height: 640 });
     const metrics = await login.evaluate(form => {

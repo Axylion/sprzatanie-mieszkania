@@ -110,7 +110,8 @@
       color: var(--text);
       transition: background .2s, color .2s;
     }
-    button, select { font: inherit; }
+    button, select, input, textarea { font: inherit; }
+    dialog { font-family: inherit; }
     button { cursor: pointer; }
     button:disabled { cursor: default; }
     :where(a[href]) { color: var(--accent-text); }
@@ -404,18 +405,18 @@
   <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui10">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js?v=ui8"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui10">
-  <link rel="stylesheet" href="./kalendarz/kalendarz.css?v=ui10">
-  <script defer src="./dyskusje/ui-components.js?v=ui10"></script>
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui10-r2">
+  <link rel="stylesheet" href="./kalendarz/kalendarz.css?v=ui10-r2">
+  <script defer src="./dyskusje/ui-components.js?v=ui10-r2"></script>
   <script defer src="./dyskusje/config.js"></script>
-  <script defer src="./dyskusje/dyskusje.js?v=ui10"></script>
-  <script defer src="./dyskusje/private-chat.js?v=ui10"></script>
+  <script defer src="./dyskusje/dyskusje.js?v=ui10-r2"></script>
+  <script defer src="./dyskusje/private-chat.js?v=ui10-r2"></script>
   <script defer src="./dyskusje/notifications.js?v=ui10"></script>
   <script defer src="./ogloszenia/content.js"></script>
   <script defer src="./pwa-install.js?v=ui10"></script>
-  <script defer src="./administracja/dyzury.js?v=ui8"></script>
-  <script defer src="./administracja/announcements.js?v=f1"></script>
-  <script defer src="./administracja/admin.js?v=f1"></script>
+  <script defer src="./administracja/dyzury.js?v=ui10-r2"></script>
+  <script defer src="./administracja/announcements.js?v=ui10-r2"></script>
+  <script defer src="./administracja/admin.js?v=ui10-r2"></script>
   </template>
   <script>
     // Keep URLs out of the speculative preload scanner on redirecting documents.
@@ -647,7 +648,7 @@
   </ol>
   <form id="discussion-approve-form" class="discussion-approval">
     <label for="discussion-approve-code">Kod z nowego urządzenia:</label>
-    <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="off" spellcheck="false" placeholder="000 000">
+    <input id="discussion-approve-code" aria-describedby="device-approval-status" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="off" spellcheck="false" placeholder="000 000">
     <p id="device-approval-status" role="status"></p>
     <button class="device-primary" type="submit" value="approve" disabled>Potwierdź podłączenie</button>
     <button type="submit" value="reject" disabled>Odrzuć prośbę</button>
@@ -668,8 +669,8 @@
     <p id="discussion-status" class="discussion-status" role="status"></p>
     <button type="button" id="discussion-retry" hidden>Spróbuj ponownie</button>
     <section id="discussion-join" class="discussion-welcome" hidden aria-labelledby="discussion-join-title">
-      <div class="discussion-welcome-intro">
-        <span class="discussion-welcome-icon" aria-hidden="true">
+      <div class="discussion-welcome-intro empty-state">
+        <span class="discussion-welcome-icon empty-state-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><use href="#g19-chat-icon"/></svg>
           <svg class="discussion-welcome-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="11" width="12" height="9" rx="2"/><path d="M9 11V8a3 3 0 0 1 6 0v3"/></svg>
         </span>
@@ -769,10 +770,10 @@
     <h1 id="admin-login-title" tabindex="-1">Administracja</h1>
     <p class="admin-login-caption">Panel logowania</p>
     <label for="admin-username">Login</label>
-    <input id="admin-username" value="Admin" disabled>
+    <input id="admin-username" name="username" value="Admin" autocomplete="username" readonly>
     <label for="admin-password">Hasło</label>
     <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="Wprowadź hasło" required>
-    <button type="submit" disabled>Zaloguj się</button>
+    <button type="submit">Zaloguj się</button>
   </form>
   <p id="admin-status" role="status"></p>
   <section id="admin-panel" aria-labelledby="admin-title" hidden>

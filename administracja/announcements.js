@@ -8,6 +8,7 @@
   const editor = document.getElementById("announcement-editor");
   const preview = document.getElementById("admin-announcement-preview");
   const message = document.getElementById("admin-announcement-status");
+  const setStatus = (text, brief = false) => g19AdminStatus(message, text, brief);
   const filter = document.getElementById("admin-announcement-filter");
   const formatter = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Warsaw" });
   const dayFormatter = new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeZone: "Europe/Warsaw" });
@@ -144,12 +145,16 @@
       badge.className = "admin-announcement-badge";
       badge.dataset.state = item.status;
       const dates = [
-        item.publishedAt && "Opublikowano: " + formatter.format(new Date(item.publishedAt)),
-        "Koniec publikacji: " + expiryLabel(item),
-        item.withdrawnAt && "Wycofano: " + formatter.format(new Date(item.withdrawnAt))
+        item.publishedAt && ["Opublikowano:", formatter.format(new Date(item.publishedAt))],
+        ["Koniec publikacji:", expiryLabel(item)],
+        item.withdrawnAt && ["Wycofano:", formatter.format(new Date(item.withdrawnAt))]
       ].filter(Boolean);
       main.append(headline, badge, text("p", item.summary));
-      side.append(...dates.map(date => text("p", date)));
+      for (const [label, value] of dates) {
+        const date = document.createElement("p");
+        date.append(text("strong", label), " " + value);
+        side.append(date);
+      }
       const actions = document.createElement("div");
       actions.className = "admin-actions";
       actions.append(button("Edytuj", () => edit(item)));
@@ -168,14 +173,23 @@
       row.append(main, side);
       return row;
     }));
-    if (!selected.length) list.append(text("p", "Brak ogłoszeń w tym widoku."));
+    if (!selected.length) {
+      const empty = {
+        published: ["Brak opublikowanych ogłoszeń", "Opublikowane ogłoszenia pojawią się tutaj."],
+        draft: ["Brak szkiców", "Zapisane szkice ogłoszeń pojawią się tutaj."],
+        expired: ["Brak wygasłych ogłoszeń", "Ogłoszenia po zakończeniu publikacji pojawią się tutaj."],
+        withdrawn: ["Brak wycofanych ogłoszeń", "Wycofane ogłoszenia pojawią się tutaj."],
+        all: ["Brak ogłoszeń", "Utwórz nowe ogłoszenie, aby pojawiło się na liście."]
+      };
+      list.append(g19EmptyState("announcement", ...empty[selectedStatus]));
+    }
   }
 
   function handleError(error) {
     if ([401, 403].includes(error.status)) return onUnauthorized();
-    message.textContent = error.status === 409
+    setStatus(error.status === 409
       ? "Ogłoszenie zmieniło się. Odśwież listę przed ponowieniem."
-      : "Nie udało się wykonać operacji. Sprawdź dane i spróbuj ponownie.";
+      : "Nie udało się wykonać operacji. Sprawdź dane i spróbuj ponownie.");
   }
 
   async function refresh() {
@@ -320,8 +334,8 @@
     document.getElementById("announcement-save-draft").hidden = !draft;
     document.getElementById("announcement-publish").hidden = !draft;
     document.getElementById("announcement-save-changes").hidden = draft;
-    message.textContent = "";
-    document.getElementById("admin-status").textContent = "";
+    setStatus("");
+    g19AdminStatus(document.getElementById("admin-status"), "");
     listView.hidden = true;
     form.hidden = false;
     initial = JSON.stringify(data());
@@ -338,7 +352,7 @@
     try {
       await rpc(method, args);
       if (generation !== sessionGeneration) return;
-      message.textContent = feedback;
+      setStatus(feedback, true);
       showList();
       await refresh();
     } catch (error) {
@@ -351,7 +365,7 @@
   function saveForm(publish) {
     if (!form.reportValidity() || !titleInput.value.trim()) return;
     if (publish && !editor.textContent.trim()) {
-      message.textContent = "Wpisz treść ogłoszenia przed publikacją.";
+      setStatus("Wpisz treść ogłoszenia przed publikacją.");
       editor.focus();
       return;
     }
@@ -424,7 +438,7 @@
         if (value === null) return;
         if (!value.trim()) return command("unlink");
         const url = content.safeLink(value.trim());
-        if (!url) { message.textContent = "Wpisz prawidłowy adres http:// lub https://."; return; }
+        if (!url) { setStatus("Wpisz prawidłowy adres http:// lub https://."); return; }
         if (document.getSelection().isCollapsed && currentLink) {
           document.getSelection().selectAllChildren(currentLink);
           savedRange = document.getSelection().getRangeAt(0).cloneRange();
@@ -473,7 +487,7 @@
       control.disabled = selected && (name !== "rooms" || !document.querySelector("#admin-rooms.admin-room-selected"));
     }
     if (name === "announcements") refresh();
-    document.getElementById("admin-title").textContent = name === "announcements" ? "Ważne ogłoszenia" : "Zarządzanie pokojami";
+    document.getElementById("admin-title").textContent = ({ announcements: "Ważne ogłoszenia", duties: "Dyżury", rooms: "Zarządzanie pokojami" })[name];
   }
   nav.addEventListener("click", async event => {
     const name = event.target.dataset.section;
@@ -508,7 +522,7 @@
       clearTimeout(statusTimer);
       selectedStatus = "published";
       list.replaceChildren();
-      message.textContent = "";
+      setStatus("");
       showList();
       activate("rooms", true);
     }

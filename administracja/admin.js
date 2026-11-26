@@ -3,6 +3,7 @@
   const view = document.getElementById("admin-view");
   const form = document.getElementById("admin-login");
   const passwordField = form.elements.password;
+  const setStatus = (text, brief = false) => g19AdminStatus(status, text, brief);
   const submit = form.querySelector('button[type="submit"]');
   const panel = document.getElementById("admin-panel");
   const list = document.getElementById("admin-rooms");
@@ -42,10 +43,8 @@
   announcements.init(rpc, () => endSession("Zaloguj się ponownie."));
 
   function updateSubmit() {
-    submit.disabled = busy || !passwordField.value;
+    submit.disabled = busy;
   }
-
-  passwordField.addEventListener("input", updateSubmit);
 
   function useSession(token, expiresAt) {
     if (typeof token !== "string" || !token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
@@ -80,7 +79,7 @@
     updateSubmit();
     form.hidden = !configured;
     panel.hidden = true;
-    status.textContent = message;
+    setStatus(message);
   }
 
   function action(label, callback) {
@@ -315,10 +314,10 @@
       if (session !== expected) return false;
       if ([401, 403].includes(error.status)) endSession("Zaloguj się ponownie.");
       else {
-        status.textContent = "Nie udało się odczytać pokoi. Spróbuj ponownie.";
+        setStatus("Nie udało się odczytać pokoi. Spróbuj ponownie.");
         if (panel.hidden) {
           const retry = action("Spróbuj ponownie", () => {
-            status.textContent = "";
+            setStatus("");
             refresh();
           });
           status.append(" ", retry);
@@ -330,7 +329,7 @@
 
   form.addEventListener("submit", async event => {
     event.preventDefault();
-    if (!configured || busy) return;
+    if (!configured || busy || !form.reportValidity()) return;
     busy = true;
     updateSubmit();
     const password = passwordField.value;
@@ -341,7 +340,7 @@
       const limits = [now + Math.min(Number(auth.expires_in), 3600) * 1000];
       if (Number.isFinite(auth.expires_at)) limits.push(auth.expires_at * 1000);
       useSession(auth.access_token, Math.min(...limits));
-      status.textContent = "";
+      setStatus("");
       if (await refresh() && !view.hidden) document.getElementById("admin-title").focus();
     } catch (error) {
       endSession(error.status === 429 ? "Za dużo prób. Spróbuj ponownie później." : "Nie udało się zalogować.");
@@ -355,9 +354,10 @@
     if (!await announcements.canLeave() || !await duties.canLeave()) return;
     const token = session;
     endSession();
+    if (!form.hidden && !view.hidden) passwordField.focus();
     if (token) {
       try { await request("/auth/v1/logout?scope=local", {}, token); }
-      catch { status.textContent = "Wylogowano z aplikacji. Nie udało się potwierdzić zakończenia sesji na serwerze."; }
+      catch { setStatus("Wylogowano z aplikacji. Nie udało się potwierdzić zakończenia sesji na serwerze."); }
     }
   });
   const refreshButton = document.getElementById("admin-refresh");
@@ -366,10 +366,10 @@
     const expected = session;
     refreshButton.disabled = true;
     refreshButton.setAttribute("aria-busy", "true");
-    status.textContent = "Odświeżanie…";
+    setStatus("Odświeżanie…");
     try {
       const success = await (announcements.isOpen() ? announcements.refresh() : duties.isOpen() ? duties.refresh() : refresh());
-      if (expected === session) status.textContent = success ? "Dane odświeżone." : "Nie udało się odświeżyć danych. Spróbuj ponownie.";
+      if (expected === session) setStatus(success ? "Dane odświeżone." : "Nie udało się odświeżyć danych. Spróbuj ponownie.", success);
     } finally {
       refreshButton.disabled = false;
       refreshButton.removeAttribute("aria-busy");
@@ -384,11 +384,11 @@
       const args = { p_room: room.room, p_generation: room.generation };
       if (device) await rpc("detach", { ...args, p_device: device.id });
       else await rpc("release", { ...args, p_devices: room.devices.map(item => item.id) });
-      status.textContent = device ? "Urządzenie zostało odłączone." : "Pokój został zwolniony.";
+      setStatus(device ? "Urządzenie zostało odłączone." : "Pokój został zwolniony.", true);
     } catch (error) {
-      status.textContent = error.status === 409
+      setStatus(error.status === 409
         ? "Stan pokoju zmienił się. Sprawdź aktualną listę."
-        : "Nie udało się potwierdzić wyniku. Sprawdź aktualną listę przed ponowieniem.";
+        : "Nie udało się potwierdzić wyniku. Sprawdź aktualną listę przed ponowieniem.");
     } finally {
       confirm.close();
       confirmAction.disabled = false;

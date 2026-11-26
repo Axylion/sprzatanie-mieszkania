@@ -38,6 +38,7 @@
       if (!token || !boundRoom || deviceCount !== 1 || approvalDetails.open) return;
       document.getElementById("device-approval-room").textContent = "pokój nr " + boundRoom;
       approvalStatus.textContent = "";
+      approvalCode.removeAttribute("aria-invalid");
       approvalDetails.showModal();
       deviceToggle.setAttribute("aria-expanded", "true");
       approvalCode.focus();
@@ -45,6 +46,7 @@
       approvalDetails.close();
       deviceToggle.setAttribute("aria-expanded", "false");
       approvalCode.value = "";
+      approvalCode.removeAttribute("aria-invalid");
       updateApproval();
     }
   }
@@ -762,7 +764,12 @@
       button.disabled = Boolean(approval.dataset.busy) || approvalCode.value.length !== 6;
     }
   }
+  function clearApprovalError() {
+    if (approvalCode.hasAttribute("aria-invalid")) approvalStatus.textContent = "";
+    approvalCode.removeAttribute("aria-invalid");
+  }
   approvalCode.addEventListener("input", () => {
+    clearApprovalError();
     approvalCode.value = approvalCode.value.replace(/[^0-9]/g, "").slice(0, 6);
     updateApproval();
   });
@@ -770,6 +777,7 @@
     const pasted = event.clipboardData?.getData("text");
     if (pasted === undefined) return;
     event.preventDefault();
+    clearApprovalError();
     const start = approvalCode.selectionStart;
     const end = approvalCode.selectionEnd;
     approvalCode.value = (approvalCode.value.slice(0, start) + pasted.replace(/[^0-9]/g, "") +
@@ -785,10 +793,15 @@
     const approve = event.submitter?.value !== "reject";
     approval.dataset.busy = "true";
     updateApproval();
+    clearApprovalError();
     approvalStatus.textContent = "Sprawdzanie kodu…";
     try {
       const result = await rpc("pair_decide", { p_token: usedToken, p_code: value, p_approve: approve });
       if (token !== usedToken) return;
+      if (result.state === "unavailable" && approvalCode.value === value) {
+        approvalCode.setAttribute("aria-invalid", "true");
+        approvalCode.focus();
+      }
       if (result.state === "approved" || result.state === "rejected") {
         approvalCode.value = "";
       }

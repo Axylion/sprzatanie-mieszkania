@@ -171,7 +171,7 @@ test('Announcement editor formats the current block, previews, publishes, hides 
           assert.deepEqual(await field.evaluate(el => {
             const css = getComputedStyle(el);
             return [css.outlineStyle, css.outlineWidth, css.boxShadow];
-          }), ['solid', '2px', 'none']);
+          }), ['solid', '1px', 'none']);
         }
       }
       await page.locator('#announcement-date-open').click();

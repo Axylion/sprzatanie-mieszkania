@@ -68,7 +68,13 @@
       if(item.unread){const badge=document.createElement('span');badge.className='private-unread';badge.textContent=item.unread>99?'99+':item.unread;badge.setAttribute('aria-label','Nieprzeczytane: '+item.unread);link.append(badge);}
       row.append(link);return row;
     }));
-    if(archive&&!items.length){const row=document.createElement('li');row.append(g19EmptyState('archive', 'Brak rozmów archiwalnych', 'Nie masz jeszcze żadnych rozmów archiwalnych.'));target.append(row);}
+    if (!items.length) {
+      const row = document.createElement('li');
+      row.append(archive
+        ? g19EmptyState('archive', 'Brak rozmów archiwalnych', 'Nie masz jeszcze żadnych rozmów archiwalnych.')
+        : g19EmptyState('chat', 'Brak rozmów prywatnych', 'Prywatne rozmowy pojawią się tutaj.'));
+      target.append(row);
+    }
   }
   async function refreshSummary(){
     const key=token();if(summaryPending?.key===key)return summaryPending.promise;

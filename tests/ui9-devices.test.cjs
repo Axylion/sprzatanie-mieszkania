@@ -180,7 +180,11 @@ for (const [first, second] of [['phone','computer'],['computer','phone'],['phone
       await input.fill('999999');
       await modal.getByRole('button',{name:'Potwierdź podłączenie'}).click();
       await modal.getByText(/Kod jest nieprawidłowy/).waitFor();
+      assert.equal(await input.getAttribute('aria-invalid'), 'true');
+      assert.equal(await input.evaluate(el => document.activeElement === el), true);
       await input.fill('');
+      assert.equal(await input.getAttribute('aria-invalid'), null);
+      assert.equal(await modal.getByText(/Kod jest nieprawidłowy/).count(), 0);
       await input.evaluate((field, code) => {
         const clipboardData = new DataTransfer();
         clipboardData.setData('text/plain', code);

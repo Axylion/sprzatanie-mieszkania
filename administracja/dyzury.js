@@ -8,6 +8,7 @@
   const send = byId("send");
   const dialog = byId("confirm");
   const feedback = byId("feedback");
+  const setFeedback = (text, brief = false) => g19AdminStatus(feedback, text, brief);
   const pushFeedback = byId("push-feedback");
   const pending = new Map();
   const waitLimit = 4 * 60 * 1000;
@@ -159,7 +160,7 @@
   }
   function error(err, message) {
     if ([401, 403].includes(err.status)) unauthorized();
-    else feedback.textContent = message;
+    else setFeedback(message);
   }
   function waitExpired() {
     finishPolling();
@@ -256,7 +257,7 @@
       saved = duty.value.get(currentDate) === Number(currentRoom);
       ready = true;
       if (!keepDraft) missed.checked = saved;
-    } else feedback.textContent = "Nie udało się pobrać statusu dyżuru.";
+    } else setFeedback("Nie udało się pobrać statusu dyżuru.");
     preview();
     return duty.status === "fulfilled" && outcome.value === true;
   }
@@ -270,7 +271,7 @@
     result = receipt && { status: receipt.accepted
       ? (Date.now() < receipt.deadline ? "pending" : "unknown")
       : "unconfirmed" };
-    feedback.textContent = "";
+    setFeedback("");
     preview();
     return refresh();
   }
@@ -294,7 +295,7 @@
       const status = await rpc("save_duty", { ...args(), p_missed: missed.checked });
       if (request !== generation) return;
       missed.checked = saved = status;
-      feedback.textContent = "Status dyżuru zapisano.";
+      setFeedback("Status dyżuru zapisano.", true);
       window.dispatchEvent(new Event("g19-duty-status-change"));
     } catch (err) {
       if (request === generation) error(err, "Nie udało się zapisać statusu dyżuru.");
@@ -316,7 +317,7 @@
     receipt = { id, deadline: receipt?.deadline ?? Date.now() + waitLimit, accepted: false };
     remember(key, receipt);
     busy = true;
-    feedback.textContent = "";
+    setFeedback("");
     controls();
     try {
       const next = await bounded(() => rpc("send_duty", { ...args(), p_request_id: id }));
@@ -373,6 +374,7 @@
       ++generation;
       busy = ready = false;
       currentRoom = currentDate = result = null;
+      setFeedback("");
       finishPolling();
       receipt = null;
       if (dialog.open) dialog.close();

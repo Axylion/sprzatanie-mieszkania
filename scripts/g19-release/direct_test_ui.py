@@ -5,28 +5,24 @@ import tempfile
 
 import release as release
 
-SOURCE = "64d2d70eaf891781fde264178efce19e24c18b0c"
-ARCHIVE = "693997e8ae2477ddd46d68a535dbcc64fc76788fe53e7938a68c00fc572e675b"
-ACTIVE = "3489b11b-966e-4fe8-a932-fdac17950773"
+SOURCE = "897e3c31b0a81a4627e2389258e57cf14ec0a20a"
+ARCHIVE = "96a183d1590c9a5e49eeba94d8c2896af0945644c2c9e1355ce62e8cfae88472"
+ACTIVE = "26affdd3-b1c0-4de0-8e13-f051cc7699b9"
 UI8 = "c4bcf201-9463-4f6a-94f3-f80a0462ce43"
 URL = "https://goleszan-19-preview.pages.dev/"
-MANIFEST = {
-    "source_sha": SOURCE,
-    "expected_file_count": 68,
-    "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r3-polish",
-    "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co",
-}
+MANIFEST = release.read_json(Path("direct-ui-candidate/manifest.json"))
 
 
 def artifact():
     candidate = Path("direct-ui-candidate")
+    release.require(MANIFEST["source_sha"] == SOURCE, "Unexpected source SHA")
     build = release.read_json(candidate / "build.json")
     release.require(build["artifact_sha256"] == ARCHIVE, "Unexpected archive SHA-256")
     return release.verify_zip(candidate, build, MANIFEST)
 
 
 def main():
-    release.require(os.environ["GITHUB_REF"] == "refs/tags/g19-direct-test-ui-64d2d70-verified",
+    release.require(os.environ["GITHUB_REF"] == "refs/tags/g19-direct-test-ui-897e3c3",
                     "Unexpected release ref")
     files = artifact()
     baseline = release.snapshot()

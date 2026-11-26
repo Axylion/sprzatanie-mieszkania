@@ -1,7 +1,7 @@
 name: Goleszan direct test UI
 on:
   push:
-    tags: [g19-direct-test-ui-64d2d70]
+    tags: [g19-direct-test-ui-64d2d70-verified]
 permissions:
   contents: read
 concurrency:

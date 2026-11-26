@@ -1,0 +1,39 @@
+name: Goleszan direct test UI
+on:
+  push:
+    tags: [g19-direct-test-ui-64d2d70]
+permissions:
+  contents: read
+concurrency:
+  group: goleszan-19-preview-pages-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: >-
+      github.repository == 'Axylion/sprzatanie-mieszkania' &&
+      github.actor == 'Axylion' && github.actor_id == '80595490' &&
+      github.event.created && !github.event.deleted && !github.event.forced &&
+      github.run_attempt == '1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.22.0'
+      - run: npm ci --prefix scripts/g19-release --ignore-scripts --no-audit --no-fund
+      - name: Verify and publish exact artifact to the test slot
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: python3 -B scripts/g19-release/direct_test_ui.py
+      - name: Preserve publication evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: g19-direct-test-ui-evidence
+          path: stage-record/
+          if-no-files-found: warn

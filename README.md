@@ -226,11 +226,18 @@ zacznie działać po pierwszym udanym wdrożeniu. Podsumowanie workflow zawiera
 zweryfikowany SHA, wersję Service Workera i indywidualny URL wdrożenia.
 Pamięć podręczna Service Workera w podglądzie ma osobną wersję dla każdego SHA.
 
-Przed pierwszym pushem trzeba potwierdzić w Cloudflare, że projekt korzysta
-z Direct Upload, ma aktywne wdrożenie Production, a jego gałąź produkcyjna
-jest inna niż gałąź podglądu. W GitHub należy utworzyć environment
-`g19-visual-preview` z dostępem ograniczonym do `feature/g19-visual-review`,
-zmienną `G19_VISUAL_CF_ACCOUNT_ID` i sekretem `G19_VISUAL_CF_API_TOKEN`.
+Przed pierwszym pushem polecenie `python3 scripts/g19-visual-preview.py preflight`
+wykonuje tylko odczyt Cloudflare API. Oczekuje zmiennych
+`CLOUDFLARE_ACCOUNT_ID` i `CLOUDFLARE_API_TOKEN` przekazanych w środowisku
+procesu. Sprawdza konto, Direct Upload, aktywne wdrożenie Production
+i brak kolizji gałęzi.
+
+W GitHub otwórz **Settings → Environments**, utwórz `g19-visual-preview`
+i w **Deployment branches and tags** wybierz **Selected branches and tags**.
+Dodaj regułę typu **Branch** z dokładną nazwą `feature/g19-visual-review`.
+Ustaw zmienną środowiska `G19_VISUAL_CF_ACCOUNT_ID` na
+`6c1ff8f43cd435c244a2f03a7650fe4e` i dodaj sekret środowiska
+`G19_VISUAL_CF_API_TOKEN`.
 Token potrzebuje uprawnienia **Account → Cloudflare Pages → Edit**
 dla właściwego konta. Jest to uprawnienie na poziomie konta, dlatego
 workflow dodatkowo sprawdza projekt, gałąź i identyfikator aktywnego

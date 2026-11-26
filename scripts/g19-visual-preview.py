@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 
 
+ACCOUNT = "6c1ff8f43cd435c244a2f03a7650fe4e"
 PROJECT = "goleszan-19-preview"
 DOMAIN = f"{PROJECT}.pages.dev"
 BRANCH = "f1-ui-review"
@@ -82,8 +83,8 @@ def get(url, headers=None):
 def cloudflare(path=""):
     account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
     token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
-    require(re.fullmatch(r"[a-f0-9]{32}", account) and token,
-            "Configure Preview-only Cloudflare account ID and API token")
+    require(account == ACCOUNT, "Cloudflare account does not match the approved Preview account")
+    require(token, "Configure the Preview Cloudflare API token")
     url = f"https://api.cloudflare.com/client/v4/accounts/{account}/pages/projects/{PROJECT}{path}"
     body, _ = get(url, {"Authorization": f"Bearer {token}"})
     data = json.loads(body)
@@ -106,6 +107,12 @@ def production_snapshot():
     require(active and active["environment"] == "production" and active["id"],
             "Could not identify the active Production deployment")
     return project["id"], branch, active["id"]
+
+
+def preflight():
+    project_id, production_branch, production_id = production_snapshot()
+    print(f"{PROJECT} ({project_id}): Direct Upload, Preview branch {BRANCH}, "
+          f"Production branch {production_branch}, active deployment {production_id}")
 
 
 def find_deployment(marker, sha):
@@ -145,7 +152,8 @@ def verify_http(base, manifest, marker, *, all_assets=False):
     for path, expected in assets.items():
         body, headers = get(f"{base}/{path}?verify={marker}", {"Cache-Control": "no-cache"})
         require(sha256(body) == expected, f"Published bytes differ at {base}/{path}")
-        require(POLICY in headers.get("Content-Security-Policy", ""),
+        directives = {part.strip() for part in headers.get("Content-Security-Policy", "").split(";")}
+        require(set(POLICY.split("; ")).issubset(directives),
                 f"Preview connection policy is missing at {base}/{path}")
         if path == "sw.js":
             require(service_worker_version(body) == manifest["service_worker"],
@@ -195,7 +203,7 @@ def deploy():
 
 if __name__ == "__main__":
     try:
-        {"package": package, "deploy": deploy}[sys.argv[1]]()
+        {"package": package, "preflight": preflight, "deploy": deploy}[sys.argv[1]]()
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as error:
         print(f"Visual Preview failed: {error}", file=sys.stderr)
         sys.exit(1)

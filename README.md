@@ -224,6 +224,7 @@ workflow **Goleszan 19 Visual Preview**, który buduje dokładny SHA przez
 [Stały adres podglądu](https://f1-ui-review.goleszan-19-preview.pages.dev/)
 zacznie działać po pierwszym udanym wdrożeniu. Podsumowanie workflow zawiera
 zweryfikowany SHA, wersję Service Workera i indywidualny URL wdrożenia.
+Pamięć podręczna Service Workera w podglądzie ma osobną wersję dla każdego SHA.
 
 Przed pierwszym pushem trzeba potwierdzić w Cloudflare, że projekt korzysta
 z Direct Upload, ma aktywne wdrożenie Production, a jego gałąź produkcyjna

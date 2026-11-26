@@ -40,6 +40,14 @@ def service_worker_version(data):
 
 
 def package():
+    sha = os.environ["GITHUB_SHA"]
+    require(re.fullmatch(r"[a-f0-9]{40}", sha), "Invalid Git SHA")
+    worker = DIST / "sw.js"
+    source = worker.read_bytes()
+    version = f"{service_worker_version(source)}-preview-{sha}"
+    # A new worker must activate even when only CSS or another shell asset changes.
+    worker.write_bytes(re.sub(SW_VERSION, f'const CACHE_NAME = "{version}";'.encode(),
+                              source, count=1, flags=re.MULTILINE))
     # Keep this restriction in the Preview artifact, including on worker responses.
     (DIST / "_headers").write_text(f"/*\n  Content-Security-Policy: {POLICY}\n")
     assets = {
@@ -48,8 +56,8 @@ def package():
         if path.is_file() and path.name != "_headers"
     }
     manifest = {
-        "sha": os.environ["GITHUB_SHA"],
-        "service_worker": service_worker_version((DIST / "sw.js").read_bytes()),
+        "sha": sha,
+        "service_worker": version,
         "assets": assets,
     }
     (DIST / METADATA).write_text(json.dumps(manifest, sort_keys=True) + "\n")

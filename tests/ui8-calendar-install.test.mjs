@@ -95,6 +95,8 @@ function installer(userAgent, options = {}) {
       const handlers = new Map();
       nodes.set(id, {
         hidden: false, innerHTML: '',
+        querySelector: selector => element(id + selector),
+        setAttribute: (key, value) => { element(id)[key] = value; },
         addEventListener: (type, callback) => handlers.set(type, callback),
         trigger: (type, event) => handlers.get(type)(event),
         showModal() { this.open = true; },
@@ -124,6 +126,7 @@ for (const [name, ua, expected] of [
     element('shortcut-open').trigger('click');
     assert.match(element('shortcut-instructions').innerHTML, expected);
     assert.equal(element('native-install').hidden, true);
+    assert.equal(element('shortcut-openspan').textContent, /Android|iPhone/.test(ua) ? 'Na telefon' : 'Na komputer');
   });
 }
 test('Chromium native install prompt takes precedence and an installed app hides the affordance', async () => {

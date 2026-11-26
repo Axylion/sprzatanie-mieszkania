@@ -10,6 +10,11 @@
     (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const android = /Android/.test(navigator.userAgent);
   const firefox = /Firefox\//.test(navigator.userAgent);
+  const mobile = ios || android || navigator.userAgentData?.mobile === true;
+  const label = mobile ? "Na telefon" : "Na komputer";
+  open.querySelector("span").textContent = label;
+  open.setAttribute("aria-label", label + " — dodaj Goleszan 19");
+  if (!mobile) open.querySelector("svg").outerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-desktop-icon"/></svg>';
   let installed = false;
   let promptEvent;
   try { installed = localStorage.getItem(key) === "true"; }

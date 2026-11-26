@@ -157,6 +157,9 @@
   function setBoundRoom(room) {
     if (room === boundRoom) return;
     boundRoom = room;
+    const label = document.getElementById("discussion-room");
+    label.hidden = !room;
+    label.textContent = room ? "Pokój nr " + room : "";
     window.dispatchEvent(new CustomEvent("g19-bound-room", {detail: room}));
   }
 
@@ -267,11 +270,11 @@
     const focusedSelector = active?.dataset.reaction ? `[data-reaction="${active.dataset.reaction}"]`
       : active?.closest("[data-original]") ? "[data-original]"
       : active?.closest("[data-reply]") ? "[data-reply]"
-      : active?.matches(".message-author-link") ? ".message-author-link" : null;
+      : active?.matches(".message-private-link") ? ".message-private-link" : null;
     const fragment = document.createDocumentFragment();
     if (!items.length) {
       const empty = document.createElement("li");
-      empty.textContent = "Nie ma jeszcze wiadomości.";
+      empty.append(g19EmptyState("chat", "Nie ma jeszcze wiadomości", "Rozpocznij dyskusję, wysyłając pierwszą wiadomość."));
       fragment.append(empty);
     }
     for (const message of items) {
@@ -291,14 +294,15 @@
       const reactions = document.createElement("div");
       reactions.className = "discussion-reactions";
       reactions.append(reactionButton(message, 1), reactionButton(message, -1));
-      if (capabilities.privateChat && !message.mine && !message.former && message.canPrivate !== false && message.authorPeriod) {
+      meta.append(author);
+      if (capabilities.privateChat && !message.mine && !message.former && message.canPrivate === true && message.authorPeriod) {
         const link = document.createElement("a");
         link.href = "#dyskusje/prywatne/pokoj/" + message.room + "/" + message.authorPeriod;
-        link.textContent = author.textContent;
-        link.className = "message-author-link";
-        author.replaceChildren(link);
+        link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-chat-icon"/></svg> Napisz prywatnie';
+        link.className = "message-private-link";
+        meta.append(link);
       }
-      meta.append(author, time);
+      meta.append(time);
       const avatar = document.createElement("span");
       avatar.className = "discussion-avatar";
       avatar.setAttribute("aria-hidden", "true");
@@ -314,7 +318,7 @@
         card.append(quote);
       }
       if(capabilities.replies) {
-        const reply=document.createElement("button");reply.type="button";reply.className="message-reply-action";reply.dataset.reply=message.id;reply.textContent="Odpowiedz";reactions.append(reply);
+        const reply=document.createElement("button");reply.type="button";reply.className="message-reply-action";reply.dataset.reply=message.id;reply.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-reply-icon"/></svg> Odpowiedz';reactions.append(reply);
       }
       card.append(content, reactions);
       fragment.append(row);
@@ -1077,6 +1081,9 @@
     if (location.hash !== "#ustawienia") sessionStorage.removeItem(returnKey);
     if (view.hidden && home.hidden) showApproval(false);
     resume();
+  });
+  window.addEventListener("g19-private-room", event => {
+    if (token && [1, 2, 3, 4].includes(event.detail)) setBoundRoom(event.detail);
   });
   window.addEventListener("g19-device-revoked", () => { if (token) showRevoked(); });
   window.addEventListener("online", resume);

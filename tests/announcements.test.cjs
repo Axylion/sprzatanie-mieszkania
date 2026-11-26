@@ -236,10 +236,10 @@ test('PWA v13-10-2 to v13-11-0 update under the GitHub Pages subpath', async () 
 });
 
 test('F1 PWA relaunch loads the new interface and retains local resident data', {timeout:45000}, async () => {
-  const previousCache = 'goleszan19-shell-v13-11-0-f1-ui8-r2';
-  const currentCache = 'goleszan19-shell-v13-11-0-f1-ui9';
-  const currentDutyScript = './administracja/dyzury.js?v=ui8';
-  const previousDutyScript = './administracja/dyzury.js?v=f1-push2';
+  const previousCache = 'goleszan19-shell-v13-11-0-f1-ui9';
+  const currentCache = 'goleszan19-shell-v13-11-0-f1-ui10';
+  const currentDiscussionScript = './dyskusje/dyskusje.js?v=ui10';
+  const previousDiscussionScript = './dyskusje/dyskusje.js?v=ui9';
   const localData = {
     'cleaning-theme': 'dark',
     'cleaning-room': '1',
@@ -261,7 +261,7 @@ test('F1 PWA relaunch loads the new interface and retains local resident data', 
     res.setHeader('Content-Type', name.endsWith('.webmanifest') ? 'application/manifest+json' : mimeTypes[path.extname(name)] || 'text/html');
     const contents = fs.readFileSync(target);
     res.end(previous && !previousRoot && ['index.html', 'sw.js'].includes(name)
-      ? contents.toString().replace(currentCache, previousCache).replace(currentDutyScript, previousDutyScript)
+      ? contents.toString().replace(currentCache, previousCache).replace(currentDiscussionScript, previousDiscussionScript)
       : contents);
   });
   let browser;
@@ -279,7 +279,7 @@ test('F1 PWA relaunch loads the new interface and retains local resident data', 
     await installed.goto(origin);
     await installed.waitForFunction(() => navigator.serviceWorker.controller);
     assert.ok(await installed.evaluate(async ([cache, script]) =>
-      Boolean(await (await caches.open(cache)).match(script)), [previousCache, previousDutyScript]));
+      Boolean(await (await caches.open(cache)).match(script)), [previousCache, previousDiscussionScript]));
     await installed.evaluate(data => {
       for (const [key, value] of Object.entries(data)) localStorage.setItem(key, value);
       localStorage.setItem('goleszan19-installed', 'true');
@@ -299,8 +299,8 @@ test('F1 PWA relaunch loads the new interface and retains local resident data', 
     assert.ok(await relaunched.evaluate(async ([cache, oldCache, script]) => {
       const keys = await caches.keys();
       return keys.includes(cache) && !keys.includes(oldCache) && Boolean(await (await caches.open(cache)).match(script));
-    }, [currentCache, previousCache, currentDutyScript]));
-    assert.equal(await relaunched.locator(`script[src="${currentDutyScript}"]`).count(), 1);
+    }, [currentCache, previousCache, currentDiscussionScript]));
+    assert.equal(await relaunched.locator(`script[src="${currentDiscussionScript}"]`).count(), 1);
     assert.deepEqual(await relaunched.evaluate(keys => Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)])),
       Object.keys(localData)), localData);
     await relaunched.getByRole('link', {name: /Poradnik sprzątania/}).click();

@@ -310,12 +310,14 @@ test('pairing survives reload, verifies expiry and renews without opening chat',
     await page.getByRole('button',{name:/Pokój nr 1 Zajęty/}).click();
     await page.locator('#room-confirm').click();
     await page.getByText('012 345',{exact:true}).waitFor();
+    assert.equal(await page.locator('#discussion-pair-renew').isVisible(),false);
     await page.reload();
     await page.getByText('012 345',{exact:true}).waitFor();
     state = 'expired';
     await page.getByText('Kod wygasł.',{exact:true}).waitFor();
     await page.getByRole('button',{name:'Wygeneruj nowy kod'}).click();
     await page.getByText('023 456',{exact:true}).waitFor();
+    assert.equal(await page.locator('#discussion-pair-renew').isVisible(),false);
     assert.equal(started,2);
     assert.ok(!calls.includes('read') && !calls.includes('bind'));
   } finally { await browser.close(); }

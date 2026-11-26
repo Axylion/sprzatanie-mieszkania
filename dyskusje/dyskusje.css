@@ -164,8 +164,7 @@
 }
 .calendar-legend li { display: flex; align-items: center; gap: 6px; }
 .calendar-legend span { width: 10px; height: 10px; border-radius: 50%; }
-.legend-current { background: var(--accent-bg); border: 1px solid var(--accent); }
-.legend-mine { background: var(--accent-fill); }
+.legend-current { border: 1px solid var(--accent); }
 .device-list { list-style: none; padding: 0; margin: 8px 0; }
 .device-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border); }
 .device-list svg { width: 26px; height: 26px; flex: none; color: var(--muted); }
@@ -248,17 +247,6 @@
 .calendar-month button { min-height: 44px; border-color: var(--control-edge); background: var(--surface-alt); font-size: 1.35rem; }
 .calendar-grid .calendar-weekend { background: var(--accent-bg); color: var(--accent-text); }
 .dashboard-calendar .calendar-own { background: var(--accent-fill); color: #fff; }
-#calendar-days .calendar-day[aria-current="date"] { position: relative; font-weight: 750; }
-#calendar-days .calendar-day[aria-current="date"]::after {
-  content: "";
-  position: absolute;
-  inset: auto 18% 2px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--today-mark);
-  pointer-events: none;
-}
-#calendar-days .calendar-own[aria-current="date"]::after { background: var(--own-today-mark); }
 .calendar-grid [aria-pressed="true"] { outline: 2px solid var(--accent-text); outline-offset: -2px; font-weight: 750; }
 .dashboard-calendar button:focus-visible { outline: 2px dashed var(--accent); outline-offset: -2px; }
 
@@ -691,13 +679,13 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
 .admin-announcement-dialog h2 { font-size: 1.25rem; margin: 0 0 12px; }
 .admin-announcement-dialog .admin-actions { justify-content: flex-end; margin-top: 12px; }
 .expiry-actions { margin-top: 5px; }
-.expiry-navigation { grid-template-columns: auto auto minmax(0,1fr) auto auto; }
+.expiry-navigation { grid-template-columns: 44px minmax(0,1fr) 44px; }
 .expiry-navigation strong { text-align: center; }
 .admin-announcement-dialog .calendar-grid button { min-width: 0; padding-inline: 0; }
 .admin-announcement-dialog button[aria-pressed="true"] {
   background: var(--accent-bg); color: var(--accent-text); border-color: var(--accent);
 }
-.admin-announcement-dialog button[aria-current="date"] { border-bottom: 3px solid var(--accent); }
+.admin-announcement-dialog button[aria-current="date"] { box-shadow: inset 0 0 0 1px var(--today-mark); }
 .admin-announcement-dialog button:disabled { opacity: .48; cursor: default; }
 @media (max-width: 460px) {
   #admin-panel > .admin-toolbar h1 { font-size: clamp(1rem, 4.2vw, 1.32rem); }
@@ -767,7 +755,6 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
   [data-theme="dark"] {
     --field-focus: #63e5ef;
     --field-hover: #479aa5;
-    --field-glow: rgb(99 229 239 / 20%);
     --field-error: #f08089;
   }
   [data-theme="dark"] .calendar-upcoming {
@@ -790,16 +777,6 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
   }
   [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"]):not(#discussion-body, #private-body):not(:disabled):hover {
     border-color: var(--field-hover);
-  }
-  [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"]):not(#discussion-body, #private-body):not(:disabled):focus {
-    border-color: var(--field-focus); outline: 2px solid var(--field-focus); outline-offset: 1px;
-    box-shadow: 0 0 0 3px var(--field-glow);
-  }
-  [data-theme="dark"] #admin-announcements :is(input, select, #announcement-editor):focus,
-  [data-theme="dark"] #admin-login #admin-password:focus,
-  [data-theme="dark"] #admin-view :is(input, textarea, select, [contenteditable="true"]):focus-visible,
-  [data-theme="dark"] .discussion-panel :is(input, textarea, select):not(#discussion-body, #private-body):focus-visible {
-    outline: 2px solid var(--field-focus); outline-offset: 1px; border-color: var(--field-focus); box-shadow: 0 0 0 3px var(--field-glow);
   }
   [data-theme="dark"] :is(input, textarea, select, [contenteditable="true"])[aria-invalid="true"],
   [data-theme="dark"] :is(input, textarea, select):not(#discussion-body, #private-body):user-invalid {
@@ -881,9 +858,9 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
 .discussion-tabs a[aria-current="page"] { background: var(--private-tint); color: var(--private-accent); border-color: var(--border); font-weight: 700; }
 .private-unread, #private-tab-count:not([hidden]) { display: inline-grid; place-items: center; min-width: 20px; padding: 1px 5px; border-radius: 10px; background: var(--private-tint); color: var(--private-accent); font-size: .8rem; }
 .private-list { list-style: none; padding: 0; margin: 12px 0; }
-.private-list li + li { border-top: 1px solid var(--border); }
+.private-list li:has(> a) { border-bottom: 1px solid var(--border); }
 .private-list a { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: start; gap: 12px; padding: 15px 0; color: var(--text); text-decoration: none; }
-.private-list a:hover { background: var(--surface-alt); }
+
 .private-list-content { display: grid; gap: 4px; min-width: 0; }
 .private-list-content > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .private-list time { color: var(--muted); font-size: .8rem; }
@@ -894,12 +871,12 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
 .private-dialog-heading { display: flex; align-items: center; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
 .private-dialog-heading h2 { margin: 0; font-size: 1.2rem; font-weight: 700; }
 .private-dialog-heading p { margin: 2px 0 0; color: var(--muted); font-size: .875rem; }
-#private-back {
+.private-back {
   display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px;
   border: 1px solid var(--border); border-radius: 12px; background: var(--surface-alt); color: var(--text);
 }
-#private-back svg { width: 17px; height: 17px; }
-#private-back:hover { background: var(--private-tint); }
+.private-back svg { width: 17px; height: 17px; }
+.private-back:hover { background: var(--private-tint); }
 .private-history { height: auto; min-height: 180px; max-height: min(55dvh,520px); }
 #discussion-chat .discussion-message {
   display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: start; column-gap: 9px;
@@ -950,7 +927,7 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .discussion-tabs a:hover, .private-list a:hover { text-decoration: none; background: var(--private-tint); }
+  .discussion-tabs a:hover { text-decoration: none; background: var(--private-tint); }
   .discussion-tabs a[aria-current="page"]:hover { filter: brightness(1.1); }
 }
 
@@ -1203,3 +1180,141 @@ body:has(#admin-view:not([hidden]) #admin-login:not([hidden])) :is(footer, #admi
   font: inherit;
 }
 .device-approval-dialog button:disabled { opacity: .6; cursor: default; }
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 155px;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text);
+}
+.empty-state-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 15px;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  margin-bottom: 4px;
+}
+.empty-state-icon svg { width: 28px; height: 28px; }
+.empty-state p { margin: 0; color: var(--muted); }
+#notification-list:empty, #hidden-announcements-list:empty, #hidden-announcements-status:empty { display: none; }
+
+.announcement-dismiss:not(:disabled):hover {
+  background: rgb(119 102 60 / 12%);
+  box-shadow: none;
+}
+#discussion-pair :is(#discussion-pair-back, #discussion-pair-retry) {
+  border: 1px solid var(--control-edge);
+  border-radius: 10px;
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+#discussion-pair :is(#discussion-pair-back, #discussion-pair-retry):not(:disabled):hover { background: var(--secondary-hover); }
+#discussion-pair button { margin-block: 4px; }
+#discussion-pair button[hidden] { display: none; }
+@media (max-width: 460px) {
+  #discussion-pair button:not([hidden]) { display: block; width: 100%; }
+}
+.pairing-instructions { padding-inline-start: 1.55em; margin-block: 14px 20px; line-height: 1.55; }
+.pairing-instructions li { padding-inline-start: .18em; }
+.pairing-instructions li + li { margin-top: .55em; }
+#discussion-approve-form label { display: block; padding-top: 13px; border-top: 1px solid var(--border); }
+#shortcut-open svg { width: 19px; height: 22px; flex: none; }
+
+.discussion-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+#discussion-room { color: var(--accent-text); font-size: .875rem; }
+.discussion-meta .message-private-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-inline-start: auto;
+  padding-inline: 4px;
+  border-radius: 6px;
+  font-size: .83rem;
+  color: var(--private-accent);
+  text-decoration: none;
+}
+.message-private-link:hover { background: var(--private-tint); }
+.discussion-meta .message-private-link + time { flex-basis: 100%; }
+:is(.message-private-link, .message-reply-action) svg { width: 15px; height: 15px; flex: none; }
+#discussion-chat .discussion-reactions .message-reply-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+#discussion-chat .discussion-reactions .message-reply-action:hover {
+  background: var(--secondary-hover);
+  border-color: var(--control-edge);
+}
+@media (pointer: coarse), (max-width: 600px) {
+  #discussion-chat .discussion-reactions .message-reply-action, .discussion-meta .message-private-link { min-height: 44px; }
+}
+
+.private-list a { margin-block: 4px; padding: 10px 8px; border-radius: 9px; }
+@media (hover: hover) {
+  .private-list a:hover { background: var(--secondary-hover); text-decoration: none; }
+}
+.private-list a:active { background: var(--secondary-active); }
+.private-privacy { margin-top: 14px; padding-top: 8px; }
+#private-dialog-view .private-privacy, #private-list-view:has(#private-archive-open:not([hidden])) .private-privacy {
+  border-top: 1px solid var(--border);
+}
+.private-privacy summary { align-items: center; min-height: 44px; padding: 6px; border-radius: 8px; }
+.private-privacy summary:hover { background: var(--secondary-hover); }
+.private-privacy p { padding-inline: 34px 10px; }
+.privacy-chevron {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  margin-inline: auto 6px;
+  border: solid currentColor;
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+.private-privacy[open] .privacy-chevron { transform: rotate(225deg); }
+#private-archive-open:not([hidden]) {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px;
+  border-radius: 9px;
+  background: var(--surface-alt);
+  color: var(--accent-text);
+  text-decoration: none;
+}
+#private-archive-open:hover { background: var(--secondary-hover); }
+#private-archive-open svg { width: 20px; height: 20px; }
+
+:root :is(button, a[href], input, select, textarea, summary, [contenteditable="true"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+:root .announcement-dismiss:focus-visible { outline-color: var(--accent-fill); }
+:root .calendar-grid button:focus-visible { outline-offset: -2px; }
+:root :is(.discussion-compose, .private-compose):has(textarea:focus-visible) {
+  border-color: var(--border);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.discussion-panel :is(.discussion-compose, .private-compose) textarea:focus-visible { outline: none; }
+:root #theme-menu label:has(:focus-visible) { outline-offset: -2px; }
+@media (max-width: 360px) {
+  .header-actions { flex-wrap: wrap; justify-content: end; max-width: 100%; }
+}
+#discussion-history:has(.empty-state) { border-top: 0; }

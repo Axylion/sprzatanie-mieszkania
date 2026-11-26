@@ -168,8 +168,10 @@ test('Announcement editor formats the current block, previews, publishes, hides 
         for (const field of [page.locator('#admin-announcement-form input[name=title]'),paragraph,editor]) {
           await field.focus();
           await page.waitForTimeout(170);
-          assert.equal(await field.evaluate(el=>getComputedStyle(el).borderColor),'rgb(99, 229, 239)');
-          assert.notEqual(await field.evaluate(el=>getComputedStyle(el).boxShadow),'none');
+          assert.deepEqual(await field.evaluate(el => {
+            const css = getComputedStyle(el);
+            return [css.outlineStyle, css.outlineWidth, css.boxShadow];
+          }), ['solid', '2px', 'none']);
         }
       }
       await page.locator('#announcement-date-open').click();
@@ -177,12 +179,13 @@ test('Announcement editor formats the current block, previews, publishes, hides 
       await picker.locator('[aria-current="date"]').waitFor();
       const today = await picker.locator('[aria-current="date"]').textContent();
       if (Number(today) > 1) assert.equal(await picker.locator('#announcement-date-days button').first().isDisabled(),true);
-      await picker.getByRole('button',{name:'Następny miesiąc'}).click();
-      await picker.getByRole('button',{name:'Poprzedni miesiąc'}).click();
       const currentMonth=await picker.locator('#announcement-date-month').textContent();
-      await picker.getByRole('button',{name:'Następny rok'}).click();
-      assert.notEqual(await picker.locator('#announcement-date-month').textContent(),currentMonth);
-      await picker.getByRole('button',{name:'Poprzedni rok'}).click();
+      assert.equal(await picker.locator('.expiry-navigation button').count(), 2);
+      assert.equal(await picker.locator('[aria-current="date"]').evaluate(el => getComputedStyle(el).boxShadow.includes('inset')), true);
+      await picker.getByRole('button',{name:'Następny miesiąc'}).click();
+      assert.notEqual(await picker.locator('#announcement-date-month').textContent(), currentMonth);
+      await picker.getByRole('button',{name:'Poprzedni miesiąc'}).click();
+      assert.equal(await picker.locator('#announcement-date-month').textContent(), currentMonth);
       await picker.locator('[aria-current="date"]').focus();
       await page.keyboard.press('ArrowRight');
       await page.keyboard.press('Enter');

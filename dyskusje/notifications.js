@@ -71,6 +71,7 @@
   let pushContext = 0;
   const format = new Intl.DateTimeFormat("pl-PL", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Warsaw" });
   const localReadKey = "goleszan19-public-notifications-read";
+  let publicState = "loading";
   let snapshot = { items: [], unread: 0 };
   let announcementUnread = 0;
   let refreshId = 0;
@@ -196,7 +197,6 @@
 
   function categoryIcon(category) {
     const paths = {
-      messages: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/>',
       announcements: '<path d="m8 8 12-4v16L8 16H4V8h4Zm0 0v8m-3 0 2 5h4l-2-5M2 9v6"/>',
       duties: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 11h18m-10 4 2 2 4-4"/>'
     };
@@ -204,7 +204,7 @@
     icon.className = "notification-category-icon";
     icon.setAttribute("aria-hidden", "true");
     icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
-      (paths[category] || paths.announcements) + '</svg>';
+      (category === "messages" ? '<use href="#g19-chat-icon"/>' : paths[category] || paths.announcements) + '</svg>';
     return icon;
   }
 
@@ -213,7 +213,7 @@
     badge.hidden = readAll.hidden = snapshot.unread === 0;
     badge.textContent = snapshot.unread > 99 ? "99+" : String(snapshot.unread);
     badge.parentElement.setAttribute("aria-label", snapshot.unread ? "Powiadomienia, nieprzeczytane: " + snapshot.unread : "Powiadomienia");
-    empty.hidden = snapshot.items.length !== 0;
+    empty.hidden = snapshot.items.length !== 0 || Boolean(notice.textContent);
     list.replaceChildren(...snapshot.items.map(item => {
       const li = document.createElement("li");
       const link = document.createElement("a");
@@ -257,6 +257,11 @@
     const key = token();
     try {
       const items = !ready || !key ? publicAnnouncements() : null;
+      if (items && publicState !== "ready") {
+        notice.textContent = publicState === "loading" ? "Wczytywanie powiadomień…" : "Nie udało się odświeżyć powiadomień.";
+        empty.hidden = true;
+        return;
+      }
       const result = items ? { items, unread: items.filter(item => !item.read).length }
         : await rpc(capabilities.version === 1 ? "notifications_v2" : "notifications", { p_token: key, p_categories: inboxCategories });
       if (id !== refreshId || key !== token()) return;
@@ -285,12 +290,13 @@
       render();
     } catch (error) {
       if (id !== refreshId || key !== token()) return;
+      empty.hidden = true;
       if (error.code === "device_invalid") {
+        notice.textContent = "Dostęp urządzenia został zakończony.";
         snapshot = { items: [], unread: 0 };
         announcementUnread = 0;
         render();
         window.dispatchEvent(new Event("g19-device-revoked"));
-        notice.textContent = "Dostęp urządzenia został zakończony.";
       } else notice.textContent = "Nie udało się odświeżyć powiadomień.";
     }
   }
@@ -451,7 +457,11 @@
     });
   }
 
-  window.addEventListener("g19-announcements", () => { if (!token()) refresh(); scrollToTarget(); });
+  window.addEventListener("g19-announcements", event => {
+    publicState = event.detail;
+    if (!token()) refresh();
+    scrollToTarget();
+  });
   function deviceChanged() {
     privateCount = 0;
     refreshId++;

@@ -70,6 +70,21 @@ test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both
  await a.locator('#general-tab').click();assert.equal(await a.locator('#discussion-body').inputValue(),'Niedokończony tekst ogólny');
  const generalMessage=a.locator('#discussion-history p').getByText('Historia ogólna po zmianie karty',{exact:true});
  await generalMessage.waitFor();
+ const generalCard = generalMessage.locator('xpath=ancestor::li');
+ assert.equal(await generalCard.locator('.discussion-meta strong a').count(), 0);
+ assert.equal(await generalCard.getByRole('link', {name:'Napisz prywatnie'}).count(), 1);
+ assert.equal(await a.locator('#discussion-room').textContent(), 'Pokój nr 1');
+ await generalCard.getByRole('link', {name:'Napisz prywatnie'}).click();
+ await a.locator('#private-dialog-view').waitFor();
+ assert.equal(await a.locator('#private-peer-title').textContent(), 'Pokój nr 3');
+ const privacy = a.locator('#private-dialog-view .private-privacy summary');
+ await privacy.focus();
+ await a.keyboard.press('Enter');
+ await a.locator('#private-dialog-view .private-privacy summary[aria-expanded=true]').waitFor();
+ await a.keyboard.press('Enter');
+ await a.locator('#private-dialog-view .private-privacy summary[aria-expanded=false]').waitFor();
+ await a.locator('#general-tab').click();
+ await generalMessage.waitFor();
  const generalRead='**/rest/v1/rpc/g19_read';
  async function openGeneral() {
   await Promise.all([
@@ -207,13 +222,18 @@ test('Private UI uses real SQL: replies, drafts, scoped counts, archive and both
  }
  // A stale author link must not silently target the next resident of that room.
  await a.locator('#discussion-history .message-quote').first().click();
- const staleAuthor=await a.locator('#discussion-history [data-message="'+original+'"] .message-author-link').getAttribute('href');
+ const staleAuthor=await a.locator('#discussion-history [data-message="'+original+'"] .message-private-link').getAttribute('href');
  const thirdGeneration=(await db.query('select generation from g19_private.rooms where room=3')).rows[0].generation;
  await db.query('select public.g19_admin_change_resident(3,$1,1)',[thirdGeneration]);await bind(3);
  await a.goto(base+staleAuthor);
  await a.locator('#private-status').filter({hasText:'Okres pokoju się zmienił.'}).waitFor();
  assert.equal(await a.locator('#private-dialog-view').isVisible(),false);
  await a.goto(base+'#dyskusje');
+ await a.reload();
+ await a.locator('#discussion-history .message-quote[data-original="'+original+'"]').last().click();
+ const oldCard = a.locator('#discussion-history [data-message="'+original+'"]');
+ await oldCard.locator('strong').getByText(/poprzedni mieszkaniec/).waitFor();
+ assert.equal(await oldCard.locator('.message-private-link').count(), 0);
  // Closing room 1 keeps room 2's archive but removes every write control.
  const generation=(await db.query('select generation from g19_private.rooms where room=1')).rows[0].generation;
  await db.query('select public.g19_admin_change_resident(1,$1,1)',[generation]);

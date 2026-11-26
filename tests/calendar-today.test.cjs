@@ -31,21 +31,21 @@ test('Calendar marks the local date in both themes and refreshes at local midnig
       await page.goto('http://127.0.0.1:41961/');
       await page.clock.runFor(50);
       const today = page.locator('#calendar-days [aria-current="date"]');
-      const underline = () => today.evaluate(el => {
+      const contour = () => today.evaluate(el => {
         const style = getComputedStyle(el, '::after');
-        return [style.height, style.backgroundColor];
+        return [style.borderTopWidth, style.borderTopColor];
       });
 
       // In Warsaw it is already Saturday. The viewer is still on Friday, November 6.
       assert.equal(await today.textContent(), '6');
       assert.equal(await today.evaluate(el => el.classList.contains('calendar-weekend')), false);
-      assert.deepEqual(await underline(), ['3px', theme === 'light' ? 'rgb(0, 114, 121)' : 'rgb(99, 229, 239)']);
+      assert.deepEqual(await contour(), ['1px', theme === 'light' ? 'rgb(0, 114, 121)' : 'rgb(99, 229, 239)']);
 
       await page.clock.runFor(1000);
       assert.equal(await today.textContent(), '7');
       assert.equal(await today.evaluate(el => el.classList.contains('calendar-own')), true);
       assert.equal(await today.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(8, 109, 114)');
-      assert.deepEqual(await underline(), ['3px', 'rgb(186, 255, 248)']);
+      assert.deepEqual(await contour(), ['1px', 'rgb(186, 255, 248)']);
 
       await page.locator('#calendar-next-month').evaluate(el => el.click());
       assert.equal(await today.count(), 0);

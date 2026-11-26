@@ -26,13 +26,13 @@
 .guide-entry-arrow { margin-inline-start: auto; font-size: 1.45rem; }
 
 #poradnik-view, #poradnik-gallery {
-  --guide-bg: #031b23;
-  --guide-panel: #031e26;
-  --guide-tip: #062b35;
-  --guide-line: #08e0ee;
-  --guide-yellow: #ffeb16;
-  --guide-text: #f9fdff;
-  --guide-divider: #3e6269;
+  --guide-bg: var(--bg);
+  --guide-panel: var(--surface);
+  --guide-tip: var(--surface-alt);
+  --guide-line: var(--accent-text);
+  --guide-yellow: #e5c878;
+  --guide-text: var(--text);
+  --guide-divider: var(--border);
   color: var(--guide-text);
   color-scheme: dark;
 }
@@ -45,7 +45,7 @@
 #poradnik-view h1:focus { outline: none; }
 #poradnik-view a { color: inherit; }
 #poradnik-view :focus-visible, #poradnik-gallery :focus-visible {
-  outline: 2px solid var(--guide-yellow);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -54,7 +54,7 @@
 }
 
 .guide-top { margin-bottom: 12px; }
-:root[data-theme="light"] #poradnik-view {
+:root[data-theme="light"] :is(#poradnik-view, #poradnik-gallery) {
   --guide-panel: var(--surface);
   --guide-tip: var(--surface-alt);
   --guide-line: var(--accent);
@@ -289,7 +289,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 14px;
   padding-top: 10px;
-  border-top: 1px solid #297481;
+  border-top: 1px solid var(--border);
 }
 
 .guide-categories a {
@@ -400,7 +400,7 @@
 [data-theme="dark"] .guide-checklist {
   --list-head: #0b3742;
   --list-selected: #0c414a;
-  --list-ticket: #4de1ee;
+  --list-ticket: var(--accent);
 }
 .guide-checklist-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: clamp(12px, 2.2vw, 23px); }
 .guide-checklist-columns > section { border: 1px solid var(--border); border-radius: 17px; background: var(--guide-panel); min-width: 0; }

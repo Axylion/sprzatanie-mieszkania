@@ -291,12 +291,12 @@
       color: #77663c;
       display: grid;
       place-items: center;
+      border-radius: 50%;
     }
     .announcement-dismiss svg { width: 26px; height: 26px; }
     .announcement-dismiss:focus-visible {
       outline: 2px solid var(--accent-fill);
       outline-offset: 2px;
-      border-radius: 4px;
     }
     .sr-only {
       position: absolute; width: 1px; height: 1px; padding: 0;
@@ -401,17 +401,18 @@
     }
   </style>
   <template>
-  <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui8">
+  <link rel="stylesheet" href="./poradnik/poradnik.css?v=ui10">
   <script defer src="./poradnik/dane.js"></script>
   <script defer src="./poradnik/poradnik.js?v=ui8"></script>
-  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui9">
-  <link rel="stylesheet" href="./kalendarz/kalendarz.css?v=ui8-r2">
+  <link rel="stylesheet" href="./dyskusje/dyskusje.css?v=ui10">
+  <link rel="stylesheet" href="./kalendarz/kalendarz.css?v=ui10">
+  <script defer src="./dyskusje/ui-components.js?v=ui10"></script>
   <script defer src="./dyskusje/config.js"></script>
-  <script defer src="./dyskusje/dyskusje.js?v=ui9"></script>
-  <script defer src="./dyskusje/private-chat.js?v=ui4"></script>
-  <script defer src="./dyskusje/notifications.js?v=ui4"></script>
+  <script defer src="./dyskusje/dyskusje.js?v=ui10"></script>
+  <script defer src="./dyskusje/private-chat.js?v=ui10"></script>
+  <script defer src="./dyskusje/notifications.js?v=ui10"></script>
   <script defer src="./ogloszenia/content.js"></script>
-  <script defer src="./pwa-install.js?v=ui8"></script>
+  <script defer src="./pwa-install.js?v=ui10"></script>
   <script defer src="./administracja/dyzury.js?v=ui8"></script>
   <script defer src="./administracja/announcements.js?v=f1"></script>
   <script defer src="./administracja/admin.js?v=f1"></script>
@@ -426,7 +427,14 @@
 <svg class="sr-only" width="0" height="0" aria-hidden="true">
   <symbol id="g19-chat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-1-2V7a2 2 0 0 1 2-2Z"/><path d="M7 10h10m-10 3h6"/></symbol>
   <symbol id="g19-person-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3"/><path d="M6 19v-1a6 6 0 0 1 12 0v1"/></symbol>
+  <symbol id="g19-bell-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-2 7-2 9h16c0-2-2-2-2-9m-8 12a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="g19-announcement-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="m8 8 12-4v16L8 16H4V8h4Zm0 0v8m-3 0 2 5h4l-2-5M2 9v6"/></symbol>
+  <symbol id="g19-reply-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6-6 6 6 6m-6-6h11a6 6 0 0 1 6 6"/></symbol>
+  <symbol id="g19-archive-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9m-9 4h4"/></symbol>
+  <symbol id="g19-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5m6-6-6 6 6 6"/></symbol>
+  <symbol id="g19-desktop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4m-4 0h8"/></symbol>
 </svg>
+<template id="empty-state-template"><div class="empty-state"><span class="empty-state-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use/></svg></span><strong></strong><p></p></div></template>
 <header>
   <div class="container header-inner">
     <div class="brand">
@@ -440,7 +448,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v5h5l9 4V6l-9 4H4Zm4 5 2 5m10-10 2-2m-2 6 2 2"/></svg>
         <span class="push-dot" aria-hidden="true"></span><span class="sr-only" id="announcements-push-indicator">Powiadomienia wyłączone</span><span class="header-unread-count" id="announcements-count" hidden></span>
       </button>
-      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg> Na telefon</button>
+      <button type="button" class="shortcut-button" id="shortcut-open" aria-haspopup="dialog" aria-label="Na telefon — dodaj Goleszan 19"><svg width="18" height="22" viewBox="0 0 18 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><rect x="3" y="1.5" width="12" height="21" rx="2.5"/><path d="M7 4h4M8 19.5h2"/></svg><span>Na telefon</span></button>
       <div class="theme-picker">
         <button type="button" class="settings-entry" id="theme-toggle" aria-label="Motyw strony" aria-expanded="false" aria-controls="theme-menu"><span id="theme-icon" aria-hidden="true">⚙</span></button>
         <fieldset id="theme-menu" hidden>
@@ -457,7 +465,7 @@
 <dialog id="notification-panel" class="shortcut-help" aria-labelledby="notification-title">
   <div class="notification-toolbar"><div class="notification-heading"><h2 id="notification-title">Powiadomienia</h2><form method="dialog"><button type="submit" class="modal-close" aria-label="Zamknij powiadomienia" autofocus>×</button></form></div>
   <button type="button" id="notification-read-all" hidden>Oznacz wszystkie jako przeczytane</button></div>
-  <p id="notification-empty">Brak powiadomień.</p>
+  <div id="notification-empty" hidden></div>
   <p id="notification-status" role="status"></p>
   <ul id="notification-list"></ul>
 </dialog>
@@ -468,7 +476,8 @@
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-label="Powiadomienia o ogłoszeniach" aria-describedby="push-announcements-status" data-push-category="announcements"><span class="push-state">Powiadomienia wyłączone</span></button>
       <p class="push-feedback" id="push-announcements-status" role="status"></p>
     </div>
-  <p id="hidden-announcements-empty">Brak aktywnych ogłoszeń.</p>
+  <div id="hidden-announcements-empty" hidden></div>
+  <p id="hidden-announcements-status" role="status"></p>
   <ul id="hidden-announcements-list"></ul>
 </dialog>
 
@@ -576,7 +585,7 @@
     </div>
     <div class="calendar-grid" aria-label="Dni tygodnia"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span></div>
     <div class="calendar-grid" id="calendar-days" role="group" aria-label="Kalendarz dyżurów"></div>
-    <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój pokój</li></ul>
+    <ul class="calendar-legend" aria-label="Legenda kalendarza"><li><span class="legend-current"></span> Dyżur</li><li><span class="legend-mine"></span> Twój dyżur</li><li><span class="legend-holiday"></span> Święto</li><li><span class="legend-missed"></span> Nieodbyty dyżur</li></ul>
     <div class="calendar-date-info"><span id="calendar-duty" class="sr-only" aria-live="polite"></span><div class="push-control">
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-describedby="push-duties-status" data-push-category="duties">Powiadomienia o dyżurach</button>
       <p class="push-feedback" id="push-duties-status" role="status"></p>
@@ -609,7 +618,7 @@
       <p id="discussion-pair-code" class="discussion-pair-code" aria-label="Kod podłączenia"></p>
       <p id="discussion-pair-time" class="discussion-pair-time" role="timer"></p>
       <button type="button" id="discussion-pair-retry" hidden>Sprawdź ponownie</button>
-      <button type="button" id="discussion-pair-renew" hidden>Wygeneruj nowy kod</button>
+      <button type="button" class="device-primary" id="discussion-pair-renew" hidden>Wygeneruj nowy kod</button>
       <button type="button" id="discussion-pair-back">Anuluj</button>
     </section>
     <div id="device-settings" hidden>
@@ -630,14 +639,14 @@
     <h2 id="device-approval-title">Podłącz kolejne urządzenie</h2>
     <button type="button" id="device-approval-close" aria-label="Zamknij">×</button>
   </div>
-  <ol>
+  <ol class="pairing-instructions">
     <li>Otwórz stronę Goleszan 19 na nowym urządzeniu.</li>
-    <li>W sekcji Moje urządzenia wybierz <span id="device-approval-room">swój pokój</span>.</li>
-    <li>Naciśnij „Podłącz kolejne urządzenie”.</li>
+    <li>W sekcji <strong>Moje urządzenia</strong> wybierz <span id="device-approval-room">swój pokój</span>.</li>
+    <li>Naciśnij <strong>„Podłącz kolejne urządzenie”</strong>.</li>
     <li>Wpisz tutaj kod wyświetlony na nowym urządzeniu.</li>
   </ol>
   <form id="discussion-approve-form" class="discussion-approval">
-    <label for="discussion-approve-code">Kod z nowego urządzenia</label>
+    <label for="discussion-approve-code">Kod z nowego urządzenia:</label>
     <input id="discussion-approve-code" required inputmode="numeric" pattern="[0-9]{6}" autocomplete="off" spellcheck="false" placeholder="000 000">
     <p id="device-approval-status" role="status"></p>
     <button class="device-primary" type="submit" value="approve" disabled>Potwierdź podłączenie</button>
@@ -651,7 +660,7 @@
 <main class="container discussion-view" id="discussion-view" hidden>
   <a class="guide-home-link" href="#harmonogram">← Harmonogram</a>
   <section class="card discussion-panel" aria-labelledby="discussion-title">
-    <h1 id="discussion-title" tabindex="-1">Dyskusje</h1>
+    <div class="discussion-heading"><h1 id="discussion-title" tabindex="-1">Dyskusje</h1><span id="discussion-room" hidden></span></div>
     <div class="push-control discussion-push" hidden>
       <button type="button" class="push-switch" role="switch" aria-checked="false" aria-label="Powiadomienia o wiadomościach" aria-describedby="push-messages-status" data-push-category="messages"><span class="push-state">Powiadomienia wyłączone</span></button>
       <p class="push-feedback" id="push-messages-status" role="status"></p>
@@ -705,18 +714,18 @@
         <p id="private-status" role="status"></p>
         <div id="private-list-view">
           <ul id="private-list" class="private-list"></ul>
-          <a id="private-archive-open" href="#dyskusje/prywatne/archiwum" hidden>Archiwum <span id="private-archive-count"></span></a>
-          <details class="private-privacy"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg>Prywatne rozmowy są dostępne wyłącznie dla uczestniczących w nich pokoi.</summary>
+          <a id="private-archive-open" href="#dyskusje/prywatne/archiwum" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-archive-icon"/></svg> <span>Archiwum <span id="private-archive-count"></span></span><span aria-hidden="true">›</span></a>
+          <details class="private-privacy"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg>Prywatne rozmowy są dostępne wyłącznie dla uczestniczących w nich pokoi.<span class="privacy-chevron" aria-hidden="true"></span></summary>
             <p>Panel administratora nie udostępnia cudzych prywatnych rozmów. Wiadomości nie są szyfrowane end-to-end. Osoby z bezpośrednim dostępem administracyjnym do bazy danych mogą odczytać ich treść. Dostęp do pokoju współdzielą jego podłączone urządzenia.</p>
           </details>
         </div>
         <div id="private-archive-view" hidden>
-          <a href="#dyskusje/prywatne">‹ Prywatne</a><h2>Archiwum</h2>
+          <div class="private-dialog-heading"><a class="private-back" href="#dyskusje/prywatne" aria-label="Wróć do listy rozmów"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-back-icon"/></svg></a><h2>Archiwum</h2></div>
           <ul id="private-archive-list" class="private-list"></ul><button id="private-archive-more" type="button" hidden>Starsze rozmowy</button>
         </div>
         <div id="private-dialog-view" hidden>
           <div class="private-dialog-heading">
-            <a id="private-back" href="#dyskusje/prywatne" aria-label="Wróć do listy rozmów"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>
+            <a id="private-back" class="private-back" href="#dyskusje/prywatne" aria-label="Wróć do listy rozmów"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6"/></svg></a>
             <div><h2 id="private-peer-title" tabindex="-1"></h2><p id="private-peer-context">Rozmowa prywatna</p></div>
           </div>
           <p id="private-readonly" hidden>Rozmowa archiwalna — tylko do odczytu.</p>
@@ -730,6 +739,9 @@
             <textarea id="private-body" placeholder="Napisz wiadomość..." rows="1" maxlength="1500" required></textarea>
             <button id="private-send" type="submit" aria-label="Wyślij prywatną wiadomość" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="m3 3 18 9-18 9 4-9-4-9Zm4 9h14"/></svg></button>
           </form>
+          <details class="private-privacy"><summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m12 2 8 4v6c0 5-8 10-8 10S4 17 4 12V6l8-4Z"/><path d="m8 12 3 3 5-6"/></svg>Prywatne rozmowy są dostępne wyłącznie dla uczestniczących w nich pokoi.<span class="privacy-chevron" aria-hidden="true"></span></summary>
+            <p>Panel administratora nie udostępnia cudzych prywatnych rozmów. Wiadomości nie są szyfrowane end-to-end. Osoby z bezpośrednim dostępem administracyjnym do bazy danych mogą odczytać ich treść. Dostęp do pokoju współdzielą jego podłączone urządzenia.</p>
+          </details>
         </div>
       </section>
     </div>
@@ -939,11 +951,9 @@
 <dialog id="announcement-date-dialog" class="admin-announcement-dialog" aria-labelledby="announcement-date-title">
   <h2 id="announcement-date-title">Data zakończenia publikacji</h2>
   <div class="calendar-month expiry-navigation">
-    <button type="button" data-step="-12" aria-label="Poprzedni rok">«</button>
     <button type="button" data-step="-1" aria-label="Poprzedni miesiąc">‹</button>
     <strong id="announcement-date-month" aria-live="polite"></strong>
     <button type="button" data-step="1" aria-label="Następny miesiąc">›</button>
-    <button type="button" data-step="12" aria-label="Następny rok">»</button>
   </div>
   <div class="calendar-grid" aria-hidden="true"><span>Pn</span><span>Wt</span><span>Śr</span><span>Cz</span><span>Pt</span><span>So</span><span>Nd</span></div>
   <div id="announcement-date-days" class="calendar-grid" role="group" aria-labelledby="announcement-date-month"></div>
@@ -1407,7 +1417,7 @@
       announcementTimer = setTimeout(() => renderAnnouncements(loadedAnnouncements),
         Math.min(Math.min(...boundaries) - now, 2147483647));
     }
-    window.dispatchEvent(new Event("g19-announcements"));
+    window.dispatchEvent(new CustomEvent("g19-announcements", { detail: announcementState }));
     if (announcementsPanel.open) renderHiddenAnnouncements();
     renderSlides();
   }
@@ -1564,7 +1574,10 @@
       return li;
     });
     hiddenList.replaceChildren(...buttons);
-    hiddenEmpty.hidden = items.length !== 0;
+    hiddenEmpty.hidden = items.length !== 0 || announcementState !== "ready";
+    document.getElementById("hidden-announcements-status").textContent = items.length ? "" :
+      announcementState === "loading" ? "Wczytywanie ogłoszeń…" :
+      announcementState === "error" ? "Nie udało się wczytać ogłoszeń." : "";
     if (focusedKey) {
       const matching = [...hiddenList.querySelectorAll("button")].find(button => button.dataset.announcementKey === focusedKey);
       (matching || announcementsPanel.querySelector("form button")).focus();
@@ -1585,11 +1598,12 @@
   document.fonts.ready.then(updateAnnouncementToggles);
 
   let announcementRequest = 0;
+  let announcementState = "loading";
   async function loadAnnouncements() {
     const request = ++announcementRequest;
     try {
       const config = window.goleszanDiscussionsConfig;
-      if (!config?.url || !config.publishableKey) return renderAnnouncements([]);
+      if (!config?.url || !config.publishableKey) throw new Error("Announcements unavailable");
       const response = await fetch(config.url.replace(/\/$/, "") + "/rest/v1/rpc/g19_public_announcements", {
         method: "POST", cache: "no-store", headers: { apikey: config.publishableKey, "Content-Type": "application/json" },
         body: "{}", signal: AbortSignal.timeout(8000)
@@ -1598,11 +1612,15 @@
       const data = await response.json();
       if (!Array.isArray(data)) throw new Error("Invalid announcements data");
       if (request !== announcementRequest) return;
+      announcementState = "ready";
       migrateHiddenAnnouncements(data);
       renderAnnouncements(data);
     } catch (_) {
       // Offline nadal działa harmonogram; nie pokazuj nieaktualnych ogłoszeń.
-      if (request === announcementRequest) renderAnnouncements([]);
+      if (request === announcementRequest) {
+        announcementState = "error";
+        renderAnnouncements([]);
+      }
     }
   }
   document.addEventListener("DOMContentLoaded", loadAnnouncements, {once: true});

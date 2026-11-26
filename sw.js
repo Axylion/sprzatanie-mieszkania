@@ -1,11 +1,11 @@
 // Goleszan 19: offline schedule and guide; public announcements always use the network.
-const CACHE_NAME = "goleszan19-shell-v13-11-0-f1-ui9";
+const CACHE_NAME = "goleszan19-shell-v13-11-0-f1-ui10";
 const SHELL = [
   "./", "./index.html", "./favicon.svg", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png", "./manifest.webmanifest",
-  "./dyskusje/notifications.js?v=ui4", "./administracja/admin.js?v=f1", "./administracja/dyzury.js?v=ui8", "./administracja/announcements.js?v=f1", "./ogloszenia/content.js", "./pwa-install.js?v=ui8",
-  "./dyskusje/dyskusje.css?v=ui9", "./dyskusje/config.js", "./dyskusje/dyskusje.js?v=ui9", "./dyskusje/private-chat.js?v=ui4",
-  "./kalendarz/kalendarz.js?v=ui8", "./kalendarz/kalendarz.css?v=ui8-r2",
-  "./poradnik/poradnik.css?v=ui8", "./poradnik/dane.js", "./poradnik/poradnik.js?v=ui8",
+  "./dyskusje/ui-components.js?v=ui10", "./dyskusje/notifications.js?v=ui10", "./administracja/admin.js?v=f1", "./administracja/dyzury.js?v=ui8", "./administracja/announcements.js?v=f1", "./ogloszenia/content.js", "./pwa-install.js?v=ui10",
+  "./dyskusje/dyskusje.css?v=ui10", "./dyskusje/config.js", "./dyskusje/dyskusje.js?v=ui10", "./dyskusje/private-chat.js?v=ui10",
+  "./kalendarz/kalendarz.js?v=ui8", "./kalendarz/kalendarz.css?v=ui10",
+  "./poradnik/poradnik.css?v=ui10", "./poradnik/dane.js", "./poradnik/poradnik.js?v=ui8",
   "./poradnik/media/kabina-1.webp",
   "./poradnik/media/kabina-2.webp",
   "./poradnik/media/kabina-3.webp",

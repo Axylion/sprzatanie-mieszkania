@@ -30,6 +30,7 @@
     if(current&&['private_context_changed','private_conversation_archived','private_conversation_unavailable'].includes(error.code)){
       current.readOnly=true;current.contextChanged=error.code==='private_context_changed';updateComposer();
       if(error.code==='private_conversation_unavailable')$('private-history').replaceChildren();
+      else renderMessages(current.items, false);
     }
   }
   function saveDraft(){if(current) drafts.set(current.key,{text:$('private-body').value,reply:current.reply,request:current.request});}
@@ -67,7 +68,7 @@
       if(item.unread){const badge=document.createElement('span');badge.className='private-unread';badge.textContent=item.unread>99?'99+':item.unread;badge.setAttribute('aria-label','Nieprzeczytane: '+item.unread);link.append(badge);}
       row.append(link);return row;
     }));
-    if(!items.length){const row=document.createElement('li');row.textContent='Brak archiwalnych rozmów.';target.append(row);}
+    if(archive&&!items.length){const row=document.createElement('li');row.append(g19EmptyState('archive', 'Brak rozmów archiwalnych', 'Nie masz jeszcze żadnych rozmów archiwalnych.'));target.append(row);}
   }
   async function refreshSummary(){
     const key=token();if(summaryPending?.key===key)return summaryPending.promise;
@@ -81,6 +82,7 @@
       if(key!==token()||request!==summaryVersion||!Array.isArray(data?.items))return;
       if(summary?.period&&summary.period!==data.period){reset();}
       summary=data;$('discussion-tabs').hidden=false;
+      window.dispatchEvent(new CustomEvent('g19-private-room', {detail: data.room}));
       const count=$('private-tab-count');count.hidden=!data.unread;count.textContent=data.unread>99?'99+':data.unread;
       $('private-archive-open').hidden=!data.archiveCount;
       $('private-archive-count').textContent='('+data.archiveCount+')'+(data.archiveUnread?' · Nieprzeczytane: '+data.archiveUnread:'');
@@ -129,12 +131,21 @@
       if(!current.readOnly){
         const actions=document.createElement('div');actions.className='discussion-reactions';
         const reply=document.createElement('button');reply.type='button';reply.className='message-reply-action';
-        reply.dataset.reply=message.id;reply.textContent='Odpowiedz';actions.append(reply);card.append(actions);
+        reply.dataset.reply=message.id;reply.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><use href="#g19-reply-icon"/></svg> Odpowiedz';actions.append(reply);card.append(actions);
       }
       row.append(avatar,card);
       return row;
     }));
-    if(!items.length){const row=document.createElement('li');row.textContent='Nie ma jeszcze wiadomości.';history.append(row);}
+    if (!items.length) {
+      const row = document.createElement('li');
+      let description = 'Rozpocznij rozmowę, wysyłając pierwszą wiadomość.';
+      if (current.contextChanged) description = 'Otwórz nową rozmowę z listy.';
+      else if (current.readOnly) description = current.id
+        ? 'Rozmowa archiwalna — tylko do odczytu.'
+        : 'Wysyłanie wiadomości będzie możliwe po podłączeniu pokoju.';
+      row.append(g19EmptyState('chat', 'Nie ma jeszcze wiadomości', description));
+      history.append(row);
+    }
     if(bottom)history.scrollTop=history.scrollHeight;
     else if(anchor){const restored=[...history.children].find(e=>e.dataset.message===anchor.dataset.message);if(restored)history.scrollTop+=restored.getBoundingClientRect().top-bounds.top-offset;}
     if(focusedId&&focusedAction)history.querySelector('[data-message="'+focusedId+'"] '+focusedAction)?.focus({preventScroll:true});
@@ -169,7 +180,12 @@
     if(!ctx.id){
       const peer=summary?.items.find(p=>p.room===ctx.room);
       if(peer?.peerPeriod!==ctx.expectedPeerPeriod){ctx.readOnly=true;ctx.contextChanged=true;notice('Mieszkaniec pokoju się zmienił. Wróć do listy rozmów.');updateComposer();return;}
-      ctx.readOnly=!peer?.canSend;updateComposer();
+      const readOnly = !peer?.canSend;
+      if (ctx.readOnly !== readOnly) {
+        ctx.readOnly = readOnly;
+        renderMessages(ctx.items, false);
+      }
+      updateComposer();
       if(peer?.conversation){ctx.id=peer.conversation;window.history.replaceState(window.history.state,'',prefix+'/'+ctx.id);}else return;
     }
     const history=$('private-history'),nearEnd=history.scrollHeight-history.scrollTop-history.clientHeight<55;

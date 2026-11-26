@@ -1,10 +1,10 @@
 {
-  "name": "Goleszan 19 F1 UI10-r5",
-  "version": "f1-ui10-r5",
-  "source_sha": "77fb976427d4b91791b59592e2c80184c163389d",
+  "name": "Goleszan 19 F1 UI10-r5 addendum",
+  "version": "f1-ui10-r5-addendum",
+  "source_sha": "114d33094908191d5c0d286024ec4d083f7e1aa6",
   "build_command": "bash scripts/build-pages-ui8.sh",
   "output_directory": "dist",
   "expected_file_count": 68,
-  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5",
+  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-addendum",
   "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co"
 }

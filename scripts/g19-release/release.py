@@ -23,6 +23,10 @@ WORKFLOW = ".github/workflows/goleszan-pages-release.yml"
 ACCOUNT = "6c1ff8f43cd435c244a2f03a7650fe4e"
 PROJECT = "goleszan-19-preview"
 DOMAIN = PROJECT + ".pages.dev"
+PAGES_USER_AGENT = (
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 SUPABASE = "https://pbsubdmuupwmtgzncxmh.supabase.co"
 SHA = r"[0-9a-f]{40}"
 UUID = r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}"
@@ -271,6 +275,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def http(url, headers, limit=30 * 1024 * 1024):
     with urllib.request.build_opener(NoRedirect).open(
             urllib.request.Request(url, headers=headers, method="GET"), timeout=20) as response:
+        require(response.status == 200, f"Expected HTTP 200, received HTTP {response.status}")
         body = response.read(limit + 1)
         require(len(body) <= limit, "HTTP response exceeds size limit")
         return body
@@ -353,7 +358,8 @@ def check_served(url, files):
         elif route.endswith(".html"):
             route = route[:-5]
         target = url + urllib.parse.quote(route, safe="/") + "?g19=" + digest(expected)[:16]
-        actual = http(target, {"Accept-Encoding": "identity", "Cache-Control": "no-cache"})
+        actual = http(target, {"Accept-Encoding": "identity", "Cache-Control": "no-cache",
+                               "User-Agent": PAGES_USER_AGENT})
         require(digest(actual) == digest(expected), f"Published bytes differ for {name}")
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(check, files.items()))

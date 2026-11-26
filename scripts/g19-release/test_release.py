@@ -47,6 +47,7 @@ class ReleaseTests(unittest.TestCase):
         self.build = {"source_sha": SOURCE, "file_count": len(FILES),
                       "files": {n: r.digest(d) for n, d in FILES.items()},
                       "artifact_sha256": r.digest((self.archive / "dist.zip").read_bytes())}
+        (self.archive / "build.json").write_text(json.dumps(self.build))
         identity = {"preview_id": PREVIEW, "source_sha": SOURCE,
                     "artifact_sha256": self.build["artifact_sha256"]}
         self.prior = {"api": {"baseline": SNAPSHOT},
@@ -159,6 +160,35 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "HTTP 403"):
                 r.cf()
 
+    def test_preview_upload_keeps_production_active(self):
+        self.snapshot.side_effect = [SNAPSHOT] * 3
+        self.publisher.return_value = STAGED
+        r.execute(VERSION, "preview", MANIFEST, self.root)
+        self.publisher.assert_called_once()
+        self.assertEqual(self.publisher.call_args.args[3:5], (STAGED["branch"], "preview"))
+        self.assertEqual(self.snapshot.call_count, 3)
+
+    def test_preview_rejects_changed_production_after_upload(self):
+        self.snapshot.side_effect = [SNAPSHOT, SNAPSHOT, SNAPSHOT | {"production_id": NEW}]
+        self.publisher.return_value = STAGED
+        with self.assertRaisesRegex(ValueError, "Active Production changed"):
+            r.execute(VERSION, "preview", MANIFEST, self.root)
+        self.publisher.assert_called_once()
+
+    def test_functional_verifies_the_preview_artifact_without_upload(self):
+        r.execute(VERSION, "functional", MANIFEST, self.root)
+        r.check_served.assert_called_once_with(STAGED["url"], FILES)
+        self.publisher.assert_not_called()
+
+    def test_post_verifies_the_active_artifact_without_upload(self):
+        production = {"id": NEW, "url": "https://" + r.DOMAIN + "/"}
+        self.prior["production"] = {"identity": self.prior["functional"]["identity"],
+                                    "baseline": SNAPSHOT, "production": production}
+        self.snapshot.side_effect = [SNAPSHOT | {"production_id": NEW}] * 2
+        r.execute(VERSION, "post", MANIFEST, self.root)
+        r.check_served.assert_called_once_with(production["url"], FILES)
+        self.publisher.assert_not_called()
+
     def test_recreated_tag_or_concurrent_duplicate_rejected(self):
         for items in ([{"id": 7}, {"id": 10}], [{"id": 7}], []):
             with self.subTest(items=items), self.assertRaises(ValueError):
@@ -188,6 +218,34 @@ class ReleaseTests(unittest.TestCase):
 
 real_download = r.download
 real_snapshot = r.snapshot
+
+
+class ServedFileTests(unittest.TestCase):
+    def test_verifies_every_file_with_browser_user_agent(self):
+        def fetch(url, headers):
+            self.assertEqual(headers["User-Agent"], r.PAGES_USER_AGENT)
+            self.assertEqual(headers["Accept-Encoding"], "identity")
+            self.assertEqual(headers["Cache-Control"], "no-cache")
+            route = url.removeprefix(STAGED["url"]).split("?", 1)[0]
+            return FILES[route or "index.html"]
+
+        with patch.object(r, "http", side_effect=fetch) as http:
+            r.check_served(STAGED["url"], FILES)
+        self.assertEqual(http.call_count, len(FILES))
+
+    def test_rejects_different_bytes(self):
+        with patch.object(r, "http", return_value=b"wrong"):
+            with self.assertRaisesRegex(ValueError, "Published bytes differ for sw.js"):
+                r.check_served(STAGED["url"], {"sw.js": FILES["sw.js"]})
+
+    def test_rejects_non_200_even_with_matching_bytes(self):
+        for status in (206, 403):
+            with self.subTest(status=status), patch.object(r.urllib.request, "build_opener") as opener:
+                opener.return_value.open.return_value.__enter__.return_value = Mock(
+                    status=status, read=Mock(return_value=FILES["sw.js"]))
+                with self.assertRaisesRegex(ValueError, f"Expected HTTP 200, received HTTP {status}"):
+                    r.check_served(STAGED["url"], {"sw.js": FILES["sw.js"]})
+
 
 if __name__ == "__main__":
     unittest.main()

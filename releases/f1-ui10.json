@@ -1,0 +1,10 @@
+{
+  "build_command": "bash scripts/build-pages-ui8.sh",
+  "expected_file_count": 68,
+  "name": "Goleszan 19 F1 UI10",
+  "output_directory": "dist",
+  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10",
+  "source_sha": "b6e8338e59641d7d03c9fda20c52781abe9ef06a",
+  "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co",
+  "version": "f1-ui10"
+}

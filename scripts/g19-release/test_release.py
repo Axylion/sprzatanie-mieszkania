@@ -155,9 +155,9 @@ class ReleaseTests(unittest.TestCase):
         deploy.assert_not_called()
 
     def test_cleanup_refuses_to_delete_non_preview(self):
-        with patch.object(r, "cf", return_value={
-            "id": BASE, "environment": "production"
-        }), patch.object(r.subprocess, "run") as run:
+        with patch.object(r, "all_preview_deployments", return_value=[{"id": BASE}]), patch.object(
+            r, "cf", return_value={"id": BASE, "environment": "production"}
+        ), patch.object(r.subprocess, "run") as run:
             result = r.cleanup_previews(self.root)
         run.assert_not_called()
         self.assertEqual(result["status"], "partial")

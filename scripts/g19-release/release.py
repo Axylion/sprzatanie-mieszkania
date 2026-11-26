@@ -528,7 +528,7 @@ def deploy(root, files, manifest, branch, record):
 
 
 def all_preview_deployments():
-    first = cf_response("/deployments?env=preview&per_page=100")
+    first = cf_response("/deployments?env=preview&per_page=25&page=1")
     items = first.get("result")
     require(isinstance(items, list), "Unexpected Preview deployment inventory")
     info = first.get("result_info") or {}
@@ -538,7 +538,7 @@ def all_preview_deployments():
         pages = 1
     require(1 <= pages <= 100, "Unexpected Preview deployment pagination")
     for page in range(2, pages + 1):
-        extra = cf(f"/deployments?env=preview&per_page=100&page={page}")
+        extra = cf(f"/deployments?env=preview&per_page=25&page={page}")
         require(isinstance(extra, list), "Unexpected Preview deployment page")
         items.extend(extra)
     return items

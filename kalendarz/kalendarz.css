@@ -258,4 +258,8 @@
 [data-theme="dark"] #calendar-days .calendar-day.calendar-missed-own .calendar-number {
   color: var(--bg);
 }
+[data-theme="dark"] #calendar-days .calendar-holiday.calendar-missed-own .calendar-number {
+  text-decoration: underline solid currentColor 2px;
+  text-underline-offset: 2px;
+}
 [data-theme="dark"] #admin-panel #admin-duty-missed:checked::after { background: var(--bg); }

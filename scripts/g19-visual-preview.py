@@ -17,6 +17,7 @@ ACCOUNT = "6c1ff8f43cd435c244a2f03a7650fe4e"
 PROJECT = "goleszan-19-preview"
 DOMAIN = f"{PROJECT}.pages.dev"
 BRANCH = "f1-ui-review"
+PRODUCTION_BRANCH = "main"
 GIT_BRANCH = "feature/g19-visual-review"
 ALIAS = f"https://{BRANCH}.{DOMAIN}"
 DIST = Path("dist")
@@ -104,6 +105,7 @@ def production_snapshot():
     require(branch and re.sub(r"[^a-z0-9]", "-", branch.lower()) != BRANCH
             and branch != GIT_BRANCH,
             "Preview branch could collide with Production")
+    require(branch == PRODUCTION_BRANCH, "Expected main as the Production branch")
     require(active and active["environment"] == "production" and active["id"],
             "Could not identify the active Production deployment")
     return project["id"], branch, active["id"]

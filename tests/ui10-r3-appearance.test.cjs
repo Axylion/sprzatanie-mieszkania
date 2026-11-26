@@ -89,6 +89,60 @@ test('UI10-r3 presentation across desktop and mobile, with both themes', async t
       });
       await shot('notifications');
       await page.keyboard.press('Escape');
+      if (!baseline) {
+        await page.evaluate(() => {
+          calendarMonth.setTime(Date.UTC(2026, 10, 1));
+          const missedWeekends = ['2026-10-31', '2026-11-28'];
+          selectedRoom = String(roomFor(Date.parse(missedWeekends[0])));
+          missed.clear();
+          for (const date of missedWeekends) missed.set(date, roomFor(Date.parse(date)));
+          renderCalendar();
+        });
+        const day = date => page.locator(`#calendar-days [data-date="${Date.parse(date)}"]`);
+        const holiday = day('2026-11-11');
+        const missedDuty = day('2026-11-28');
+        const combined = day('2026-11-01');
+        const appearance = cell => cell.evaluate(el => {
+          const number = getComputedStyle(el.querySelector('.calendar-number'));
+          return {
+            fill: getComputedStyle(el).backgroundColor,
+            number: number.color,
+            mark: number.textDecorationLine,
+          };
+        });
+        const holidayStyle = await appearance(holiday);
+        const missedStyle = await appearance(missedDuty);
+        const combinedStyle = await appearance(combined);
+        assert.equal(holidayStyle.number, dark ? 'rgb(255, 223, 121)' : 'rgb(121, 81, 0)');
+        assert.equal(missedStyle.fill, dark ? red : 'rgb(141, 54, 88)');
+        assert.equal(combinedStyle.fill, missedStyle.fill);
+        assert.notEqual(holidayStyle.fill, missedStyle.fill);
+        assert.equal(missedStyle.mark, 'none');
+        assert.equal(holidayStyle.mark, 'none');
+        assert.equal(combinedStyle.mark, dark ? 'underline' : 'none');
+        assert.equal(missedStyle.number, dark ? 'rgb(3, 23, 32)' : 'rgb(255, 255, 255)');
+        assert.equal(combinedStyle.number, dark ? missedStyle.number : 'rgb(255, 223, 121)');
+        assert.match(await holiday.getAttribute('aria-label'), /Narodowe Święto Niepodległości/);
+        assert.match(await missedDuty.getAttribute('aria-label'), /Dyżur niewykonany/);
+        const combinedLabel = await combined.getAttribute('aria-label');
+        assert.match(combinedLabel, /Dyżur niewykonany/);
+        assert.match(combinedLabel, /Wszystkich Świętych/);
+        const tooltip = page.getByRole('tooltip');
+        await combined.focus();
+        await tooltip.getByText('Wszystkich Świętych', { exact: true }).waitFor();
+        assert.match(await tooltip.textContent(), /Dyżur niewykonany/);
+        const bounds = await tooltip.boundingBox();
+        assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width);
+        assert.ok(await fits());
+        await page.keyboard.press('Escape');
+        await tooltip.waitFor({ state: 'hidden' });
+        if (screenshots) {
+          await combined.blur();
+          await page.locator('#calendar-days').screenshot({
+            path: join(screenshots, `calendar-${theme}-${width}.png`),
+          });
+        }
+      }
       await page.goto('http://localhost/#administracja');
       await page.getByLabel('Hasło').fill('fixture-password');
       await page.getByRole('button', { name: 'Zaloguj się' }).click();

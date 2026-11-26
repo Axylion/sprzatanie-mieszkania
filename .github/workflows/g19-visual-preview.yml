@@ -1,0 +1,44 @@
+name: Goleszan 19 Visual Preview
+
+on:
+  push:
+    branches: [feature/g19-visual-review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g19-visual-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.repository == 'Axylion/sprzatanie-mieszkania'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: g19-visual-preview
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22.22.0'
+      - name: Build exact revision
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          bash scripts/build-pages-ui8.sh
+          python3 scripts/g19-visual-preview.py package
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: visual-preview-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish and verify Preview
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.G19_VISUAL_CF_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.G19_VISUAL_CF_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: python3 scripts/g19-visual-preview.py deploy

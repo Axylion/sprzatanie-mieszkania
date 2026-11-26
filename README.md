@@ -214,3 +214,39 @@ bieżącego urządzenia. Kategorie w aplikacji i push mają osobne ustawienia.
 Przypomnienie o dyżurze przypada w piątek o 14:00 czasu Europe/Warsaw.
 
 [Instrukcja wdrożenia zadania i konfiguracji VAPID](supabase/functions/g19-deliver/README.md).
+
+## Podgląd zmian wizualnych Goleszan 19
+
+Zmiany wizualne trafiają do gałęzi `feature/g19-visual-review`. Push uruchamia
+workflow **Goleszan 19 Visual Preview**, który buduje dokładny SHA przez
+`scripts/build-pages-ui8.sh` i wysyła pliki do gałęzi Direct Upload
+`f1-ui-review` w projekcie Cloudflare Pages `goleszan-19-preview`.
+[Stały adres podglądu](https://f1-ui-review.goleszan-19-preview.pages.dev/)
+zacznie działać po pierwszym udanym wdrożeniu. Podsumowanie workflow zawiera
+zweryfikowany SHA, wersję Service Workera i indywidualny URL wdrożenia.
+
+Przed pierwszym pushem trzeba potwierdzić w Cloudflare, że projekt korzysta
+z Direct Upload, ma aktywne wdrożenie Production, a jego gałąź produkcyjna
+jest inna niż gałąź podglądu. W GitHub należy utworzyć environment
+`g19-visual-preview` z dostępem ograniczonym do `feature/g19-visual-review`,
+zmienną `G19_VISUAL_CF_ACCOUNT_ID` i sekretem `G19_VISUAL_CF_API_TOKEN`.
+Token potrzebuje uprawnienia **Account → Cloudflare Pages → Edit**
+dla właściwego konta. Jest to uprawnienie na poziomie konta, dlatego
+workflow dodatkowo sprawdza projekt, gałąź i identyfikator aktywnego
+Production. GitHub Actions potrzebuje dostępu `contents: read`.
+Konfiguracja environment wymaga administratora repozytorium, a push wymaga
+prawa zapisu do gałęzi. Release v2 obsługuje dotychczasowy proces wydawniczy.
+
+Podgląd jest statyczny. Nagłówki dodane podczas pakowania blokują połączenia
+i wysyłanie formularzy poza origin podglądu. Funkcje zależne od Supabase,
+w tym dyskusje i połączenie urządzenia, wymagają oddzielnego środowiska do
+testów funkcjonalnych.
+
+Do akceptacji zapisz SHA i indywidualny URL z podsumowania Actions.
+Aby przywrócić poprzedni zaakceptowany stan pod stałym adresem, Codex
+odwraca późniejsze zmiany nowym commitem na gałęzi wizualnej i czeka na
+weryfikację nowego wdrożenia. Indywidualny URL poprzedniego podglądu działa,
+dopóki Cloudflare przechowuje wdrożenie. GitHub przechowuje artefakty
+przez 90 dni. Przy czerwonym statusie Actions sprawdź log przed retry.
+Cloudflare może już przełączyć alias, gdy zawiedzie weryfikacja HTTP po
+uploadzie. Poprzedni indywidualny URL pozostaje wtedy punktem odniesienia.

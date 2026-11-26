@@ -528,13 +528,19 @@ def deploy(root, files, manifest, branch, record):
 
 
 def all_preview_deployments():
-    first = cf_response("/deployments?env=preview&per_page=100&page=1")
-    items = list(first["result"])
-    pages = first.get("result_info", {}).get("total_pages", 1)
-    require(type(pages) is int and 1 <= pages <= 100,
-            "Unexpected Preview deployment pagination")
+    first = cf_response("/deployments?env=preview&per_page=100")
+    items = first.get("result")
+    require(isinstance(items, list), "Unexpected Preview deployment inventory")
+    info = first.get("result_info") or {}
+    try:
+        pages = int(info.get("total_pages") or 1)
+    except (TypeError, ValueError):
+        pages = 1
+    require(1 <= pages <= 100, "Unexpected Preview deployment pagination")
     for page in range(2, pages + 1):
-        items.extend(cf(f"/deployments?env=preview&per_page=100&page={page}"))
+        extra = cf(f"/deployments?env=preview&per_page=100&page={page}")
+        require(isinstance(extra, list), "Unexpected Preview deployment page")
+        items.extend(extra)
     return items
 
 
@@ -548,7 +554,7 @@ def cleanup_previews(root):
             "status": "inventory_failed",
             "removed": removed,
             "retained": retained,
-            "error": type(exc).__name__,
+            "error": str(exc)[:300],
         }
     wrangler = Path(__file__).resolve().parent / "node_modules/.bin/wrangler"
     env = dict(os.environ)

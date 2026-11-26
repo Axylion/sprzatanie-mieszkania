@@ -8,6 +8,7 @@
   const panel = document.getElementById("admin-panel");
   const list = document.getElementById("admin-rooms");
   const status = document.getElementById("admin-status");
+  const refreshStatus = document.getElementById("admin-refresh-status");
   const confirm = document.getElementById("admin-confirm");
   const confirmAction = document.getElementById("admin-confirm-action");
   const configured = /^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(config?.url) &&
@@ -79,6 +80,7 @@
     updateSubmit();
     form.hidden = !configured;
     panel.hidden = true;
+    g19AdminStatus(refreshStatus, "");
     setStatus(message);
   }
 
@@ -366,11 +368,16 @@
     const expected = session;
     refreshButton.disabled = true;
     refreshButton.setAttribute("aria-busy", "true");
-    setStatus("Odświeżanie…");
+    setStatus("");
+    g19AdminStatus(refreshStatus, "Odświeżanie…");
     try {
       const success = await (announcements.isOpen() ? announcements.refresh() : duties.isOpen() ? duties.refresh() : refresh());
-      if (expected === session) setStatus(success ? "Dane odświeżone." : "Nie udało się odświeżyć danych. Spróbuj ponownie.", success);
+      if (expected === session) {
+        g19AdminStatus(refreshStatus, success ? "Dane odświeżone." : "", success);
+        if (!success) setStatus("Nie udało się odświeżyć danych. Spróbuj ponownie.");
+      }
     } finally {
+      if (refreshStatus.textContent === "Odświeżanie…") g19AdminStatus(refreshStatus, "");
       refreshButton.disabled = false;
       refreshButton.removeAttribute("aria-busy");
     }

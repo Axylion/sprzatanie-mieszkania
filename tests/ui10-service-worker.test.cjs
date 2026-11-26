@@ -72,7 +72,7 @@ test('UI9 to UI10 on one origin activates the new shell and retains local regist
   }, registration);
   serveUi10 = true;
   await page.evaluate(async () => (await navigator.serviceWorker.ready).update().then(() => undefined));
-  await activeCache('goleszan19-shell-v13-11-0-f1-ui10-r2-no-ornament');
+  await activeCache('goleszan19-shell-v13-11-0-f1-ui10-r3');
   await page.reload();
   await page.locator('#chat-open').click();
   await page.locator('#discussion-room').waitFor();
@@ -82,7 +82,7 @@ test('UI9 to UI10 on one origin activates the new shell and retains local regist
     localStorage.getItem('cleaning-theme'), localStorage.getItem('goleszan19-guide-supplies-v1')
   ]), [registration, '1', 'light', '{}']);
   assert.equal(await page.evaluate(async () => {
-    const cache = await caches.open('goleszan19-shell-v13-11-0-f1-ui10-r2-no-ornament');
+    const cache = await caches.open('goleszan19-shell-v13-11-0-f1-ui10-r3');
     return Boolean(await cache.match('./dyskusje/ui-components.js?v=ui10-r2')) &&
       !await cache.match('./dyskusje/dyskusje.css?v=ui9');
   }), true);

@@ -1,5 +1,5 @@
 :root { --push-off-text: #a12a36; }
-[data-theme="dark"] { --push-off-text: #ffa4ae; }
+[data-theme="dark"] { --push-off-text: var(--state-red); }
 .push-feedback[data-enabled="false"],
 .push-switch[aria-checked="false"] .push-state { color: var(--push-off-text); }
 #calendar-days .calendar-number { color: inherit; font-size: inherit; }
@@ -29,8 +29,8 @@
 }
 [data-theme="dark"] {
   --calendar-holiday: #ffdf79;
-  --calendar-missed: #f68eaf;
-  --missed-duty-bg: #863b5b;
+  --calendar-missed: var(--state-red);
+  --missed-duty-bg: var(--state-red);
 }
 #calendar-days .calendar-weekend, .legend-current { background: var(--calendar-duty); }
 #calendar-days .calendar-own, .legend-mine { background: var(--calendar-own); }
@@ -96,7 +96,7 @@
   --duty-line: #3d747d;
   --duty-info: #133f48;
   --duty-tint: #0c303a;
-  --duty-mark: #ff9da7;
+  --duty-mark: var(--state-red);
 }
 .duty-icon-library { position: absolute; }
 .duty-icon {
@@ -198,7 +198,7 @@
 }
 #admin-duty-preview .calendar-own { background: var(--accent-fill); color: #fff; }
 #admin-duty-preview .calendar-missed-own { background: var(--missed-duty-bg); }
-#admin-duty-preview .calendar-missed-other::before { inset: 4px 4px auto auto; width: 7px; height: 7px; background: #f12a34; }
+#admin-duty-preview .calendar-missed-other::before { inset: 4px 4px auto auto; width: 7px; height: 7px; background: var(--state-red, #f12a34); }
 #admin-duty-feedback:empty { display: none; }
 @media (max-width: 740px) {
   .admin-duty-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
@@ -249,7 +249,13 @@
   border-radius: 50%;
   background: var(--muted);
 }
-#admin-panel #admin-duty-missed:checked { background: #c22431; border-color: #c22431; }
+#admin-panel #admin-duty-missed:checked { background: var(--state-red, #c22431); border-color: var(--state-red, #c22431); }
 #admin-panel #admin-duty-missed:checked::after { transform: translateX(17px); background: #fff; }
 #admin-panel #admin-duty-missed:checked + span { color: var(--push-off-text); }
 #admin-panel #admin-duty-missed:disabled { opacity: .55; cursor: default; }
+
+[data-theme="dark"] :is(#calendar-days, #admin-duty-preview) .calendar-missed-own,
+[data-theme="dark"] #calendar-days .calendar-day.calendar-missed-own .calendar-number {
+  color: var(--bg);
+}
+[data-theme="dark"] #admin-panel #admin-duty-missed:checked::after { background: var(--bg); }

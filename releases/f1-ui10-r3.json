@@ -5,6 +5,7 @@
   "build_command": "bash scripts/build-pages-ui8.sh",
   "output_directory": "dist",
   "expected_file_count": 68,
+  "expected_artifact_sha256": "c6b4d50680a52304a243cc95de4ede82936fb322839b6e3890de216ccb932f90",
   "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r3",
   "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co"
 }

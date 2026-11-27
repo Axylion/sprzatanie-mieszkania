@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "a1fea7b495de5a737b673bf6794f83d1acbae345279dad4288bc4e0e941a782c",
+  "artifact_sha256": "be74f728b34d06d56bda76944360200022936a33135aef2157273296df3def69",
   "file_count": 68,
   "files": {
     "administracja/admin.js": "1a1702443cc30c69af75700c98bed18b6c9280cca1f204ba3cf4973cf76c4db9",
@@ -16,7 +16,7 @@
     "icon-192.png": "a13b1fc18e47b741f3af64e6c8d499f7f245804a3583c399392f5799b70911c3",
     "icon-512.png": "880ddf1bbfaa76c6575c619092ffa71df55dd995aa45aa646262cb271061d37a",
     "icon-maskable-512.png": "5059723321e79dbb347bcd5e73cc5ce8a18a2b96ada757638d8bd2346b8d3b0e",
-    "index.html": "f7d50dc8a62810d4d913414cb49352c93616c064d76779827056fc83eefc827d",
+    "index.html": "80de2618d01be198fd957b0c7d9879e96fb4a37aba0948c1a4246459632a4254",
     "kalendarz/kalendarz.css": "f1f22f20cf6a938c6be255e43c12178c419622d510b63990e62c275b265560d6",
     "kalendarz/kalendarz.js": "56e4aef1b99473976eaae6469396520b05d1f7e9e51989ba019328c23a35edd1",
     "manifest.webmanifest": "b90ae16b00cf978931150a2880eea1c51924c4716ad7853904bd00cb60aa1c50",
@@ -69,7 +69,7 @@
     "poradnik/poradnik.css": "a4b70e03f455c091314d1a236c54c266f1c3c2fe565d3f52a4b4f79fbeb110be",
     "poradnik/poradnik.js": "9dc4152fbee343f99c17f3c27f1fce2035d387084e0a679792756adb60af3efd",
     "pwa-install.js": "5017a422aa5a056ee72abbcabc5b2d9377d13e152d2644f481194b1700b773cb",
-    "sw.js": "6d39233af26897fb1cc71c7a6131bc4cd1dd94fc2e140e606c37ffa8300956a7"
+    "sw.js": "93a6f1cf1cf9eaaafa4ddcc47f5458940471a61b90edb853e2987ba5ce195628"
   },
-  "source_sha": "1925ba8096ea30d4b8f41ccd08d9d5967b1ce29c"
+  "source_sha": "7dd1de915c19026db79041ebf05ea3ca4c366e44"
 }

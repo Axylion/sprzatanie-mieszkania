@@ -2,12 +2,13 @@
 import os
 from pathlib import Path
 import tempfile
+import time
 
 import release as release
 
-SOURCE = "1925ba8096ea30d4b8f41ccd08d9d5967b1ce29c"
-ARCHIVE = "a1fea7b495de5a737b673bf6794f83d1acbae345279dad4288bc4e0e941a782c"
-ACTIVE = "d435a855-eecb-4fd0-aa68-44c4277c1bff"
+SOURCE = "7dd1de915c19026db79041ebf05ea3ca4c366e44"
+ARCHIVE = "be74f728b34d06d56bda76944360200022936a33135aef2157273296df3def69"
+ACTIVE = "50eb5c38-5f57-44e0-ac86-9f696b8dc5d4"
 UI8 = "c4bcf201-9463-4f6a-94f3-f80a0462ce43"
 URL = "https://goleszan-19-preview.pages.dev/"
 MANIFEST = release.read_json(Path("direct-ui-candidate/manifest.json"))
@@ -22,7 +23,7 @@ def artifact():
 
 
 def main():
-    release.require(os.environ["GITHUB_REF"] == "refs/tags/g19-direct-test-ui-1925ba8",
+    release.require(os.environ["GITHUB_REF"] == "refs/tags/g19-direct-test-ui-7dd1de9",
                     "Unexpected release ref")
     files = artifact()
     baseline = release.snapshot()
@@ -48,7 +49,15 @@ def main():
     release.require(active["production_id"] == deployed["id"] and deployed["url"] == URL,
                     "New deployment is not active on the canonical test URL")
     print(f"Cloudflare Deployment ID: {deployed['id']}", flush=True)
-    release.check_served(URL, files)
+    for attempt in range(5):
+        try:
+            release.check_served(URL, files)
+            break
+        except (ValueError, OSError):
+            if attempt == 4:
+                raise
+            release.require(release.snapshot() == active, "Active deployment changed during verification")
+            time.sleep(5 * (attempt + 1))
     release.deployment(ACTIVE, "production")
     release.deployment(UI8, "production")
     release.require(release.snapshot() == active, "Active deployment changed during verification")

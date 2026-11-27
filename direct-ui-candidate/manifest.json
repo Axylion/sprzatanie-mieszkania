@@ -1,10 +1,10 @@
 {
   "build_command": "bash scripts/build-pages-ui8.sh",
   "expected_file_count": 68,
-  "name": "Goleszan 19 UI10-r5 replies",
+  "name": "Goleszan 19 UI10-r5 device limit",
   "output_directory": "dist",
-  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-replies",
-  "source_sha": "1925ba8096ea30d4b8f41ccd08d9d5967b1ce29c",
+  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-device-limit",
+  "source_sha": "7dd1de915c19026db79041ebf05ea3ca4c366e44",
   "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co",
-  "version": "f1-ui10-r5-replies"
+  "version": "f1-ui10-r5-device-limit"
 }

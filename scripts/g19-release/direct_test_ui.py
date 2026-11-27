@@ -2,7 +2,6 @@
 import os
 from pathlib import Path
 import tempfile
-import time
 
 import release as release
 
@@ -43,21 +42,14 @@ def main():
         record["deployment"] = release.deploy(Path(directory), files, MANIFEST, "main",
                                                "production", record)
         release.save(record)
+    deployed = record["deployment"]
+    release.require(deployed["url"] == URL, "Unexpected canonical test URL")
+    print(f"Cloudflare Deployment ID: {deployed['id']}", flush=True)
+    release.verify_release_assets(deployed, files, baseline,
+                                  environment="production", manifest=MANIFEST)
     active = release.snapshot()
     release.stable(active, baseline, new_production=True)
-    deployed = record["deployment"]
-    release.require(active["production_id"] == deployed["id"] and deployed["url"] == URL,
-                    "New deployment is not active on the canonical test URL")
-    print(f"Cloudflare Deployment ID: {deployed['id']}", flush=True)
-    for attempt in range(5):
-        try:
-            release.check_served(URL, files)
-            break
-        except (ValueError, OSError):
-            if attempt == 4:
-                raise
-            release.require(release.snapshot() == active, "Active deployment changed during verification")
-            time.sleep(5 * (attempt + 1))
+    release.require(active["production_id"] == deployed["id"], "Active deployment changed during verification")
     release.deployment(ACTIVE, "production")
     release.deployment(UI8, "production")
     release.require(release.snapshot() == active, "Active deployment changed during verification")

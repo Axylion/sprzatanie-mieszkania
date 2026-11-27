@@ -2,6 +2,7 @@
 """Cloudflare Pages release stages. Only deploy() can modify Cloudflare."""
 import base64
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -272,13 +273,27 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def http(url, headers, limit=30 * 1024 * 1024):
+def http(url, headers, limit=30 * 1024 * 1024, *, timeout=20):
+    deadline = time.monotonic() + timeout
     with urllib.request.build_opener(NoRedirect).open(
-            urllib.request.Request(url, headers=headers, method="GET"), timeout=20) as response:
-        require(response.status == 200, f"Expected HTTP 200, received HTTP {response.status}")
-        body = response.read(limit + 1)
-        require(len(body) <= limit, "HTTP response exceeds size limit")
-        return body
+            urllib.request.Request(url, headers=headers, method="GET"), timeout=timeout) as response:
+        if response.status != 200:
+            raise urllib.error.HTTPError(url, response.status, "Expected HTTP 200", None, None)
+        body = bytearray()
+        while True:
+            if time.monotonic() >= deadline:
+                raise TimeoutError("HTTP response deadline exceeded")
+            chunk = response.read1(min(65536, limit + 1 - len(body)))
+            if time.monotonic() >= deadline:
+                raise TimeoutError("HTTP response deadline exceeded")
+            if not chunk:
+                return bytes(body)
+            body.extend(chunk)
+            require(len(body) <= limit, "HTTP response exceeds size limit")
+
+
+class CloudflareUnavailable(ValueError):
+    """A read-only Cloudflare API request may succeed on retry."""
 
 
 def cf(path=""):
@@ -289,7 +304,8 @@ def cf(path=""):
     try:
         data = json.loads(http(endpoint + path, {"Authorization": f"Bearer {token}"}))
     except urllib.error.HTTPError as exc:
-        raise ValueError(f"Cloudflare API returned HTTP {exc.code}") from None
+        error = CloudflareUnavailable if exc.code in {408, 429} or 500 <= exc.code <= 599 else ValueError
+        raise error(f"Cloudflare API returned HTTP {exc.code}") from None
     require(data.get("success") is True, "Cloudflare API did not report success")
     return data["result"]
 
@@ -349,20 +365,161 @@ def verify_preview(preview, manifest):
             "Preview deployment identity mismatch")
 
 
+VERIFY_DELAYS = (0, 5, 10, 20, 30, 60)
+VERIFY_BUDGET = 180
+ASSET_TIMEOUT = 10
+
+
+def asset_url(url, name, sha256):
+    route = "" if name == "index.html" else name
+    if route.endswith("/index.html"):
+        route = route[:-len("index.html")]
+    elif route.endswith(".html"):
+        route = route[:-5]
+    return url + urllib.parse.quote(route, safe="/") + "?g19=" + sha256[:16]
+
+
+ASSET_HEADERS = {"Accept-Encoding": "identity", "Cache-Control": "no-cache",
+                 "User-Agent": PAGES_USER_AGENT}
+
+
 def check_served(url, files):
+    """One strict pass for callers that do not have a deployment identity."""
     def check(item):
         name, expected = item
-        route = "" if name == "index.html" else name
-        if route.endswith("/index.html"):
-            route = route[:-len("index.html")]
-        elif route.endswith(".html"):
-            route = route[:-5]
-        target = url + urllib.parse.quote(route, safe="/") + "?g19=" + digest(expected)[:16]
-        actual = http(target, {"Accept-Encoding": "identity", "Cache-Control": "no-cache",
-                               "User-Agent": PAGES_USER_AGENT})
-        require(digest(actual) == digest(expected), f"Published bytes differ for {name}")
+        sha256 = digest(expected)
+        try:
+            actual = http(asset_url(url, name, sha256), ASSET_HEADERS)
+        except urllib.error.HTTPError as error:
+            raise ValueError(f"Expected HTTP 200, received HTTP {error.code}") from None
+        require(digest(actual) == sha256, f"Published bytes differ for {name}")
     with ThreadPoolExecutor(max_workers=8) as pool:
         list(pool.map(check, files.items()))
+
+
+def inspect_asset(url, item, deadline):
+    name, expected = item
+    row = {"path": name, "expected_sha256": expected, "actual_sha256": None,
+           "http_status": None, "error": None, "matched": False, "retryable": True}
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        return dict(row, error="budget_exhausted")
+    try:
+        actual = http(asset_url(url, name, expected), ASSET_HEADERS,
+                      timeout=min(ASSET_TIMEOUT, remaining))
+    except urllib.error.HTTPError as error:
+        return dict(row, http_status=error.code, error="unexpected_http_status",
+                    retryable=error.code in {404, 408, 425, 429} or 500 <= error.code <= 599)
+    except OSError as error:
+        # Exception messages can contain URLs, proxy details or credential material.
+        return dict(row, error="timeout" if isinstance(error, TimeoutError)
+                    or isinstance(getattr(error, "reason", None), TimeoutError)
+                    else type(error).__name__)
+    except ValueError:
+        return dict(row, http_status=200, error="invalid_response", retryable=False)
+    actual_sha256 = digest(actual)
+    matched = actual_sha256 == expected
+    return dict(row, http_status=200, actual_sha256=actual_sha256, matched=matched,
+                error=None if matched else "sha256_mismatch")
+
+
+def utc_now():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def verify_publication(url, files, expected_id, current_id, report_path, *,
+                       delays=VERIFY_DELAYS, budget=VERIFY_BUDGET):
+    """Verify a complete pass bracketed by read-only deployment identity checks."""
+    started = time.monotonic()
+    deadline = started + budget
+    hashes = {name: digest(body) for name, body in files.items()}
+    report = {"expected_deployment_id": expected_id, "expected_files": len(hashes),
+              "budget_seconds": budget, "request_timeout_seconds": ASSET_TIMEOUT,
+              "started_at": utc_now(), "attempts": [], "result": "failed"}
+    try:
+        require(hashes, "No manifest files to verify")
+        write_json(report_path, report)
+        for number, delay in enumerate(delays, 1):
+            if time.monotonic() + delay >= deadline:
+                report["result"] = "budget_exhausted"
+                break
+            if delay:
+                time.sleep(delay)
+            attempt = {"number": number, "started_at": utc_now(),
+                       "expected_deployment_id": expected_id,
+                       "deployment_before": None, "deployment_after": None,
+                       "checked_files": 0, "matched_files": 0, "unmatched_paths": [],
+                       "files": [], "result": "failed"}
+            report["attempts"].append(attempt)
+            try:
+                attempt["deployment_before"] = current_id()
+                if attempt["deployment_before"] != expected_id:
+                    attempt["result"] = "deployment_changed"
+                    break
+                if time.monotonic() >= deadline:
+                    attempt["result"] = "budget_exhausted"
+                    break
+                with ThreadPoolExecutor(max_workers=8) as pool:
+                    attempt["files"] = list(pool.map(
+                        lambda item: inspect_asset(url, item, deadline), hashes.items()))
+                attempt["checked_files"] = sum(row["error"] != "budget_exhausted"
+                                               for row in attempt["files"])
+                attempt["matched_files"] = sum(row["matched"] for row in attempt["files"])
+                attempt["unmatched_paths"] = [row["path"] for row in attempt["files"]
+                                              if not row["matched"]]
+                if time.monotonic() >= deadline:
+                    attempt["result"] = "budget_exhausted"
+                    break
+                attempt["deployment_after"] = current_id()
+                if attempt["deployment_after"] != expected_id:
+                    attempt["result"] = "deployment_changed"
+                    break
+                if time.monotonic() >= deadline:
+                    attempt["result"] = "budget_exhausted"
+                    break
+                if attempt["matched_files"] == len(hashes):
+                    attempt["result"] = report["result"] = "passed"
+                    return
+                if any(not row["retryable"] for row in attempt["files"]):
+                    attempt["result"] = "non_retryable_file_error"
+                    break
+                attempt["result"] = "retryable_file_error"
+            except (OSError, CloudflareUnavailable) as error:
+                attempt["error"] = type(error).__name__
+                if time.monotonic() >= deadline:
+                    attempt["result"] = "budget_exhausted"
+                    break
+                attempt["result"] = "identity_network_error"
+            except Exception as error:
+                attempt["result"] = "identity_or_verifier_error"
+                attempt["error"] = type(error).__name__
+                raise ValueError("Deployment identity or verification failed") from None
+            finally:
+                attempt["finished_at"] = utc_now()
+                if attempt["result"] in {"deployment_changed", "budget_exhausted",
+                                         "non_retryable_file_error", "identity_or_verifier_error"}:
+                    report["result"] = attempt["result"]
+                write_json(report_path, report)
+        if report["result"] == "failed":
+            report["result"] = "attempts_exhausted"
+        raise ValueError("Published file verification failed: " + report["result"])
+    finally:
+        report["finished_at"] = utc_now()
+        write_json(report_path, report)
+
+
+def verify_release_assets(released, files, baseline, *, environment, manifest):
+    def current_id():
+        current = snapshot()
+        require(current["config_sha256"] == baseline["config_sha256"], "Pages configuration changed")
+        if environment == "preview":
+            stable(current, baseline)
+            verify_preview(released, manifest)
+            return released["id"]
+        return current["production_id"]
+
+    verify_publication(released["url"], files, released["id"], current_id,
+                       Path("stage-record/published-verification.json"))
 
 
 def deploy(root, files, manifest, branch, environment, record):
@@ -439,6 +596,8 @@ def execute(version, stage, manifest, root):
             record["preview"] = deploy(root, files, manifest, "g19-" + version, "preview", record)
             save(record)
             stable(snapshot(), baseline)
+            verify_release_assets(record["preview"], files, baseline,
+                                  environment="preview", manifest=manifest)
         else:
             preview = previous(version, "preview", root / "preview")
             require(preview["baseline"] == baseline, "Preview baseline differs from API Check")
@@ -451,7 +610,8 @@ def execute(version, stage, manifest, root):
                         "artifact_sha256": build["artifact_sha256"]}
             record.update(build=build, preview=preview["preview"], identity=identity)
             if stage == "functional":
-                check_served(preview["preview"]["url"], files)
+                verify_release_assets(preview["preview"], files, baseline,
+                                      environment="preview", manifest=manifest)
                 record.update(automatic={"published_assets_sha256": "passed"},
                               manual=dict.fromkeys(CHECKS, "passed"))
             else:
@@ -473,7 +633,8 @@ def execute(version, stage, manifest, root):
                             "Production record does not match live deployment")
                     record["production"] = production["production"]
                     record["manual_post"] = dict.fromkeys(POST_CHECKS, "passed")
-                check_served(record["production"]["url"], files)
+                verify_release_assets(record["production"], files, baseline,
+                                      environment="production", manifest=manifest)
                 deployment(baseline["production_id"], "production")
                 verified = snapshot()
                 stable(verified, baseline, new_production=True)

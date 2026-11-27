@@ -68,7 +68,7 @@ class ReleaseTests(unittest.TestCase):
         self.fetch = Mock()
         for name, value in {"snapshot": self.snapshot, "previous": lambda _, s, __: self.prior[s],
                             "deployment": self.preview, "download": self.fetch, "deploy": self.publisher,
-                            "save": Mock(), "check_served": Mock()}.items():
+                            "save": Mock(), "verify_release_assets": Mock()}.items():
             stub = patch.object(r, name, value)
             stub.start()
             self.addCleanup(stub.stop)
@@ -177,7 +177,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_functional_verifies_the_preview_artifact_without_upload(self):
         r.execute(VERSION, "functional", MANIFEST, self.root)
-        r.check_served.assert_called_once_with(STAGED["url"], FILES)
+        r.verify_release_assets.assert_called_once_with(STAGED, FILES, SNAPSHOT, environment="preview", manifest=MANIFEST)
         self.publisher.assert_not_called()
 
     def test_post_verifies_the_active_artifact_without_upload(self):
@@ -186,7 +186,7 @@ class ReleaseTests(unittest.TestCase):
                                     "baseline": SNAPSHOT, "production": production}
         self.snapshot.side_effect = [SNAPSHOT | {"production_id": NEW}] * 2
         r.execute(VERSION, "post", MANIFEST, self.root)
-        r.check_served.assert_called_once_with(production["url"], FILES)
+        r.verify_release_assets.assert_called_once_with(production, FILES, SNAPSHOT, environment="production", manifest=MANIFEST)
         self.publisher.assert_not_called()
 
     def test_recreated_tag_or_concurrent_duplicate_rejected(self):

@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "fa8d925eeca3e8c0eeddce78096048c3b0eb6919799f4a3f7cf7f8a7f659f913",
+  "artifact_sha256": "fad8ebc2b62a09873c2cc6196a2988486c8021bcda59e18bd2cc4f51496d628b",
   "file_count": 68,
   "files": {
     "administracja/admin.js": "1a1702443cc30c69af75700c98bed18b6c9280cca1f204ba3cf4973cf76c4db9",
@@ -8,7 +8,7 @@
     "announcements.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
     "dyskusje/config.js": "48744d15620966d3dce0dfdf3fc7f3f16df66df612f398b3db806743e9780909",
     "dyskusje/dyskusje.css": "f335de3e149213e83414d08d683410316db096a9476b84b769e75b41f0e835ea",
-    "dyskusje/dyskusje.js": "af9c40811484f097a23e7532afeb1649466ab5963c0824a552cc237429566553",
+    "dyskusje/dyskusje.js": "cecf8341ac2ca2c9431f3214f6edc7079d5498def495862999a963dd9e6df6a1",
     "dyskusje/notifications.js": "891f1771d724ea7a1795b981d824bff9dd03f14d04c23df38ea964d7203ef4b4",
     "dyskusje/private-chat.js": "51157acae3636eeb35f2068ec136a28dd3f474abe9b1cb8bdb4098a77d0c9930",
     "dyskusje/ui-components.js": "fdc00900d9ccbe9c67b4580beaa9c326a286e12febd0db19c3ff8de913574428",
@@ -16,7 +16,7 @@
     "icon-192.png": "a13b1fc18e47b741f3af64e6c8d499f7f245804a3583c399392f5799b70911c3",
     "icon-512.png": "880ddf1bbfaa76c6575c619092ffa71df55dd995aa45aa646262cb271061d37a",
     "icon-maskable-512.png": "5059723321e79dbb347bcd5e73cc5ce8a18a2b96ada757638d8bd2346b8d3b0e",
-    "index.html": "f79035593a801ebd38f773c56b015c930cfe221d3983a8649c102e4aca23bc9b",
+    "index.html": "7af5c3b1a6fe193b1600864b44bbb86d8ceb32ab09897df4c660ebe34fbdbde3",
     "kalendarz/kalendarz.css": "f1f22f20cf6a938c6be255e43c12178c419622d510b63990e62c275b265560d6",
     "kalendarz/kalendarz.js": "56e4aef1b99473976eaae6469396520b05d1f7e9e51989ba019328c23a35edd1",
     "manifest.webmanifest": "b90ae16b00cf978931150a2880eea1c51924c4716ad7853904bd00cb60aa1c50",
@@ -69,7 +69,7 @@
     "poradnik/poradnik.css": "a4b70e03f455c091314d1a236c54c266f1c3c2fe565d3f52a4b4f79fbeb110be",
     "poradnik/poradnik.js": "9dc4152fbee343f99c17f3c27f1fce2035d387084e0a679792756adb60af3efd",
     "pwa-install.js": "5017a422aa5a056ee72abbcabc5b2d9377d13e152d2644f481194b1700b773cb",
-    "sw.js": "9c6a42affe8af17212d8cc0a579ce5dfe82974e62ef747059634f2a4aca262bd"
+    "sw.js": "c1f6228826a9c926dc136e4b20c502b99e436b1ce83396ca45c47f551f6bb1e6"
   },
-  "source_sha": "884b9bb3442b797ae0e5fd5f5af7f1f5b3f4df11"
+  "source_sha": "f64b17faf04aad6149fc924286890582e4f4fe0a"
 }

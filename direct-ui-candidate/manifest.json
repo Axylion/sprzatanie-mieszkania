@@ -1,10 +1,10 @@
 {
   "build_command": "bash scripts/build-pages-ui8.sh",
   "expected_file_count": 68,
-  "name": "Goleszan 19 UI10-r5 announcement badge",
+  "name": "Goleszan 19 UI10-r5 onboarding registration state",
   "output_directory": "dist",
-  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-badge",
-  "source_sha": "884b9bb3442b797ae0e5fd5f5af7f1f5b3f4df11",
+  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-guide-state",
+  "source_sha": "f64b17faf04aad6149fc924286890582e4f4fe0a",
   "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co",
-  "version": "f1-ui10-r5-badge"
+  "version": "f1-ui10-r5-guide-state"
 }

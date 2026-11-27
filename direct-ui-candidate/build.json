@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "b7626bb6361652aa8d5f23e83d902b637b099cf5e86256c019dc8905bee1c8c1",
+  "artifact_sha256": "7b579794892c454e0c9efb3d4f4f0b7f4c2e0777a8b536470589ca17ea78facc",
   "file_count": 68,
   "files": {
     "administracja/admin.js": "50cd5c9c62da3d4989f15dcdc011918cfc9085f59a72155a1c988cfb01dce1eb",
@@ -16,7 +16,7 @@
     "icon-192.png": "a13b1fc18e47b741f3af64e6c8d499f7f245804a3583c399392f5799b70911c3",
     "icon-512.png": "880ddf1bbfaa76c6575c619092ffa71df55dd995aa45aa646262cb271061d37a",
     "icon-maskable-512.png": "5059723321e79dbb347bcd5e73cc5ce8a18a2b96ada757638d8bd2346b8d3b0e",
-    "index.html": "cbd3f2108596c12c1e76658a23fa668b3a91fc4976325c6d8c177b886396b481",
+    "index.html": "31d7504502b15e8a2de9f0661fd84395855acd56e8cb4660d7578a3f2a607526",
     "kalendarz/kalendarz.css": "f1f22f20cf6a938c6be255e43c12178c419622d510b63990e62c275b265560d6",
     "kalendarz/kalendarz.js": "56e4aef1b99473976eaae6469396520b05d1f7e9e51989ba019328c23a35edd1",
     "manifest.webmanifest": "b90ae16b00cf978931150a2880eea1c51924c4716ad7853904bd00cb60aa1c50",
@@ -66,10 +66,10 @@
     "poradnik/media/zlewozmywak-7.webp": "92d698e64c39469a3c09ad92b5bca1aac68e4b1584129e07189c925870b327dd",
     "poradnik/media/zlewozmywak-ikony-light.webp": "9fa209dd362283060d8a645928ff766ec799e1127649103d63836a1acd383a37",
     "poradnik/media/zlewozmywak-ikony.webp": "74e2d7b6a89ce06252d076ac9ae7f76c12d66d02023409986559205b3af71f1a",
-    "poradnik/poradnik.css": "9793404be0123f49d5fe791d4aee1b60c41007ef175695c514621d563cb4a368",
-    "poradnik/poradnik.js": "aee7cb865b2796b1e4ad7eea40442195b654c6a9b6dade3d23155be5fa3e80b7",
+    "poradnik/poradnik.css": "a4b70e03f455c091314d1a236c54c266f1c3c2fe565d3f52a4b4f79fbeb110be",
+    "poradnik/poradnik.js": "9dc4152fbee343f99c17f3c27f1fce2035d387084e0a679792756adb60af3efd",
     "pwa-install.js": "5017a422aa5a056ee72abbcabc5b2d9377d13e152d2644f481194b1700b773cb",
-    "sw.js": "6c81002ef31ef30c8ab0ecc2353df7153091922ba99d89b23983ceb4e5de4104"
+    "sw.js": "fe07b9ff8d0025a7ce7366507af138ebe8a563801c0eb42b8966c6b937ae92a0"
   },
-  "source_sha": "c1189eea78e1004a04042ce8afcc03fc64402f7a"
+  "source_sha": "c27cfd744a16b2a2d1db8b19b3409dfbf8ac90cb"
 }

@@ -5,9 +5,9 @@ import tempfile
 
 import release as release
 
-SOURCE = "c1189eea78e1004a04042ce8afcc03fc64402f7a"
-ARCHIVE = "b7626bb6361652aa8d5f23e83d902b637b099cf5e86256c019dc8905bee1c8c1"
-ACTIVE = "54881237-e449-45d1-880d-12573be180ad"
+SOURCE = "c27cfd744a16b2a2d1db8b19b3409dfbf8ac90cb"
+ARCHIVE = "7b579794892c454e0c9efb3d4f4f0b7f4c2e0777a8b536470589ca17ea78facc"
+ACTIVE = "d2268aba-1ef2-496b-94f2-10c084c32544"
 UI8 = "c4bcf201-9463-4f6a-94f3-f80a0462ce43"
 URL = "https://goleszan-19-preview.pages.dev/"
 MANIFEST = release.read_json(Path("direct-ui-candidate/manifest.json"))
@@ -22,7 +22,7 @@ def artifact():
 
 
 def main():
-    release.require(os.environ["GITHUB_REF"] == "refs/tags/g19-direct-test-ui-c1189ee",
+    release.require(os.environ["GITHUB_REF"] == "refs/tags/g19-direct-test-ui-c27cfd7",
                     "Unexpected release ref")
     files = artifact()
     baseline = release.snapshot()

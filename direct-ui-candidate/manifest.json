@@ -1,10 +1,10 @@
 {
-  "name": "Goleszan 19 F1 UI10-r5 geometry",
-  "version": "f1-ui10-r5-geometry",
-  "source_sha": "c1189eea78e1004a04042ce8afcc03fc64402f7a",
+  "name": "Goleszan 19 Poradnik transparent icons",
+  "version": "f1-ui10-r5-guide",
+  "source_sha": "c27cfd744a16b2a2d1db8b19b3409dfbf8ac90cb",
   "build_command": "bash scripts/build-pages-ui8.sh",
   "output_directory": "dist",
   "expected_file_count": 68,
-  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-geometry",
+  "service_worker_version": "goleszan19-shell-v13-11-0-f1-ui10-r5-guide",
   "supabase_url": "https://pbsubdmuupwmtgzncxmh.supabase.co"
 }

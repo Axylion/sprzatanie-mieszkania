@@ -1,14 +1,14 @@
 {
-  "artifact_sha256": "7b579794892c454e0c9efb3d4f4f0b7f4c2e0777a8b536470589ca17ea78facc",
+  "artifact_sha256": "0286028e8a51807e12cc4e05d1c7259258d71dfb942aa40529559585d68e7bb7",
   "file_count": 68,
   "files": {
-    "administracja/admin.js": "50cd5c9c62da3d4989f15dcdc011918cfc9085f59a72155a1c988cfb01dce1eb",
+    "administracja/admin.js": "1a1702443cc30c69af75700c98bed18b6c9280cca1f204ba3cf4973cf76c4db9",
     "administracja/announcements.js": "26b8b64167fd0f5c7201d24866c9d278f7a68c98bb5cfad87b08072260cdcbed",
     "administracja/dyzury.js": "3563c34daf2fb1bf3e878caf9aeb5146f1a3b83197927fc90dcedc70e9998873",
     "announcements.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
     "dyskusje/config.js": "48744d15620966d3dce0dfdf3fc7f3f16df66df612f398b3db806743e9780909",
-    "dyskusje/dyskusje.css": "000f6a6189b22432a8daf99fcf264001f01ce77a574bb99001c720e8c454724c",
-    "dyskusje/dyskusje.js": "f91acf3e0000dc00f7b6bbe8008f8afda085c7f23d6c867b423c4a8c4590b5fa",
+    "dyskusje/dyskusje.css": "1ce328329657b5977e3d3f0a9eaf0720ede8c27672f2de18c8870d333cf1f229",
+    "dyskusje/dyskusje.js": "55e27648823cadfd0633090751d0a8517153283c59ac9f504a6368087acc3447",
     "dyskusje/notifications.js": "891f1771d724ea7a1795b981d824bff9dd03f14d04c23df38ea964d7203ef4b4",
     "dyskusje/private-chat.js": "4e224612cd119ea7d0118b78e042ac6e7588cb3398d474cf2ffaaad7439b28e6",
     "dyskusje/ui-components.js": "bb1de2fbfccba4bfd2715e3ed4400ea26875a795e4ac10a1bb13012f097a623a",
@@ -16,7 +16,7 @@
     "icon-192.png": "a13b1fc18e47b741f3af64e6c8d499f7f245804a3583c399392f5799b70911c3",
     "icon-512.png": "880ddf1bbfaa76c6575c619092ffa71df55dd995aa45aa646262cb271061d37a",
     "icon-maskable-512.png": "5059723321e79dbb347bcd5e73cc5ce8a18a2b96ada757638d8bd2346b8d3b0e",
-    "index.html": "31d7504502b15e8a2de9f0661fd84395855acd56e8cb4660d7578a3f2a607526",
+    "index.html": "c236e60b2111838025b45dc1b218b33e334fea2999b9b6c901448d32a6dd3464",
     "kalendarz/kalendarz.css": "f1f22f20cf6a938c6be255e43c12178c419622d510b63990e62c275b265560d6",
     "kalendarz/kalendarz.js": "56e4aef1b99473976eaae6469396520b05d1f7e9e51989ba019328c23a35edd1",
     "manifest.webmanifest": "b90ae16b00cf978931150a2880eea1c51924c4716ad7853904bd00cb60aa1c50",
@@ -69,7 +69,7 @@
     "poradnik/poradnik.css": "a4b70e03f455c091314d1a236c54c266f1c3c2fe565d3f52a4b4f79fbeb110be",
     "poradnik/poradnik.js": "9dc4152fbee343f99c17f3c27f1fce2035d387084e0a679792756adb60af3efd",
     "pwa-install.js": "5017a422aa5a056ee72abbcabc5b2d9377d13e152d2644f481194b1700b773cb",
-    "sw.js": "fe07b9ff8d0025a7ce7366507af138ebe8a563801c0eb42b8966c6b937ae92a0"
+    "sw.js": "506dd5f9c2f9e142457acc2d077db291c7406ce13d0f2975789385f75db222b4"
   },
-  "source_sha": "c27cfd744a16b2a2d1db8b19b3409dfbf8ac90cb"
+  "source_sha": "b224f45dc196a6bb2d0647225d9a80ac02bedef7"
 }
